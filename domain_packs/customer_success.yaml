@@ -241,6 +241,54 @@ retrieval_sources:
     label: "Internal Customer Success playbook library"
     source_type: knowledge_base
 
+# Declarative guardrail layer. The policy engine evaluates every recommendation
+# against these rules and renders the result as pass/fail/warn gates. Rules are
+# data, not code: a new guardrail is a few lines here. See app/policy/rules.py
+# for the supported rule types and condition specs.
+policies:
+  - id: discount_cap_15
+    description: "Retention discounts above 15% require deal-desk approval."
+    type: discount_cap
+    condition:
+      max_pct: 15
+    severity: high
+    requires_approval: true
+  - id: exec_escalation_signoff
+    description: "Executive escalations require Customer Success manager sign-off."
+    type: action_requires_approval
+    condition:
+      actions: [open_executive_escalation]
+    severity: high
+    requires_approval: true
+  - id: outreach_cooldown
+    description: "No new customer outreach within 7 days of the last touch."
+    type: cooldown_window
+    condition:
+      min_days: 7
+      applies_to_actions:
+        - schedule_executive_business_review
+        - launch_adoption_campaign
+        - open_executive_escalation
+    severity: medium
+    requires_approval: false
+  - id: low_confidence_review
+    description: "Recommendations below 60% confidence need human review."
+    type: confidence_floor
+    condition:
+      min: 0.6
+    severity: medium
+    requires_approval: true
+  - id: high_value_account_review
+    description: "High-ARR accounts (at or above $250k) get an extra review touch."
+    type: field_threshold
+    condition:
+      field: account.arr
+      op: gte
+      value: 250000
+      on_violation: warn
+    severity: low
+    requires_approval: false
+
 planner_prompt: |
   You are a Customer Success decision planner. Your job is to turn account
   signals into a single, explainable Next Best Action that protects recurring

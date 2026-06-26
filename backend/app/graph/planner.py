@@ -4,7 +4,8 @@ A real, end to end multi node flow driven by the domain pack and the agent
 registry:
 
     planner -> retrieval -> risk_scorer -> play_recommender ->
-    outcome_simulator -> drafter -> critic -> hitl_gate -> commit -> END
+    outcome_simulator -> drafter -> critic -> policy_gate -> hitl_gate ->
+    commit -> END
 
 The planner reads the domain pack's ``planner_prompt`` and ``decision_points``
 to classify the signal and select which specialists to run. Specialist nodes are
@@ -26,6 +27,9 @@ from app.deps import get_llm
 from app.packs.loader import load_pack
 from app.packs.registry import AGENTS
 from app.graph.state import RunState
+from app.policy.engine import evaluate as evaluate_policy
+from app.policy.engine import evaluation_summary
+from app.policy.rules import load_policies
 
 # The ordered specialist pipeline. Critic always runs; the others are gated by
 # the planner's capability selection.
@@ -169,6 +173,80 @@ async def critic_node(state: RunState) -> Dict[str, Any]:
     return await card.node(dict(state))
 
 
+def _account_context(state: RunState) -> Dict[str, Any]:
+    """Assemble a best-effort account dict for policy evaluation.
+
+    Prefers the accounts seed (so account-scoped rules have data) and always
+    falls back to the minimal identity from state, so evaluation works offline
+    and never raises.
+    """
+
+    account_id = state.get("account_id", "")
+    domain = state.get("domain", "customer_success")
+    base: Dict[str, Any] = {"account_id": account_id, "domain": domain}
+    try:
+        from app.api.accounts import _BY_ID  # type: ignore
+
+        account = _BY_ID.get(account_id)
+        if account:
+            return {**account, "domain": account.get("domain", domain)}
+    except Exception:  # noqa: BLE001 - accounts slice is optional
+        pass
+    return base
+
+
+async def policy_gate_node(state: RunState) -> Dict[str, Any]:
+    """Evaluate the recommendation against the domain's declarative policies.
+
+    Runs the pure, offline policy engine, attaches the gate results to the
+    recommendation under ``recommendation['policy']`` (and to the trace), and
+    forces human review when any failing gate requires approval. Existing critic
+    fields are preserved; only ``requires_hitl`` is escalated, never relaxed.
+    """
+
+    domain = state.get("domain", "customer_success")
+    recommendation = dict(state.get("recommendation") or {})
+
+    rules = load_policies(domain)
+    account = _account_context(state)
+    results = evaluate_policy(recommendation, account, rules)
+    summary = evaluation_summary(results)
+
+    # Make the guardrail layer visible on the recommendation itself.
+    recommendation["policy"] = results
+
+    # Escalate to human review when a failing gate demands approval. Never
+    # downgrade an existing critic requirement.
+    critic = dict(state.get("critic") or {})
+    forced = bool(summary.get("requires_approval"))
+    critic["requires_hitl"] = bool(critic.get("requires_hitl")) or forced
+    critic["policy_summary"] = summary
+
+    if forced:
+        gist = "Policy gate requires approval"
+    elif summary.get("warned"):
+        gist = "Policy gate passed with warnings"
+    else:
+        gist = "Policy gate cleared"
+    detail = (
+        f"{gist}: {summary['passed']} pass, {summary['warned']} warn, "
+        f"{summary['failed']} fail of {summary['total']}."
+    )
+
+    return {
+        "recommendation": recommendation,
+        "critic": critic,
+        "messages": [{"role": "policy_gate", "content": detail}],
+        "steps": [
+            make_step(
+                "policy_gate",
+                detail,
+                {"results": results, "summary": summary},
+            )
+        ],
+    }
+
+
 async def hitl_gate_node(state: RunState) -> Dict[str, Any]:
     """Record whether the recommendation routes to a human.
 
@@ -236,11 +314,12 @@ def build_graph(checkpointer: Any):
     for capability in _PIPELINE:
         graph.add_node(capability, _make_specialist_node(capability))
     graph.add_node("critic", critic_node)
+    graph.add_node("policy_gate", policy_gate_node)
     graph.add_node("hitl_gate", hitl_gate_node)
     graph.add_node("commit", commit_node)
 
     graph.add_edge(START, "planner")
-    ordered = ["planner", *_PIPELINE, "critic", "hitl_gate", "commit"]
+    ordered = ["planner", *_PIPELINE, "critic", "policy_gate", "hitl_gate", "commit"]
     for src, dst in zip(ordered, ordered[1:]):
         graph.add_edge(src, dst)
     graph.add_edge("commit", END)

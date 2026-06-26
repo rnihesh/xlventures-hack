@@ -81,6 +81,35 @@ retrieval_sources:
     label: "Call notes and email summaries"
     source_type: crm_note
 
+# Declarative guardrail layer. Same schema as every other pack: the policy
+# engine evaluates each recommendation against these rules and surfaces the
+# result as pass/fail/warn gates in the UI.
+policies:
+  - id: discount_cap_20
+    description: "Proposal discounts above 20% require sales manager approval."
+    type: discount_cap
+    condition:
+      max_pct: 20
+    severity: high
+    requires_approval: true
+  - id: closing_proposal_signoff
+    description: "Sending a closing proposal requires manager sign-off."
+    type: action_requires_approval
+    condition:
+      actions: [send_proposal]
+    severity: high
+    requires_approval: true
+  - id: buyer_outreach_cooldown
+    description: "No buyer outreach within 5 days of the last contact."
+    type: cooldown_window
+    condition:
+      min_days: 5
+      applies_to_actions:
+        - re_engage_buyer
+        - send_proposal
+    severity: medium
+    requires_approval: false
+
 planner_prompt: |
   You are a SaaS Sales decision planner. Turn opportunity signals into a single,
   explainable Next Best Action that advances qualified pipeline.
