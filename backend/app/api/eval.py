@@ -16,20 +16,26 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
-from app.eval.runner import load_cached, run_all
+from app.api._org import current_org
+from app.eval.runner import eval_for_org, run_all
 
 router = APIRouter(tags=["eval"])
 
 
 @router.get("/eval")
-async def get_eval(refresh: bool = Query(False, description="Force a fresh run")) -> Dict[str, Any]:
-    """Return suites + outcomes, from cache when available unless refresh=true."""
+async def get_eval(
+    refresh: bool = Query(False, description="Re-run the golden suites (slow, uses the LLM)"),
+    org_id: str = Depends(current_org),
+) -> Dict[str, Any]:
+    """Return the engine suites + the requesting org's outcomes.
 
-    if not refresh:
-        cached = load_cached()
-        if cached is not None:
-            return cached
+    Fast by default: serves cached golden-suite scores (global engine quality)
+    and computes only the cheap, org-scoped outcomes, so a dashboard load never
+    runs the LLM and never hangs. ``?refresh=true`` re-runs the golden cases.
+    """
 
-    return await run_all()
+    if refresh:
+        return await run_all(org_id)
+    return await eval_for_org(org_id)

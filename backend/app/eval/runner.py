@@ -20,6 +20,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
+from app.api._org import DEMO_ORG
 from app.eval import component, outcome, scenario
 
 CACHE_PATH = os.path.join(os.path.dirname(__file__), "_last_run.json")
@@ -36,8 +37,14 @@ def _slim_suite(suite: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-async def run_all() -> Dict[str, Any]:
-    """Run all suites against one shared set of golden-case records."""
+async def run_all(org_id: str = DEMO_ORG) -> Dict[str, Any]:
+    """Run all suites against one shared set of golden-case records.
+
+    The golden-case SUITES (grounding, faithfulness, action match, trajectory)
+    are platform engine-quality metrics and stay global. The OUTCOMES block is
+    org-scoped: ``org_id`` threads through to ``compute_outcomes`` so a new empty
+    org sees honest empty numbers, never another org's (or the seed) figures.
+    """
 
     cases = scenario.load_golden()
     records = await scenario.run_cases(cases)
@@ -49,7 +56,7 @@ async def run_all() -> Dict[str, Any]:
         scenario.score_trajectory(records),
     ]
 
-    outcome_suite, headline, breakdown = await outcome.compute_outcomes(records)
+    outcome_suite, headline, breakdown = await outcome.compute_outcomes(records, org_id)
     suites.append(outcome_suite)
 
     payload = {
@@ -62,6 +69,31 @@ async def run_all() -> Dict[str, Any]:
     }
     _write_cache(payload)
     return payload
+
+
+async def eval_for_org(org_id: str = DEMO_ORG) -> Dict[str, Any]:
+    """Fast path for GET /eval: serve the cached engine suites and compute only
+    the org-scoped OUTCOMES (cheap, no LLM). Never re-runs the golden cases on a
+    dashboard request, so the endpoint cannot hang. Run ``python -m
+    app.eval.runner`` (or refresh) to refresh the engine suites.
+    """
+
+    cache = load_cached() or {}
+    cached_suites = cache.get("suites", []) or []
+    # Drop the cached (stale, possibly other-org) outcome suite; recompute ours.
+    engine_suites = [s for s in cached_suites if s.get("metric") != "kpis_improved"]
+
+    outcome_suite, headline, breakdown = await outcome.compute_outcomes([], org_id)
+    suites = engine_suites + [_slim_suite(outcome_suite)]
+
+    return {
+        "suites": suites,
+        "outcomes": headline,
+        "breakdown": breakdown,
+        "engine": cache.get("engine", "cached"),
+        "case_count": cache.get("case_count", 0),
+        "generated_at": cache.get("generated_at"),
+    }
 
 
 def _write_cache(payload: Dict[str, Any]) -> None:

@@ -1,13 +1,22 @@
 """Learning loop API.
 
-``GET /learning`` exposes the memory's episodes, the overall acceptance rate,
-and a concrete before/after KPI delta computed from seeded + live outcomes. It
-is the evidence surface for the "memory + measurable learning" story:
+``GET /learning`` is the evidence surface for the "memory + measurable learning"
+story. Every number it returns is computed from REAL episodes recorded by the
+system (live runs plus human decisions through ``memory.record_outcome``):
 
-  * ``episodes``    - recent decision episodes with their human outcomes.
-  * ``accepted_rate`` - share of decided episodes that were accepted/edited.
-  * ``before_after`` - a single KPI (projected NRR) compared across the
-    pre-learning baseline and post-distillation phases on the same accounts.
+  * ``accepted_rate`` : approved-or-edited over total decided episodes.
+  * ``trend``         : the cumulative acceptance rate after each decision, in
+    chronological order, so the UI can plot acceptance over episode order from
+    real data instead of a synthetic curve.
+  * ``episodes``      : recent decision episodes with their human outcomes.
+  * ``before_after``  : projected NRR across the earliest decided episodes versus
+    the most recent ones, computed only from outcomes that carry a measured
+    ``nrr_projected`` metric. It is a clearly-labeled projection, not an actual.
+
+The loop starts EMPTY. With zero episodes the endpoint returns a clean,
+honest payload (zeros, empty lists, ``has_data: false``) and never invents a
+before/after history. Run ``make gen-runs`` (or approve/reject in the UI) to
+populate it from real outcomes.
 
 ``POST /learning/distill`` re-runs distillation on demand so a presenter can
 trigger the improvement live, and ``POST /learning/outcome`` lets the UI write
@@ -18,9 +27,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from app.api._org import DEMO_ORG, current_org
 from app.memory.distill import run_distillation
 from app.memory.store import get_memory
 from app.memory.types import ACCEPTED_LIKE
@@ -28,78 +38,165 @@ from app.memory.types import ACCEPTED_LIKE
 router = APIRouter(tags=["learning"])
 
 
-def _mean_nrr(episodes: List[Any], phase: str) -> Optional[float]:
-    """Mean projected NRR over episodes of a given phase that have a metric."""
-    values: List[float] = []
-    for ep in episodes:
-        if ep.phase != phase or ep.outcome is None:
-            continue
-        nrr = ep.outcome.metrics.get("nrr_projected")
-        if isinstance(nrr, (int, float)):
-            values.append(float(nrr))
-    if not values:
-        return None
-    return round(sum(values) / len(values), 1)
+def _for_org(episodes: List[Any], org_id: str) -> List[Any]:
+    """Episodes owned by ``org_id``.
+
+    Seeded day-zero episodes carry no ``org_id``; they belong to the Demo org,
+    so an unscoped episode is treated as the demo tenant's history. Every other
+    org sees only the episodes it produced.
+    """
+    return [ep for ep in episodes if (getattr(ep, "org_id", None) or DEMO_ORG) == org_id]
+
+_KPI = "Net Revenue Retention (projected %)"
+
+_EMPTY_NOTE = (
+    "No runs yet. Run 'make gen-runs' or approve/reject recommendations to start "
+    "the learning loop; the acceptance trend and projected NRR fill from real "
+    "outcomes."
+)
 
 
-def _accepted_rate(episodes: List[Any], phase: Optional[str] = None) -> tuple[int, int]:
-    """Return (accepted_like_count, decided_count), optionally scoped to a phase."""
-    accepted = 0
-    decided = 0
-    for ep in episodes:
-        if phase is not None and ep.phase != phase:
-            continue
-        if ep.outcome is None or ep.outcome.decision == "pending":
-            continue
-        decided += 1
-        if ep.outcome.decision in ACCEPTED_LIKE:
-            accepted += 1
-    return accepted, decided
+def _decided(episodes: List[Any]) -> List[Any]:
+    """Decided episodes (outcome present and not pending), oldest first."""
+    out = [
+        ep
+        for ep in episodes
+        if ep.outcome is not None and ep.outcome.decision != "pending"
+    ]
+    out.sort(key=lambda e: getattr(e, "created_at", "") or "")
+    return out
 
 
-def _build_before_after(episodes: List[Any]) -> Dict[str, Any]:
-    """Compute the headline KPI delta on the same accounts, before vs after."""
+def _mean(values: List[float]) -> float:
+    return round(sum(values) / len(values), 1) if values else 0.0
 
-    before = _mean_nrr(episodes, "baseline")
-    after = _mean_nrr(episodes, "learned")
 
-    # Fall back gracefully if either phase is missing (e.g. only live data).
-    if before is None:
-        before = 0.0
-    if after is None:
-        after = before
+def _counts(decided: List[Any]) -> Dict[str, int]:
+    """Tally decided outcomes by canonical verb."""
+    tally = {"accepted": 0, "edited": 0, "rejected": 0}
+    for ep in decided:
+        verb = ep.outcome.decision
+        if verb in tally:
+            tally[verb] += 1
+    accepted_like = tally["accepted"] + tally["edited"]
+    return {
+        "approved": tally["accepted"],
+        "edited": tally["edited"],
+        "rejected": tally["rejected"],
+        "accepted": accepted_like,
+        "decided": len(decided),
+    }
 
-    b_acc, b_dec = _accepted_rate(episodes, "baseline")
-    a_acc, a_dec = _accepted_rate(episodes, "learned")
-    before_rate = round(100 * b_acc / b_dec) if b_dec else 0
-    after_rate = round(100 * a_acc / a_dec) if a_dec else 0
 
+def _trend(decided: List[Any]) -> List[Dict[str, Any]]:
+    """Cumulative acceptance rate after each decision, in chronological order.
+
+    This is the real series the learning UI plots: it shows whether the team
+    accepts more of the system's recommendations as outcomes accrue, computed
+    purely from recorded decisions (no synthetic curve).
+    """
+    series: List[Dict[str, Any]] = []
+    running = 0
+    for i, ep in enumerate(decided, start=1):
+        is_accepted = ep.outcome.decision in ACCEPTED_LIKE
+        running += 1 if is_accepted else 0
+        series.append(
+            {
+                "index": i,
+                "account_id": ep.account_id,
+                "decision": ep.outcome.decision,
+                "accepted": is_accepted,
+                "rate": round(running / i, 3),
+            }
+        )
+    return series
+
+
+def _before_after(decided: List[Any]) -> Dict[str, Any]:
+    """Projected-NRR delta across the earliest versus most recent decisions.
+
+    Uses only outcomes that recorded a measured ``nrr_projected`` metric. With
+    fewer than two such outcomes it returns an honest empty state rather than a
+    fabricated number. The values are a labeled projection, never an actual.
+    """
+    sample = [
+        ep
+        for ep in decided
+        if isinstance(ep.outcome.metrics.get("nrr_projected"), (int, float))
+    ]
+    if len(sample) < 2:
+        return {
+            "kpi": _KPI,
+            "before": 0.0,
+            "after": 0.0,
+            "note": _EMPTY_NOTE,
+            "has_data": False,
+            "projected": True,
+        }
+
+    mid = max(1, len(sample) // 2)
+    early = [float(e.outcome.metrics["nrr_projected"]) for e in sample[:mid]]
+    recent = [float(e.outcome.metrics["nrr_projected"]) for e in sample[mid:]]
+    before = _mean(early)
+    after = _mean(recent)
     delta = round(after - before, 1)
     note = (
-        f"After distilling {b_dec} day-zero outcomes into preferences, "
-        f"acceptance on the same accounts rose from {before_rate}% to "
-        f"{after_rate}% and projected NRR improved by {delta:+.1f} points "
-        "(three accounts flipped from the wrong action to the action the team "
-        "actually wanted)."
+        f"Projected from {len(sample)} real outcomes: projected NRR moved "
+        f"{delta:+.1f} points from the earliest decisions to the most recent "
+        "(model projection, not an actual)."
     )
-
     return {
-        "kpi": "Net Revenue Retention (projected %)",
+        "kpi": _KPI,
         "before": before,
         "after": after,
         "note": note,
+        "has_data": True,
+        "projected": True,
+    }
+
+
+def _empty_payload(memory: Any) -> Dict[str, Any]:
+    return {
+        "episodes": [],
+        "accepted_rate": 0.0,
+        "decided": 0,
+        "accepted": 0,
+        "approved": 0,
+        "edited": 0,
+        "rejected": 0,
+        "total": 0,
+        "trend": [],
+        "before_after": {
+            "kpi": _KPI,
+            "before": 0.0,
+            "after": 0.0,
+            "note": _EMPTY_NOTE,
+            "has_data": False,
+            "projected": True,
+        },
+        "has_data": False,
+        "preferences_version": memory._pref_version,
     }
 
 
 @router.get("/learning")
-async def get_learning() -> Dict[str, Any]:
-    """Return episodes, acceptance rate, and a measurable before/after delta."""
+async def get_learning(org_id: str = Depends(current_org)) -> Dict[str, Any]:
+    """Return the org's episodes, acceptance rate, acceptance trend, and a delta."""
 
     memory = get_memory()
-    episodes = memory.all_episodes()
+    # Hydrate persisted episodes from Postgres (no-op offline) so the learning
+    # surface reflects real outcomes written by live runs and gen_runs.
+    await memory._ensure_db()
+    episodes = _for_org(memory.all_episodes(), org_id)
 
-    accepted, decided = _accepted_rate(episodes)
-    accepted_rate = round(accepted / decided, 3) if decided else 0.0
+    if not episodes:
+        return _empty_payload(memory)
+
+    decided = _decided(episodes)
+    counts = _counts(decided)
+    accepted_rate = (
+        round(counts["accepted"] / counts["decided"], 3) if counts["decided"] else 0.0
+    )
 
     # Most recent first for the timeline UI.
     public = [ep.public() for ep in episodes]
@@ -108,10 +205,16 @@ async def get_learning() -> Dict[str, Any]:
     return {
         "episodes": public,
         "accepted_rate": accepted_rate,
-        "before_after": _build_before_after(episodes),
+        "decided": counts["decided"],
+        "accepted": counts["accepted"],
+        "approved": counts["approved"],
+        "edited": counts["edited"],
+        "rejected": counts["rejected"],
+        "total": len(episodes),
+        "trend": _trend(decided),
+        "before_after": _before_after(decided),
+        "has_data": counts["decided"] > 0,
         "preferences_version": memory._pref_version,
-        "decided": decided,
-        "accepted": accepted,
     }
 
 
@@ -119,27 +222,36 @@ async def get_learning() -> Dict[str, Any]:
 async def trigger_distillation() -> Dict[str, Any]:
     """Re-run distillation on demand and return the updated summary."""
     memory = get_memory()
+    await memory._ensure_db()
     summary = run_distillation(memory)
     return {"status": "distilled", "summary": summary}
 
 
 class OutcomeIn(BaseModel):
     episode_id: str
-    decision: str = Field(..., description="approve | reject | edit (or accepted/rejected/edited)")
+    decision: str = Field(
+        ..., description="approve | reject | edit (or accepted/rejected/edited)"
+    )
     reason: Optional[str] = None
     metrics: Optional[Dict[str, Any]] = None
 
 
 @router.post("/learning/outcome")
-async def record_learning_outcome(body: OutcomeIn) -> Dict[str, Any]:
+async def record_learning_outcome(
+    body: OutcomeIn, org_id: str = Depends(current_org)
+) -> Dict[str, Any]:
     """Write an outcome back into memory so the learning metric moves live."""
     memory = get_memory()
+    await memory._ensure_db()
     await memory.record_outcome(
         body.episode_id, body.decision, body.reason, body.metrics
     )
-    accepted, decided = _accepted_rate(memory.all_episodes())
+    decided = _decided(_for_org(memory.all_episodes(), org_id))
+    counts = _counts(decided)
     return {
         "status": "recorded",
-        "accepted_rate": round(accepted / decided, 3) if decided else 0.0,
+        "accepted_rate": (
+            round(counts["accepted"] / counts["decided"], 3) if counts["decided"] else 0.0
+        ),
         "preferences_version": memory._pref_version,
     }
