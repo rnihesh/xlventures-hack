@@ -1,0 +1,212 @@
+[
+  {
+    "id": "DOC-1001-MN",
+    "account_id": "ACC-1001",
+    "source_type": "meeting_notes",
+    "title": "Northwind Logistics - Weekly CS Sync (2026-06-18)",
+    "text": "Attendees: Priya Nair (CSM), Northwind absent.\nFlag: Northwind did not join the scheduled sync for the second week in a row.\n\nUsage trend: Weekly active users fell from 96 to 59 over the last month, a 38% drop month over month against 120 licensed seats. The decline started right after their carrier API migration on May 28.\n\nRoot cause hypothesis: The TMS-to-platform integration began failing silently after Northwind's carrier changed its tracking API. Shipment sync jobs are erroring, so dispatchers stopped logging in.\n\nRelationship risk: Our champion, Ops Director Karim Haddad, left Northwind on June 5. No replacement sponsor has been identified. The remaining admin is a junior analyst with limited authority.\n\nRenewal context: Contract renews 2026-10-15 at 180k ARR. Health score dropped to 42 (high risk). Recommended next step is an executive re-engagement plus an integration fix sprint before usage erodes further."
+  },
+  {
+    "id": "DOC-1001-CT",
+    "account_id": "ACC-1001",
+    "source_type": "call_transcript",
+    "title": "Northwind Logistics - Support Bridge Call (2026-06-12)",
+    "text": "Analyst (Northwind): Honestly half my dispatch team gave up on the tool. The shipment statuses stopped updating about two weeks ago and nobody told us why.\n\nCSM (Priya): I'm sorry, that lines up with the carrier API change on May 28. Our sync jobs started failing right after.\n\nAnalyst: Right. And with Karim gone there's no one here pushing people to use it. I'm just keeping the lights on.\n\nCSM: Understood. If we fix the integration this week and I get 30 minutes with your VP of Operations, would that help rebuild momentum?\n\nAnalyst: It would have to. Otherwise people are exporting to spreadsheets again, which is exactly what we bought you to stop."
+  },
+  {
+    "id": "DOC-1001-ST",
+    "account_id": "ACC-1001",
+    "source_type": "support_tickets",
+    "title": "Northwind Logistics - Open Support Tickets",
+    "text": "Ticket NW-4471 (Priority: High, Status: Open). Title: Shipment sync jobs failing since May 28. Description: All scheduled TMS sync jobs return 502 from the carrier endpoint after Northwind switched carrier tracking providers. 4,200 shipments are stale. Engineering confirmed a connector mapping change is required.\n\nTicket NW-4480 (Priority: Medium, Status: Open). Title: Dispatchers cannot see live ETA. Description: Because syncs fail, ETA fields are blank. Workaround is manual CSV export. Customer frustration noted.\n\nTicket NW-4488 (Priority: Low, Status: Open). Title: Remove offboarded user Karim Haddad. Description: Champion departed; please revoke admin access and reassign ownership."
+  },
+  {
+    "id": "DOC-1001-CRM",
+    "account_id": "ACC-1001",
+    "source_type": "crm_notes",
+    "title": "Northwind Logistics - CRM Account Notes",
+    "text": "Stage: At-risk. Sentiment: Negative and trending down.\nKey contacts: Karim Haddad (Ops Director, CHAMPION - departed 2026-06-05); Lena Ortiz (Junior Ops Analyst, day-to-day admin, low authority); VP Operations seat currently vacant per LinkedIn.\nARR 180k, 120 seats, renewal 2026-10-15.\nLatest health drivers: login frequency -38% MoM, broken TMS integration, champion loss, no executive sponsor.\nOpen risk: If integration is not restored and a new sponsor secured within 30 days, forecast a downgrade or non-renewal. Save motion required."
+  },
+  {
+    "id": "DOC-1002-MN",
+    "account_id": "ACC-1002",
+    "source_type": "meeting_notes",
+    "title": "Helios Analytics - Quarterly Business Review (2026-06-10)",
+    "text": "Attendees: Marcus Lee (CSM), Helios VP Data (economic buyer), 2 team leads.\nHeadline: Helios has hit 95% seat utilization, 86 of 90 licensed seats active weekly. Three additional teams (Marketing Ops, Finance, and a new EU data team) are running unsanctioned pilots in shared workspaces.\n\nValue realized: Helios reports cutting dashboard build time by 60% and retiring two legacy BI tools. The VP called the platform standard tooling for analytics across the org.\n\nExpansion signals: They requested enterprise SSO and SCIM provisioning to onboard the new teams cleanly, asked about volume pricing above 150 seats, and confirmed FY budget is approved. NPS from the economic buyer is 9.\n\nNext step: Build a 60-seat expansion proposal with SSO/SCIM included and a volume discount tier. This is a textbook product-qualified expansion."
+  },
+  {
+    "id": "DOC-1002-CT",
+    "account_id": "ACC-1002",
+    "source_type": "call_transcript",
+    "title": "Helios Analytics - Expansion Discovery Call (2026-06-16)",
+    "text": "VP Data (Helios): We are basically out of seats. Marketing and Finance keep borrowing logins, which I know isn't ideal.\n\nCSM (Marcus): That's a great problem. We can formalize it. How many people across those teams?\n\nVP Data: Probably 45 to 60 once you add the new EU data group. And I'll need SSO and automated provisioning, I'm not adding 60 users by hand.\n\nCSM: Understood, SSO and SCIM come with the enterprise tier. If I bring a 60-seat proposal with volume pricing, is budget there for this fiscal year?\n\nVP Data: Budget's approved. Get me a number and I can move fast. We already consider you our standard."
+  },
+  {
+    "id": "DOC-1002-ST",
+    "account_id": "ACC-1002",
+    "source_type": "support_tickets",
+    "title": "Helios Analytics - Feature & Provisioning Requests",
+    "text": "Ticket HE-3310 (Priority: Medium, Status: Open). Title: Enable SCIM auto-provisioning. Description: Customer wants automated user provisioning/deprovisioning ahead of a 60-seat rollout. Requires enterprise plan.\n\nTicket HE-3315 (Priority: Low, Status: Open). Title: Increase concurrent query limit. Description: Heavy usage from power users occasionally hits the workspace query cap. Healthy signal of deep adoption.\n\nTicket HE-3320 (Priority: Low, Status: Resolved). Title: Add EU data residency workspace. Description: New EU team needs an EU-hosted workspace. Resolved with eu-west region enablement."
+  },
+  {
+    "id": "DOC-1002-CRM",
+    "account_id": "ACC-1002",
+    "source_type": "crm_notes",
+    "title": "Helios Analytics - CRM Account Notes",
+    "text": "Stage: Expansion. Sentiment: Very positive.\nKey contacts: VP Data (economic buyer, NPS 9, advocate); two team leads (power users).\nARR 240k, 90 seats, 95% utilization, renewal 2027-02-01.\nExpansion drivers: seat saturation (86/90 active), 3 teams piloting, SSO/SCIM requested, volume pricing inquiry, FY budget approved.\nOpportunity: 60-seat upsell on enterprise tier, est. +150k ARR. PQL criteria met. Also a strong reference/case-study candidate."
+  },
+  {
+    "id": "DOC-1003-MN",
+    "account_id": "ACC-1003",
+    "source_type": "meeting_notes",
+    "title": "Brightpath Education - Onboarding Checkpoint Day 45 (2026-06-15)",
+    "text": "Attendees: Dana Whitfield (CSM), Brightpath IT admin.\nStatus: Day 45 of onboarding. Only 2 of 7 onboarding milestones are complete. Target by day 45 is 5 of 7, so the account is behind plan.\n\nBlockers: SSO configuration has not been started; the IT admin has been pulled into semester-start systems work. Only 18 of 60 purchased seats are provisioned. The historical student data import is still pending because no one has exported the source files.\n\nEngagement: Two scheduled training sessions had no-shows. The executive sponsor (Director of Digital Learning) has been hard to reach during the back-to-school crunch.\n\nRisk: Time-to-value is slipping. If activation does not accelerate, first-value will land after the busy season, raising churn risk at the 2026-12-01 renewal. Recommend an onboarding rescue: assign an implementation specialist, set a 2-week milestone sprint, and secure 30 minutes with the sponsor."
+  },
+  {
+    "id": "DOC-1003-CT",
+    "account_id": "ACC-1003",
+    "source_type": "call_transcript",
+    "title": "Brightpath Education - Onboarding Call (2026-06-09)",
+    "text": "IT Admin (Brightpath): I want to get this live, I just have zero bandwidth. Semester systems come first this month.\n\nCSM (Dana): Totally fair. What if we take SSO and the data import off your plate? I can bring in an implementation specialist to do the heavy lifting.\n\nIT Admin: That would unblock me. The data export is the scary part, it's years of student records.\n\nCSM: We'll template it. Can you give us read access and 30 minutes with the Director of Digital Learning to confirm priorities?\n\nIT Admin: I can try. She's slammed, but if we show a quick win she'll pay attention."
+  },
+  {
+    "id": "DOC-1003-ST",
+    "account_id": "ACC-1003",
+    "source_type": "support_tickets",
+    "title": "Brightpath Education - Onboarding Tickets",
+    "text": "Ticket BP-2201 (Priority: Medium, Status: Open). Title: SSO not configured. Description: SAML setup not started; users are on manual passwords. Blocking bulk provisioning of remaining 42 seats.\n\nTicket BP-2205 (Priority: Medium, Status: Open). Title: Historical data import pending. Description: Customer has not provided source export of student records. Import templates shared; awaiting files.\n\nTicket BP-2208 (Priority: Low, Status: Open). Title: Reschedule training. Description: Two training sessions had no-shows. Requesting recorded async option plus one live session post-semester-start."
+  },
+  {
+    "id": "DOC-1003-CRM",
+    "account_id": "ACC-1003",
+    "source_type": "crm_notes",
+    "title": "Brightpath Education - CRM Account Notes",
+    "text": "Stage: Onboarding (stalled). Sentiment: Neutral, cooperative but capacity-constrained.\nKey contacts: Director of Digital Learning (sponsor, low availability); IT admin (willing but overloaded).\nARR 96k, 60 seats (18 provisioned), renewal 2026-12-01.\nStall drivers: 2 of 7 milestones at day 45, SSO unconfigured, data import pending, training no-shows, sponsor distracted by semester start.\nPlan: Onboarding acceleration play. Assign implementation specialist, 2-week milestone sprint, async training, sponsor checkpoint."
+  },
+  {
+    "id": "DOC-1004-MN",
+    "account_id": "ACC-1004",
+    "source_type": "meeting_notes",
+    "title": "Atlas Manufacturing - Renewal Strategy Sync (2026-06-14)",
+    "text": "Attendees: Sofia Romero (CSM), Atlas procurement lead.\nRenewal clock: Contract renews 2026-08-30, 65 days out, at 320k ARR across 200 seats.\n\nThreat: A newly hired VP of Operations is running a competitive evaluation against Forgeline and has asked procurement to benchmark pricing. Procurement is pushing for a 12% discount to renew.\n\nUsage reality: Product usage is actually solid, 180 of 200 seats active, strong shop-floor adoption. The risk is relationship and economics, not value. We have missed the last two Quarterly Business Reviews, so the new VP has no view of the ROI we deliver.\n\nStrategy: Re-establish the executive relationship before negotiating price. Build an ROI summary (downtime reduced, throughput gained), schedule an executive business review with the new VP, and prepare a multi-year option that protects ARR while addressing the discount ask."
+  },
+  {
+    "id": "DOC-1004-CT",
+    "account_id": "ACC-1004",
+    "source_type": "call_transcript",
+    "title": "Atlas Manufacturing - Procurement Call (2026-06-17)",
+    "text": "Procurement (Atlas): The new VP wants options on the table. We're looking at Forgeline and we'd need at least 12% off to stay.\n\nCSM (Sofia): I hear you on price. Before we get there, has the VP seen what the platform has delivered, the downtime reduction and throughput gains?\n\nProcurement: Honestly, no. He just started. He sees a line item.\n\nCSM: Then let's fix that first. If I bring an ROI review and the VP still wants to talk commercials, I'd rather discuss a multi-year structure than a flat discount. Can you get me 30 minutes with him?\n\nProcurement: If you can show hard numbers, I'll get you the meeting."
+  },
+  {
+    "id": "DOC-1004-ST",
+    "account_id": "ACC-1004",
+    "source_type": "support_tickets",
+    "title": "Atlas Manufacturing - Support History",
+    "text": "Ticket AT-5102 (Priority: Low, Status: Resolved). Title: Add throughput dashboard widget. Description: Shop-floor managers requested a throughput trend widget. Delivered; positive feedback.\n\nTicket AT-5110 (Priority: Low, Status: Resolved). Title: SSO group mapping update. Description: Mapped new plant teams to roles. Resolved same day.\n\nNote: Support volume is low and healthy. No product blockers. Renewal risk is commercial and relationship-driven, not technical."
+  },
+  {
+    "id": "DOC-1004-CRM",
+    "account_id": "ACC-1004",
+    "source_type": "crm_notes",
+    "title": "Atlas Manufacturing - CRM Account Notes",
+    "text": "Stage: Renewal at risk. Sentiment: Mixed; users happy, new exec skeptical.\nKey contacts: VP Operations (new, evaluating Forgeline, no relationship yet); procurement lead (pushing 12% discount); plant managers (active power users).\nARR 320k, 200 seats (180 active), renewal 2026-08-30 (65 days).\nRisk drivers: competitive eval, price pressure, two missed QBRs, weak executive relationship despite strong usage.\nPlan: Renewal risk mitigation. ROI business review with new VP, then multi-year proposal instead of flat discount."
+  },
+  {
+    "id": "DOC-1005-MN",
+    "account_id": "ACC-1005",
+    "source_type": "meeting_notes",
+    "title": "Vertex Financial - Incident Escalation Review (2026-06-20)",
+    "text": "Attendees: James Okafor (CSM), Vertex CTO, Vertex Head of Ops, our VP Customer Success.\nIncident: A Sev-1 outage on 2026-06-19 caused a 6-hour service disruption during Vertex's quarter-end close, the worst possible window. Root cause was a failed regional database failover.\n\nImpact: Vertex's close was delayed; their CTO has opened a formal executive escalation. CSAT on the latest interaction dropped to 2 of 5. Trust is damaged and the word churn was used on the call.\n\nCommercials: Renewal is 2026-09-20 at 410k ARR. Vertex is requesting SLA credits and a written root-cause analysis (RCA) with a remediation plan and timeline.\n\nResponse plan: Executive escalation play. Same-day apology from our VP, RCA within 48 hours, a concrete reliability remediation roadmap, proactive SLA credit offer, and a weekly executive check-in until trust is restored. This is the highest-priority account this week."
+  },
+  {
+    "id": "DOC-1005-CT",
+    "account_id": "ACC-1005",
+    "source_type": "call_transcript",
+    "title": "Vertex Financial - Escalation Call (2026-06-19)",
+    "text": "CTO (Vertex): Six hours down during quarter close is not acceptable. My board is asking questions and I don't have answers.\n\nCSM (James): You're right, and I'm not going to minimize it. We failed you at the worst possible time. Our VP wants to speak with you today.\n\nCTO: I need a real root-cause analysis, not a status page. And I expect SLA credits.\n\nCSM: You'll have a written RCA within 48 hours, a remediation roadmap, and we'll proactively apply SLA credits. I'll set a weekly executive check-in until you trust us again.\n\nCTO: Fine. But understand we are now evaluating whether to renew in September."
+  },
+  {
+    "id": "DOC-1005-ST",
+    "account_id": "ACC-1005",
+    "source_type": "support_tickets",
+    "title": "Vertex Financial - Incident Tickets",
+    "text": "Ticket VX-9001 (Priority: Sev-1, Status: Resolved-Pending-RCA). Title: 6-hour outage during quarter close. Description: Regional failover failed; primary DB unreachable 14:10-20:05 UTC on 2026-06-19. Service restored after manual failover. RCA owed to customer within 48 hours.\n\nTicket VX-9002 (Priority: High, Status: Open). Title: SLA credit calculation. Description: Customer requesting credits for breached uptime SLA. Finance to confirm amount.\n\nTicket VX-9003 (Priority: High, Status: Open). Title: Reliability remediation roadmap. Description: Customer requests written remediation plan with dates: multi-region active-active, automated failover tests, and status comms improvements."
+  },
+  {
+    "id": "DOC-1005-CRM",
+    "account_id": "ACC-1005",
+    "source_type": "crm_notes",
+    "title": "Vertex Financial - CRM Account Notes",
+    "text": "Stage: Escalation / churn risk. Sentiment: Strongly negative.\nKey contacts: CTO (escalation owner, threatening non-renewal); Head of Ops (impacted); economic buyer aligned with CTO.\nARR 410k, 150 seats, renewal 2026-09-20 (critical, 92 days). Health 38.\nEscalation drivers: Sev-1 6-hour outage during quarter close, failed regional failover, CSAT 2/5, SLA credit and RCA demands, explicit churn language.\nPlan: Executive escalation play. VP apology same day, RCA in 48h, remediation roadmap, proactive SLA credits, weekly exec check-in."
+  },
+  {
+    "id": "DOC-1006-MN",
+    "account_id": "ACC-1006",
+    "source_type": "meeting_notes",
+    "title": "Cobalt Retail Group - Monthly Check-in (2026-06-11)",
+    "text": "Attendees: Elena Petrova (CSM), Cobalt economic buyer.\nStatus: Healthy and steady. Usage is consistent, core features adopted across 75 seats, NPS 9 from the economic buyer who called the rollout one of their smoothest software adoptions.\n\nFeedback: One minor feature request, a configurable store-comparison view. Logged for product.\n\nAdvocacy: The buyer offered to act as a reference and is open to a short case study on inventory accuracy improvements. Renewal 2027-01-10, no risk indicators. Good candidate to nurture into expansion later once new store regions come online."
+  },
+  {
+    "id": "DOC-1006-CRM",
+    "account_id": "ACC-1006",
+    "source_type": "crm_notes",
+    "title": "Cobalt Retail Group - CRM Account Notes",
+    "text": "Stage: Healthy / nurture. Sentiment: Positive.\nKey contacts: Economic buyer (advocate, NPS 9, reference-willing).\nARR 145k, 75 seats, renewal 2027-01-10, health 79.\nDrivers: steady usage, strong satisfaction, one minor feature request logged, reference and case-study opportunity. No churn risk. Future expansion possible as new store regions launch."
+  },
+  {
+    "id": "KB-001",
+    "account_id": null,
+    "source_type": "kb_article",
+    "title": "Usage Health Scoring Methodology",
+    "text": "The account health score (0-100) blends four weighted signals. Adoption breadth (35%): share of licensed seats active in the trailing 28 days. Engagement depth (25%): frequency and recency of logins and core-feature usage. Relationship strength (20%): presence of an executive sponsor and an active champion. Support and reliability (20%): open high-severity tickets, recent incidents, and CSAT.\n\nA month-over-month decline in weekly active users greater than 20% is a leading churn indicator and should trigger a health-drop review. Loss of a champion with no identified replacement reduces relationship strength materially. Scores below 50 are high risk; below 40 are critical and warrant immediate intervention."
+  },
+  {
+    "id": "KB-002",
+    "account_id": null,
+    "source_type": "kb_article",
+    "title": "Churn Save Playbook Overview",
+    "text": "A churn save begins with diagnosis: identify whether risk is driven by product value, relationship, reliability, or commercials, because the remedy differs for each. Value and adoption gaps call for re-onboarding and use-case expansion. Relationship gaps call for re-establishing an executive sponsor. Reliability incidents call for an escalation response with a written RCA. Commercial risk calls for ROI framing before any discount.\n\nAlways quantify what is at stake (ARR at risk, renewal date) and pair every save motion with a measurable success metric, for example restoring weekly active users to baseline within 30 days, or moving the health score above 50 before renewal."
+  },
+  {
+    "id": "KB-003",
+    "account_id": null,
+    "source_type": "kb_article",
+    "title": "Product-Qualified Lead (PQL) Expansion Criteria",
+    "text": "An account is a product-qualified expansion lead when it shows organic pull, not seller push. Core criteria: seat utilization at or above 90% of licensed seats; additional teams piloting or borrowing logins; a feature request that maps to a higher tier (for example SSO/SCIM or data residency); an economic buyer with NPS 8 or higher; and confirmed budget for the current fiscal year.\n\nWhen these signals co-occur, lead with a seat-expansion proposal that bundles the enterprise capability they requested and offer a volume-pricing tier. PQL expansions close faster and retain better than cold upsells because value is already proven."
+  },
+  {
+    "id": "PLAY-HEALTH-DROP",
+    "account_id": null,
+    "source_type": "playbook",
+    "title": "Health Drop Recovery Play",
+    "text": "Trigger: Weekly active users down more than 20% month over month, or health score falling below 50.\nGoal: Restore usage to baseline within 30 days and stabilize the relationship.\nSteps: 1) Diagnose the drop, separating product breakage from disengagement. 2) Fix any blocking integration or technical issue with an expedited engineering ticket. 3) Identify and secure a new executive sponsor if the champion has left. 4) Run a targeted re-activation: outreach to dormant users and a refresher on the broken workflow. 5) Set a 30-day usage recovery target and review weekly.\nSuccess metric: WAU back to within 10% of prior baseline and health score above 50 before renewal."
+  },
+  {
+    "id": "PLAY-RENEWAL",
+    "account_id": null,
+    "source_type": "playbook",
+    "title": "Renewal Risk Mitigation Play",
+    "text": "Trigger: Renewal within 90 days combined with a competitive evaluation, price pressure, or a weak executive relationship.\nGoal: Secure the renewal while protecting ARR.\nSteps: 1) Build an ROI summary quantifying delivered value (downtime reduced, throughput or revenue gained). 2) Re-establish the executive relationship with a business review before any pricing conversation. 3) Counter discount requests with a multi-year structure or value-add bundle rather than a flat cut. 4) Address the competitive threat with a differentiation one-pager. 5) Confirm the mutual close plan and signatures timeline.\nSuccess metric: Renewal signed at or above target ARR; discount, if any, exchanged for term length or expansion."
+  },
+  {
+    "id": "PLAY-ONBOARD",
+    "account_id": null,
+    "source_type": "playbook",
+    "title": "Onboarding Acceleration Play",
+    "text": "Trigger: Onboarding behind milestone plan (for example fewer than 5 of 7 milestones by day 45), low seat provisioning, or training no-shows.\nGoal: Reach first value fast and provision the purchased seats.\nSteps: 1) Assign a dedicated implementation specialist to take SSO setup and data import off the customer's plate. 2) Run a focused 2-week milestone sprint targeting the highest-value workflow first. 3) Offer asynchronous, recorded training to fit constrained schedules. 4) Secure a short sponsor checkpoint to confirm priorities and unblock access. 5) Track provisioned-seat count and milestone completion weekly.\nSuccess metric: First value delivered and at least 80% of seats provisioned within 30 days of the rescue."
+  },
+  {
+    "id": "PLAY-ESCALATION",
+    "account_id": null,
+    "source_type": "playbook",
+    "title": "Executive Escalation Response Play",
+    "text": "Trigger: Sev-1 incident, repeated outages, or a formal executive escalation, especially near a renewal.\nGoal: Contain trust damage and prevent churn.\nSteps: 1) Acknowledge same day with a senior leader (VP or above) reaching out directly. 2) Deliver a written root-cause analysis within 48 hours. 3) Provide a concrete remediation roadmap with owners and dates. 4) Proactively offer SLA credits before the customer has to ask. 5) Establish a weekly executive check-in until trust is demonstrably restored.\nSuccess metric: Escalation formally closed, CSAT recovered to 4+ of 5, and renewal retained."
+  },
+  {
+    "id": "PLAY-EXPANSION",
+    "account_id": null,
+    "source_type": "playbook",
+    "title": "Expansion and Upsell Qualification Play",
+    "text": "Trigger: Product-qualified expansion signals, seat utilization at or above 90%, additional teams piloting, a tier-mapped feature request, and approved budget.\nGoal: Convert organic demand into a clean seat and tier expansion.\nSteps: 1) Quantify the pull, naming the teams and the borrowed-login behavior. 2) Build a seat-expansion proposal bundling the requested enterprise capability (for example SSO/SCIM). 3) Offer a volume-pricing tier to reward the larger commitment. 4) Confirm the economic buyer and budget timeline. 5) Tie expansion to a value milestone and a reference or case-study ask.\nSuccess metric: Expansion closed within the current fiscal quarter at or above the proposed seat count."
+  }
+]
