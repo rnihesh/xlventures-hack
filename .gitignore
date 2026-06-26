@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.uv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# DB / data
+*.sqlite
+*.db
+pgdata/
+
+# Plans / design docs (local only, do not push)
+docs/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.log
