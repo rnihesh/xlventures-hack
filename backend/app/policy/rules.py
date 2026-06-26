@@ -67,6 +67,27 @@ class PolicyRule(BaseModel):
             data["condition"] = data["spec"]
         if "requires_approval" not in data and "needs_approval" in data:
             data["requires_approval"] = data["needs_approval"]
+
+        # Narrative pack schema (key/label/rule/severity:hard|soft/
+        # requires_approval_from). Map it onto the structured fields so these
+        # guardrails surface a real description and route through the engine as
+        # advisory gates instead of an empty, misleading "not configured" rule.
+        if "description" not in data or not data.get("description"):
+            if data.get("label"):
+                data["description"] = data["label"]
+            elif data.get("rule"):
+                data["description"] = data["rule"]
+        if "requires_approval" not in data and "requires_approval_from" in data:
+            data["requires_approval"] = bool(data.get("requires_approval_from"))
+        if "type" not in data and "condition" not in data and "spec" not in data:
+            # No machine-checkable condition: treat as a human-judgment guardrail.
+            data["type"] = "advisory"
+        # Normalize narrative severities to the engine's low|medium|high band.
+        severity = str(data.get("severity", "")).lower()
+        if severity in ("hard", "critical", "blocker"):
+            data["severity"] = "high"
+        elif severity in ("soft", "advisory", "info"):
+            data["severity"] = "low"
         return cls(**data)
 
 

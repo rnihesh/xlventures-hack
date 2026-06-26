@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "nba-backend"
 version = "0.1.0"
 description = "Next Best Action backend: FastAPI + LangGraph explainable recommendations"
-readme = "../README.md"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",

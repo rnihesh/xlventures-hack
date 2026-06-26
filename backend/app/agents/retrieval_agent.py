@@ -25,11 +25,11 @@ def _query_for(state: Dict[str, Any]) -> str:
 
 
 async def _evidence_via_retriever(
-    account_id: str, query: str, k: int
+    account_id: str, query: str, k: int, domain: str = "customer_success"
 ) -> List[Dict[str, Any]]:
     """Call the retrieval slice and normalize Evidence objects to dicts."""
 
-    retriever = await safe_get_retriever()
+    retriever = await safe_get_retriever(domain)
     if retriever is None:
         return []
     try:
@@ -58,9 +58,10 @@ async def _evidence_via_retriever(
 )
 async def node(state: Dict[str, Any]) -> Dict[str, Any]:
     account_id = state.get("account_id", "unknown-account")
+    domain = state.get("domain", "customer_success")
     query = _query_for(state)
 
-    evidence = await _evidence_via_retriever(account_id, query, k=5)
+    evidence = await _evidence_via_retriever(account_id, query, k=5, domain=domain)
     source = "retriever"
     if not evidence:
         evidence = default_evidence(account_id)

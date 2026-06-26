@@ -235,12 +235,26 @@ def _eval_field_threshold(
     return "pass", f"'{field}' is {actual:g}; within guard limits."
 
 
+def _eval_advisory(ctx: Dict[str, Any], rule: PolicyRule) -> Tuple[Status, str]:
+    """Surface a narrative guardrail that has no machine-checkable condition.
+
+    These rules (e.g. fair-debt compliance, settlement sign-off) are written as
+    prose in the pack and cannot be auto-evaluated, so the gate passes while
+    making the guardrail text visible for human judgement. The longer ``rule``
+    body is preferred as the detail, falling back to the description.
+    """
+
+    detail = getattr(rule, "rule", None) or rule.description or "Advisory guardrail."
+    return "pass", str(detail)
+
+
 _EVALUATORS: Dict[str, Callable[[Dict[str, Any], PolicyRule], Tuple[Status, str]]] = {
     "discount_cap": _eval_discount_cap,
     "cooldown_window": _eval_cooldown_window,
     "action_requires_approval": _eval_action_requires_approval,
     "confidence_floor": _eval_confidence_floor,
     "field_threshold": _eval_field_threshold,
+    "advisory": _eval_advisory,
 }
 
 

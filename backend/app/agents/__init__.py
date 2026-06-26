@@ -27,15 +27,20 @@ def make_step(node: str, summary: str, data: Optional[Dict[str, Any]] = None) ->
     return {"node": node, "summary": summary, "ts": now_iso(), "data": data or {}}
 
 
-async def safe_get_retriever() -> Optional[Any]:
-    """Return a Retriever from the retrieval slice, or None if unavailable."""
+async def safe_get_retriever(domain: str = "customer_success") -> Optional[Any]:
+    """Return a Retriever for ``domain`` from the retrieval slice, or None.
+
+    The domain must be forwarded so each run grounds in its own corpus; omitting
+    it makes every domain retrieve from the customer_success seed, leaking
+    cross-domain evidence into saas_sales and collections recommendations.
+    """
 
     try:
         from app.retrieval.store import get_retriever  # type: ignore
     except Exception:  # noqa: BLE001 - slice may not exist yet
         return None
     try:
-        retriever = get_retriever()
+        retriever = get_retriever(domain)
         if hasattr(retriever, "__await__"):
             retriever = await retriever  # type: ignore[assignment]
         return retriever

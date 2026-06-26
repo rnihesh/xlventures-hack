@@ -148,6 +148,103 @@ _SEED: List[Dict[str, Any]] = [
         ],
         "history": [],
     },
+    {
+        "account_id": "ACC-2002",
+        "name": "Cobalt Robotics",
+        "domain": "saas_sales",
+        "health_score": 72,
+        "risk_level": "low",
+        "last_signal": "Champion requested pricing for a closing proposal",
+        "arr": 0,
+        "profile": {
+            "industry": "Manufacturing",
+            "segment": "Enterprise",
+            "stage": "Proposal",
+            "owner": "Lena Fischer",
+            "deal_size": 142000,
+        },
+        "signals": [
+            {"ts": "2026-06-09", "key": "buying_intent", "label": "Champion asked for final pricing", "source_type": "crm_note"},
+            {"ts": "2026-06-18", "key": "stakeholder_alignment", "label": "Economic buyer looped into thread", "source_type": "crm_note"},
+        ],
+        "history": [],
+    },
+    # --- Collections (accounts receivable) -------------------------------
+    # Mapped onto the inbox shape: ``arr`` carries the balance due and
+    # ``health_score`` is the inverse of recovery risk so the same triage UI
+    # renders the third vertical without a bespoke schema.
+    {
+        "account_id": "AR-2001",
+        "name": "Riverstone Builders",
+        "domain": "collections",
+        "health_score": 78,
+        "risk_level": "low",
+        "last_signal": "Invoice 12 days past due; no reminder responded to yet",
+        "arr": 48250,
+        "profile": {
+            "industry": "Construction",
+            "segment": "Mid-Market",
+            "owner": "Tara Mensah",
+            "balance_due": 48250,
+            "days_past_due": 12,
+            "aging_bucket": "1-30",
+            "credit_limit": 75000,
+            "payment_terms": "net-30",
+        },
+        "signals": [
+            {"ts": "2026-06-10", "key": "invoice_past_due", "label": "Invoice 12 days past due", "source_type": "billing_event"},
+            {"ts": "2026-06-18", "key": "no_remittance_response", "label": "No response to first reminder", "source_type": "crm_note"},
+        ],
+        "history": [],
+    },
+    {
+        "account_id": "AR-2005",
+        "name": "Cardinal Freight Systems",
+        "domain": "collections",
+        "health_score": 32,
+        "risk_level": "high",
+        "last_signal": "Large balance overdue; first promise to pay was missed",
+        "arr": 287400,
+        "profile": {
+            "industry": "Logistics",
+            "segment": "Enterprise",
+            "owner": "Devon Pierce",
+            "balance_due": 287400,
+            "days_past_due": 55,
+            "aging_bucket": "31-60",
+            "credit_limit": 250000,
+            "payment_terms": "net-45",
+        },
+        "signals": [
+            {"ts": "2026-05-02", "key": "high_value_overdue", "label": "$287k balance past due", "source_type": "billing_event"},
+            {"ts": "2026-05-30", "key": "broken_promise_to_pay", "label": "Missed first promise to pay", "source_type": "crm_note"},
+        ],
+        "history": [],
+    },
+    {
+        "account_id": "AR-2006",
+        "name": "Harbor Point Foods",
+        "domain": "collections",
+        "health_score": 12,
+        "risk_level": "high",
+        "last_signal": "90+ days past due; insolvency rumor and broken promises",
+        "arr": 76900,
+        "profile": {
+            "industry": "Food & Beverage",
+            "segment": "Mid-Market",
+            "owner": "Devon Pierce",
+            "balance_due": 76900,
+            "days_past_due": 124,
+            "aging_bucket": "90+",
+            "credit_limit": 60000,
+            "payment_terms": "net-30",
+        },
+        "signals": [
+            {"ts": "2026-03-01", "key": "bankruptcy_signal", "label": "Insolvency rumor in trade press", "source_type": "crm_note"},
+            {"ts": "2026-04-15", "key": "broken_promise_to_pay", "label": "Second broken promise to pay", "source_type": "crm_note"},
+        ],
+        "history": [],
+    },
 ]
 
 _BY_ID: Dict[str, Dict[str, Any]] = {a["account_id"]: a for a in _SEED}
@@ -203,12 +300,17 @@ async def _memory_history(account_id: str) -> List[Dict[str, Any]]:
 
 
 @router.get("/accounts")
-async def list_accounts() -> List[Dict[str, Any]]:
-    """Return the triage inbox summaries, highest risk first."""
+async def list_accounts(domain: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Return the triage inbox summaries, highest risk first.
+
+    Pass ``?domain=`` to scope the inbox to one vertical; omit it for the full
+    cross-domain queue.
+    """
 
     order = {"high": 0, "medium": 1, "low": 2}
+    seed = _SEED if domain is None else [a for a in _SEED if a["domain"] == domain]
     accounts = sorted(
-        (_summary(a) for a in _SEED),
+        (_summary(a) for a in seed),
         key=lambda a: (order.get(a["risk_level"], 3), a["health_score"]),
     )
     return list(accounts)
