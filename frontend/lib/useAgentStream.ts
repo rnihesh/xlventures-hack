@@ -32,6 +32,7 @@ export interface Evidence {
   source_type: string;
   snippet: string;
   span: { start: number; end: number };
+  score?: number;
 }
 
 export interface RecommendationAction {

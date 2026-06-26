@@ -2,50 +2,85 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Aperture design system.
+  Clean, dense-but-legible, trustworthy. Neutral slate palette with a calm
+  indigo primary, soft borders, and a refined dark mode tuned for long demos.
+*/
+
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 222 47% 11%;
+
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 47% 11%;
+
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.625rem;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 47% 14%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 226 100% 97%;
+    --accent-foreground: 243 75% 45%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 60% 36%;
+    --warning: 35 92% 45%;
+    --info: 217 91% 55%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 88%;
+    --ring: 243 75% 59%;
+
+    --radius: 0.7rem;
+
+    --sidebar: 220 20% 99%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 6.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 50.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --background: 224 36% 6%;
+    --foreground: 213 31% 94%;
+
+    --card: 224 33% 9%;
+    --card-foreground: 213 31% 94%;
+
+    --popover: 224 33% 9%;
+    --popover-foreground: 213 31% 94%;
+
+    --primary: 243 80% 67%;
+    --primary-foreground: 224 40% 8%;
+
+    --secondary: 222 24% 16%;
+    --secondary-foreground: 213 31% 94%;
+
+    --muted: 222 24% 15%;
+    --muted-foreground: 217 14% 62%;
+
+    --accent: 243 40% 20%;
+    --accent-foreground: 243 90% 85%;
+
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 55% 48%;
+    --warning: 35 92% 58%;
+    --info: 217 91% 65%;
+
+    --border: 220 18% 18%;
+    --input: 220 18% 20%;
+    --ring: 243 80% 67%;
+
+    --sidebar: 224 38% 7%;
   }
 }
 
@@ -53,8 +88,74 @@
   * {
     @apply border-border;
   }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizelegibility;
+  }
+
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+    letter-spacing: -0.011em;
   }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  /* Typography scale helpers used across screens. */
+  .text-display {
+    @apply text-3xl font-semibold tracking-tight sm:text-4xl;
+  }
+  .text-eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Subtle elevated panel used for KPI cards and the run shell. */
+  .panel {
+    @apply rounded-xl border border-border bg-card shadow-sm;
+  }
+
+  /* Quiet, modern scrollbar so dense lists stay legible. */
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 9999px;
+  }
+  .scroll-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* Lightweight entrance animation reused by run-trace + nba-card. */
+@keyframes aperture-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise {
+  animation: aperture-rise 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }

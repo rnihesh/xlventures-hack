@@ -1,6 +1,11 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { AgentEvent } from "@/lib/useAgentStream";
 
@@ -15,7 +20,10 @@ interface TraceStep {
   seq: number;
 }
 
-function readString(data: Record<string, unknown>, keys: string[]): string | undefined {
+function readString(
+  data: Record<string, unknown>,
+  keys: string[],
+): string | undefined {
   for (const k of keys) {
     const v = data?.[k];
     if (typeof v === "string" && v.length > 0) return v;
@@ -119,30 +127,33 @@ function buildSteps(events: AgentEvent[]): TraceStep[] {
     }
   }
 
-  return order
-    .map((k) => byKey.get(k)!)
-    .sort((a, b) => a.seq - b.seq);
+  return order.map((k) => byKey.get(k)!).sort((a, b) => a.seq - b.seq);
 }
 
-const STATUS_STYLES: Record<StepStatus, { dot: string; badge: string; text: string }> = {
+const STATUS_STYLES: Record<
+  StepStatus,
+  { dot: string; badge: string; text: string }
+> = {
   running: {
     dot: "bg-amber-400 ring-amber-400/30 animate-pulse",
-    badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20",
+    badge:
+      "bg-amber-500/12 text-amber-600 dark:text-amber-400 ring-amber-500/20",
     text: "Running",
   },
   done: {
     dot: "bg-emerald-500 ring-emerald-500/30",
-    badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
+    badge:
+      "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
     text: "Done",
   },
   info: {
     dot: "bg-sky-500 ring-sky-500/30",
-    badge: "bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20",
+    badge: "bg-sky-500/12 text-sky-600 dark:text-sky-400 ring-sky-500/20",
     text: "Info",
   },
   error: {
     dot: "bg-rose-500 ring-rose-500/30",
-    badge: "bg-rose-500/10 text-rose-600 dark:text-rose-400 ring-rose-500/20",
+    badge: "bg-rose-500/12 text-rose-600 dark:text-rose-400 ring-rose-500/20",
     text: "Error",
   },
 };
@@ -164,15 +175,22 @@ export interface RunTraceProps {
 
 export function RunTrace({ events, className }: RunTraceProps) {
   const steps = buildSteps(events);
+  const active = steps.some((s) => s.status === "running");
 
   return (
     <Card className={cn("h-full", className)}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-semibold tracking-tight">
+          <CardTitle className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+            <span
+              className={cn(
+                "h-2 w-2 rounded-full",
+                active ? "animate-pulse bg-amber-400" : "bg-muted-foreground/40",
+              )}
+            />
             Planner trace
           </CardTitle>
-          <span className="text-xs tabular-nums text-muted-foreground">
+          <span className="text-xs tabular text-muted-foreground">
             {steps.length} step{steps.length === 1 ? "" : "s"}
           </span>
         </div>
@@ -188,7 +206,10 @@ export function RunTrace({ events, className }: RunTraceProps) {
               const style = STATUS_STYLES[step.status];
               const isLast = i === steps.length - 1;
               return (
-                <li key={step.key} className="relative flex gap-3 pb-5">
+                <li
+                  key={step.key}
+                  className="relative flex animate-rise gap-3 pb-5"
+                >
                   {!isLast && (
                     <span
                       aria-hidden
@@ -220,7 +241,7 @@ export function RunTrace({ events, className }: RunTraceProps) {
                         {step.detail}
                       </p>
                     )}
-                    <span className="mt-0.5 block text-[10px] tabular-nums text-muted-foreground/70">
+                    <span className="mt-0.5 block text-[10px] tabular text-muted-foreground/70">
                       {fmtTime(step.ts)}
                     </span>
                   </div>
