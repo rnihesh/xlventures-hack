@@ -26,6 +26,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alternatives } from "@/components/alternatives";
+import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import type { Alternative } from "@/lib/types";
 import type {
@@ -211,6 +212,26 @@ export function NbaCard({
       reason.trim() || null,
     );
     setEditing(false);
+    toast("Edit saved and approved", {
+      description: "Your revised action was sent for execution.",
+      variant: "success",
+    });
+  };
+
+  const approve = () => {
+    onDecision("approve", null, null);
+    toast("Action approved", {
+      description: "The recommended play is cleared to execute.",
+      variant: "success",
+    });
+  };
+
+  const reject = () => {
+    onDecision("reject", null, null);
+    toast("Action rejected", {
+      description: "Logged as feedback for the learning loop.",
+      variant: "info",
+    });
   };
 
   const statusVariant =
@@ -411,7 +432,7 @@ export function NbaCard({
             <Button
               className="flex-1"
               disabled={!hitlRequired}
-              onClick={() => onDecision("approve", null, null)}
+              onClick={approve}
             >
               <Check className="h-4 w-4" />
               Approve
@@ -429,7 +450,7 @@ export function NbaCard({
               variant="destructive"
               className="flex-1"
               disabled={!hitlRequired}
-              onClick={() => onDecision("reject", null, null)}
+              onClick={reject}
             >
               <X className="h-4 w-4" />
               Reject

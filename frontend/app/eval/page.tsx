@@ -5,6 +5,7 @@ import { FlaskConical } from "lucide-react";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { EvalPanel, type EvalData } from "@/components/eval-panel";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getEval } from "@/lib/api";
 
 const FALLBACK: EvalData = {
@@ -101,13 +102,10 @@ export default function EvalPage() {
             <div className="flex flex-col gap-4">
               <div className="grid gap-4 sm:grid-cols-3">
                 {Array.from({ length: 3 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-24 animate-pulse rounded-lg border border-border bg-muted/40"
-                  />
+                  <Skeleton key={i} className="h-24 rounded-lg" />
                 ))}
               </div>
-              <div className="h-64 animate-pulse rounded-lg border border-border bg-muted/40" />
+              <Skeleton className="h-64 rounded-lg" />
             </div>
           ) : (
             <EvalPanel data={data} />

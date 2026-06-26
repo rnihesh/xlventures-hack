@@ -23,6 +23,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import type { Recommendation } from "@/lib/types";
 import {
@@ -143,10 +144,18 @@ export function ExecutePanel({
       setArtifact(res.artifact);
       setAudit(res.audit);
       setActiveType(type);
+      toast(`${TYPE_LABEL[type]} ready`, {
+        description: "Review, edit inline, and copy it when you are happy.",
+        variant: "success",
+      });
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to generate artifact",
-      );
+      const message =
+        err instanceof Error ? err.message : "Failed to generate artifact";
+      setError(message);
+      toast("Could not generate artifact", {
+        description: message,
+        variant: "error",
+      });
     } finally {
       setPendingType(null);
     }

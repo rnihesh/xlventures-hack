@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -11,10 +12,65 @@ import {
   GraduationCap,
   FlaskConical,
   Boxes,
+  Moon,
+  Sun,
   type LucideIcon,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+
+const THEME_KEY = "aperture-theme";
+
+function ThemeToggle() {
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [mounted, setMounted] = useState(false);
+
+  // Read the theme the no-flash script already applied to <html>.
+  useEffect(() => {
+    setMounted(true);
+    setTheme(
+      document.documentElement.classList.contains("dark") ? "dark" : "light",
+    );
+  }, []);
+
+  const toggle = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    const classes = document.documentElement.classList;
+    if (next === "dark") classes.add("dark");
+    else classes.remove("dark");
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch {
+      /* storage may be unavailable; toggle still applies for the session */
+    }
+  };
+
+  const isDark = theme === "dark";
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+      title={isDark ? "Switch to light theme" : "Switch to dark theme"}
+      className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
+      <span className="flex items-center gap-2.5">
+        {/* Avoid an icon flip before hydration knows the real theme. */}
+        {mounted && !isDark ? (
+          <Sun className="h-4 w-4" aria-hidden />
+        ) : (
+          <Moon className="h-4 w-4" aria-hidden />
+        )}
+        {mounted ? (isDark ? "Dark" : "Light") : "Theme"}
+      </span>
+      <span className="text-[10px] uppercase tracking-[0.12em] opacity-70">
+        Theme
+      </span>
+    </button>
+  );
+}
 
 interface NavItem {
   label: string;
@@ -140,7 +196,8 @@ export function AppSidebar() {
         </div>
       </nav>
 
-      <div className="border-t border-border p-3">
+      <div className="space-y-3 border-t border-border p-3">
+        <ThemeToggle />
         <div className="rounded-lg border border-border bg-card px-3 py-2.5">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2 w-2">

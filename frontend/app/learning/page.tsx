@@ -5,6 +5,7 @@ import { GraduationCap } from "lucide-react";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { LearningPanel, type LearningData } from "@/components/learning-panel";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getLearning } from "@/lib/api";
 
 const FALLBACK: LearningData = {
@@ -127,10 +128,7 @@ export default function LearningPage() {
           {loading || !data ? (
             <div className="grid gap-4 lg:grid-cols-3">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-40 animate-pulse rounded-lg border border-border bg-muted/40"
-                />
+                <Skeleton key={i} className="h-40 rounded-lg" />
               ))}
             </div>
           ) : (

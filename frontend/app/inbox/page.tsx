@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Play, Radar, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, Inbox as InboxIcon, Play, Radar, SlidersHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/states";
 import { riskVariant, formatArr, healthTone } from "@/components/account-table";
 import { cn } from "@/lib/utils";
 import { getAccounts } from "@/lib/api";
@@ -75,12 +76,24 @@ function TriageRow({ account }: { account: Account }) {
 export default function InboxPage() {
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
+  const [error, setError] = useState(false);
+  const [nonce, setNonce] = useState(0);
+
+  const retry = useCallback(() => {
+    setError(false);
+    setAccounts(null);
+    setNonce((n) => n + 1);
+  }, []);
 
   useEffect(() => {
     const ctrl = new AbortController();
-    void getAccounts(ctrl.signal).then(setAccounts);
+    void getAccounts(ctrl.signal)
+      .then(setAccounts)
+      .catch((err) => {
+        if (err?.name !== "AbortError") setError(true);
+      });
     return () => ctrl.abort();
-  }, []);
+  }, [nonce]);
 
   const queue = useMemo(() => {
     if (!accounts) return [];
@@ -135,8 +148,9 @@ export default function InboxPage() {
               key={f}
               type="button"
               onClick={() => setFilter(f)}
+              aria-pressed={filter === f}
               className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors",
+                "rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                 filter === f
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-card text-muted-foreground hover:text-foreground",
@@ -152,7 +166,9 @@ export default function InboxPage() {
       </div>
 
       <div className="panel divide-y divide-border overflow-hidden">
-        {accounts === null ? (
+        {error ? (
+          <ErrorState onRetry={retry} />
+        ) : accounts === null ? (
           Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="flex items-center gap-3 px-5 py-4">
               <Skeleton className="h-2.5 w-2.5 rounded-full" />
@@ -164,9 +180,15 @@ export default function InboxPage() {
             </div>
           ))
         ) : queue.length === 0 ? (
-          <div className="px-5 py-16 text-center text-sm text-muted-foreground">
-            Nothing in this view. Inbox zero.
-          </div>
+          <EmptyState
+            icon={InboxIcon}
+            title="Inbox zero"
+            description={
+              filter === "all"
+                ? "No accounts need a next best action right now."
+                : `No ${filter}-risk accounts in the queue. Try another filter.`
+            }
+          />
         ) : (
           queue.map((account) => (
             <TriageRow key={account.account_id} account={account} />

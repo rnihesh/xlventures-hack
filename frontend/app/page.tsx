@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
   ArrowRight,
   ArrowUpRight,
+  Building2,
   CheckCircle2,
   Inbox,
   Play,
@@ -19,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState, ErrorState } from "@/components/ui/states";
 import { riskVariant, formatArr } from "@/components/account-table";
 import { cn } from "@/lib/utils";
 import { getAccounts, getEval, getLearning } from "@/lib/api";
@@ -97,6 +99,16 @@ export default function OverviewPage() {
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [learning, setLearning] = useState<Learning | null>(null);
   const [evalReport, setEvalReport] = useState<EvalReport | null>(null);
+  const [error, setError] = useState(false);
+  const [nonce, setNonce] = useState(0);
+
+  const retry = useCallback(() => {
+    setError(false);
+    setAccounts(null);
+    setLearning(null);
+    setEvalReport(null);
+    setNonce((n) => n + 1);
+  }, []);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -104,13 +116,17 @@ export default function OverviewPage() {
       getAccounts(ctrl.signal),
       getLearning(ctrl.signal),
       getEval(ctrl.signal),
-    ]).then(([a, l, e]) => {
-      setAccounts(a);
-      setLearning(l);
-      setEvalReport(e);
-    });
+    ])
+      .then(([a, l, e]) => {
+        setAccounts(a);
+        setLearning(l);
+        setEvalReport(e);
+      })
+      .catch((err) => {
+        if (err?.name !== "AbortError") setError(true);
+      });
     return () => ctrl.abort();
-  }, []);
+  }, [nonce]);
 
   const atRisk = accounts?.filter(
     (a) => String(a.risk_level).toLowerCase() === "high",
@@ -178,6 +194,12 @@ export default function OverviewPage() {
         </Button>
       </header>
 
+      {error ? (
+        <div className="panel mt-2">
+          <ErrorState onRetry={retry} />
+        </div>
+      ) : (
+        <>
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {loaded
           ? kpis.map((kpi) => <KpiCard key={kpi.label} kpi={kpi} />)
@@ -203,17 +225,24 @@ export default function OverviewPage() {
             </Link>
           </div>
           <div className="divide-y divide-border">
-            {recentRisk.length === 0
-              ? Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 px-5 py-3.5">
-                    <Skeleton className="h-9 w-9 rounded-full" />
-                    <div className="flex-1">
-                      <Skeleton className="h-4 w-40" />
-                      <Skeleton className="mt-1.5 h-3 w-56" />
-                    </div>
+            {accounts === null ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-5 py-3.5">
+                  <Skeleton className="h-9 w-9 rounded-full" />
+                  <div className="flex-1">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="mt-1.5 h-3 w-56" />
                   </div>
-                ))
-              : recentRisk.map((a) => (
+                </div>
+              ))
+            ) : recentRisk.length === 0 ? (
+              <EmptyState
+                icon={Building2}
+                title="No accounts yet"
+                description="Connect a data source or seed the workspace to start triaging risk."
+              />
+            ) : (
+              recentRisk.map((a) => (
                   <Link
                     key={a.account_id}
                     href={`/accounts/${a.account_id}`}
@@ -246,7 +275,8 @@ export default function OverviewPage() {
                       {formatArr(a.arr)}
                     </span>
                   </Link>
-                ))}
+                ))
+            )}
           </div>
         </section>
 
@@ -277,6 +307,8 @@ export default function OverviewPage() {
           })}
         </section>
       </div>
+        </>
+      )}
     </div>
   );
 }

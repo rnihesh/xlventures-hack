@@ -2,7 +2,14 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ListTree, Play, RotateCcw, Sparkles, Wrench } from "lucide-react";
+import {
+  CheckCircle2,
+  ListTree,
+  Play,
+  RotateCcw,
+  Sparkles,
+  Wrench,
+} from "lucide-react";
 
 import { NbaCard } from "@/components/nba-card";
 import { PolicyPanel } from "@/components/policy-panel";
@@ -77,6 +84,7 @@ function RunWorkspace() {
   }, [searchParams]);
 
   const busy = status === "starting" || status === "streaming";
+  const idle = status === "idle" && events.length === 0 && !recommendation;
 
   // The streamed recommendation carries policy gates at runtime; expose it as
   // the shared contract type so the policy and execute panels can read them.
@@ -153,7 +161,7 @@ function RunWorkspace() {
                 key={i}
                 type="button"
                 onClick={() => setSignalText(ex)}
-                className="rounded-full border border-border bg-card px-2.5 py-0.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                className="rounded-full border border-border bg-card px-2.5 py-0.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 <Sparkles className="mr-1 inline h-3 w-3" />
                 {ex.length > 36 ? `${ex.slice(0, 36)}...` : ex}
@@ -182,6 +190,50 @@ function RunWorkspace() {
           </p>
         )}
       </div>
+
+      {idle && (
+        <div className="panel mb-6 p-6">
+          <p className="text-eyebrow">Before you run</p>
+          <h2 className="mt-1 text-base font-semibold tracking-tight">
+            From a raw signal to an approved play in three steps
+          </h2>
+          <ol className="mt-4 grid gap-4 sm:grid-cols-3">
+            {[
+              {
+                icon: Sparkles,
+                title: "1. Describe the signal",
+                desc: "Pick an example above or paste any account signal to triage.",
+              },
+              {
+                icon: ListTree,
+                title: "2. Watch it reason",
+                desc: "The planner streams an evidence-backed, confidence-scored trace.",
+              },
+              {
+                icon: CheckCircle2,
+                title: "3. Approve or edit",
+                desc: "Nothing executes until you give the play a human green light.",
+              },
+            ].map((step) => {
+              const Icon = step.icon;
+              return (
+                <li
+                  key={step.title}
+                  className="rounded-xl border border-border bg-card/60 p-4"
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-foreground">
+                    <Icon className="h-4 w-4" aria-hidden />
+                  </span>
+                  <div className="mt-3 text-sm font-medium">{step.title}</div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {step.desc}
+                  </p>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
         <div className="lg:sticky lg:top-6 lg:self-start">

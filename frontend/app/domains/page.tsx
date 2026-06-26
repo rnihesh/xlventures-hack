@@ -5,6 +5,8 @@ import { Boxes, FileJson } from "lucide-react";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { DomainCard, type DomainSummary } from "@/components/domain-card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/states";
 import { getDomains } from "@/lib/api";
 
 const FALLBACK: DomainSummary[] = [
@@ -103,11 +105,16 @@ export default function DomainsPage() {
           {loading || !domains ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-56 animate-pulse rounded-lg border border-border bg-muted/40"
-                />
+                <Skeleton key={i} className="h-56 rounded-lg" />
               ))}
+            </div>
+          ) : domains.length === 0 ? (
+            <div className="panel">
+              <EmptyState
+                icon={Boxes}
+                title="No domain packs found"
+                description="Add a pack JSON under packs/ to repoint the engine at a new use case."
+              />
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

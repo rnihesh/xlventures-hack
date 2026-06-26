@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/states";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { riskVariant, formatArr, healthTone } from "@/components/account-table";
 import { cn } from "@/lib/utils";
@@ -175,13 +176,46 @@ export default function AccountDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? "";
   const [detail, setDetail] = useState<AccountDetail | null>(null);
+  const [error, setError] = useState(false);
+  const [nonce, setNonce] = useState(0);
+
+  const retry = useCallback(() => {
+    setError(false);
+    setDetail(null);
+    setNonce((n) => n + 1);
+  }, []);
 
   useEffect(() => {
     if (!id) return;
     const ctrl = new AbortController();
-    void getAccount(id, ctrl.signal).then(setDetail);
+    void getAccount(id, ctrl.signal)
+      .then(setDetail)
+      .catch((err) => {
+        if (err?.name !== "AbortError") setError(true);
+      });
     return () => ctrl.abort();
-  }, [id]);
+  }, [id, nonce]);
+
+  if (error) {
+    return (
+      <div className="mx-auto w-full max-w-5xl px-6 py-8">
+        <Link
+          href="/inbox"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to inbox
+        </Link>
+        <div className="panel mt-4">
+          <ErrorState
+            title="Could not load this account"
+            description="The account 360 is temporarily unavailable. Retry, or head back to the inbox."
+            onRetry={retry}
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (!detail) {
     return (
