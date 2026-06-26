@@ -40,3 +40,6 @@ docs/
 
 # Next.js generated
 next-env.d.ts
+
+# Eval run cache (runtime artifact)
+backend/app/eval/_last_run.json
