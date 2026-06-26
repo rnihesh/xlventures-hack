@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nba-backend"
+version = "0.1.0"
+description = "Next Best Action backend: FastAPI + LangGraph explainable recommendations"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "langgraph>=0.3",
+    "langgraph-checkpoint-postgres",
+    "langchain-openai",
+    "langchain-core",
+    "pydantic>=2",
+    "pydantic-settings",
+    "asyncpg>=0.30",
+    "pgvector",
+    "alembic>=1.14",
+    "sse-starlette",
+    "pyyaml",
+    "httpx",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# E/F: pyflakes + pycodestyle, I: isort, UP: pyupgrade, B: bugbear
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
