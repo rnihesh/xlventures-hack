@@ -10,7 +10,7 @@ seed:
 	@echo "seed: placeholder, wire up data seeding here"
 
 eval:
-	@echo "eval: placeholder, wire up evaluation harness here"
+	cd backend && python -m app.eval.runner
 
 migrate:
 	docker compose -f infra/docker-compose.yml exec api alembic upgrade head
