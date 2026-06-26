@@ -6,7 +6,8 @@ and no real OpenAI key. They degrade gracefully:
 * ``get_pool``        -> asyncpg pool when DATABASE_URL is set, else None.
 * ``get_checkpointer``-> AsyncPostgresSaver when DATABASE_URL is set, else an
                          in-memory MemorySaver.
-* ``get_llm``         -> a configured ChatOpenAI instance.
+* ``get_llm``         -> a ChatOpenAI instance, or a deterministic offline
+                         DemoChatModel when DEMO_MODE is set or no key exists.
 """
 
 from __future__ import annotations
@@ -128,14 +129,27 @@ async def close_checkpointer() -> None:
 # ---------------------------------------------------------------------------
 
 
-def get_llm(model: str | None = None, **kwargs: Any) -> ChatOpenAI:
-    """Return a ChatOpenAI configured from settings.
+def get_llm(model: str | None = None, **kwargs: Any) -> Any:
+    """Return a chat model configured from settings.
+
+    In deterministic DEMO MODE (``DEMO_MODE`` truthy OR no ``OPENAI_API_KEY``
+    configured) this returns an offline, reproducible :class:`DemoChatModel` so
+    live demos and offline runs never flake or touch the network. Otherwise it
+    returns a real ``ChatOpenAI`` instance.
 
     Args:
         model: Optional model override; defaults to ``settings.openai_model``.
-        **kwargs: Extra keyword args forwarded to ChatOpenAI (e.g. temperature,
-            streaming).
+        **kwargs: Extra keyword args forwarded to the model (e.g. temperature,
+            streaming). Ignored by the demo model.
     """
+    # Import lazily to keep the dependency surface small and avoid any import
+    # cycle with modules that import ``app.deps``.
+    from app.demo import demo_mode_enabled, get_demo_llm
+
+    if demo_mode_enabled():
+        logger.info("DEMO_MODE active: using deterministic offline chat model.")
+        return get_demo_llm(model=model or settings.openai_model, **kwargs)
+
     return ChatOpenAI(
         model=model or settings.openai_model,
         api_key=settings.openai_api_key or "sk-placeholder",
