@@ -9,6 +9,7 @@
 // OPENAI_API_KEY, and no database.
 
 import { API_BASE, SEED_ACCOUNTS } from "@/lib/api";
+import { authHeaders } from "@/lib/auth";
 import type { PolicyGate } from "@/lib/types";
 
 export type PolicySeverity = "low" | "medium" | "high" | string;
@@ -50,7 +51,11 @@ export async function getPolicies(domain: string): Promise<PolicyRule[]> {
   try {
     const res = await fetch(
       `${API_BASE}/policy/${encodeURIComponent(domain)}`,
-      { headers: { Accept: "application/json" }, cache: "no-store" },
+      {
+        headers: authHeaders({ Accept: "application/json" }),
+        credentials: "include",
+        cache: "no-store",
+      },
     );
     if (!res.ok) throw new Error(`GET /policy/${domain} failed (${res.status})`);
     const data = (await res.json()) as { policies?: PolicyRule[] };
@@ -71,7 +76,8 @@ export async function evaluatePolicy(
   try {
     const res = await fetch(`${API_BASE}/policy/evaluate`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      credentials: "include",
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error(`POST /policy/evaluate failed (${res.status})`);

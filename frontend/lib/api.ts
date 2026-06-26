@@ -22,6 +22,7 @@ import type {
   Recommendation,
   RecommendationAction,
 } from "@/lib/types";
+import { authHeaders } from "@/lib/auth";
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8000";
@@ -45,7 +46,8 @@ interface GetOptions {
 async function getJson<T>(path: string, opts: GetOptions = {}): Promise<T> {
   try {
     const res = await fetch(`${API_BASE}${path}`, {
-      headers: { Accept: "application/json" },
+      headers: authHeaders({ Accept: "application/json" }),
+      credentials: "include",
       cache: "no-store",
       signal: opts.signal,
     });
@@ -64,7 +66,8 @@ async function getJson<T>(path: string, opts: GetOptions = {}): Promise<T> {
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    credentials: "include",
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -85,7 +88,9 @@ export function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
 }
 
 export function getAccounts(signal?: AbortSignal): Promise<Account[]> {
-  return getJson<Account[]>("/accounts", { fallback: SEED_ACCOUNTS, signal });
+  // Real, org-scoped data: a new org legitimately has zero accounts and must
+  // show the empty state, never the demo seed. Fall back to empty, not SEED.
+  return getJson<Account[]>("/accounts", { fallback: [], signal });
 }
 
 export async function getAccount(
@@ -105,12 +110,30 @@ export function getDomains(signal?: AbortSignal): Promise<DomainSummary[]> {
   });
 }
 
+// Honest-empty fallbacks: a new org legitimately has no learning/eval data and
+// must show zero, never the demo seed (the fake 72% / 1.9 numbers).
+const EMPTY_LEARNING: Learning = {
+  accepted_rate: 0,
+  before_after: {
+    kpi: "Net Revenue Retention",
+    before: 0,
+    after: 0,
+    note: "No runs yet.",
+  },
+  episodes: [],
+};
+
+const EMPTY_EVAL: EvalReport = {
+  outcomes: { kpi: "Net Revenue Retention", baseline: 0, projected: 0, unit: "percent" },
+  suites: [],
+};
+
 export function getLearning(signal?: AbortSignal): Promise<Learning> {
-  return getJson<Learning>("/learning", { fallback: SEED_LEARNING, signal });
+  return getJson<Learning>("/learning", { fallback: EMPTY_LEARNING, signal });
 }
 
 export function getEval(signal?: AbortSignal): Promise<EvalReport> {
-  return getJson<EvalReport>("/eval", { fallback: SEED_EVAL, signal });
+  return getJson<EvalReport>("/eval", { fallback: EMPTY_EVAL, signal });
 }
 
 export function createRun(

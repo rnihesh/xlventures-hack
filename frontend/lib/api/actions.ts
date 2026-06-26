@@ -10,6 +10,7 @@
 // always renders something usable in a demo.
 
 import { API_BASE } from "@/lib/api";
+import { authHeaders } from "@/lib/auth";
 import type { Recommendation } from "@/lib/types";
 
 export type ArtifactType = "email" | "crm_task" | "slack";
@@ -59,6 +60,70 @@ export interface ExecutePayload {
   account_id?: string | null;
 }
 
+// Result of really dispatching an artifact through its channel (SES email,
+// Slack webhook, Gmail, or a CRM task record). The backend never raises when a
+// channel is not configured: it returns sent=false with a machine reason so the
+// UI can guide the user to connect it in Settings.
+export interface SendResult {
+  sent: boolean;
+  // Logical channel the dispatch used: "ses" | "slack" | "google" | "crm".
+  channel?: string;
+  // Machine code when not sent, eg "ses_not_configured", "slack_not_configured",
+  // "google_not_connected". Used to detect the connect-in-settings state.
+  reason?: string;
+  // Where it went (recipient email or Slack channel) when sent.
+  to?: string;
+  // Human-friendly detail, surfaced verbatim when present.
+  detail?: string;
+  // Provider message id when the channel returns one.
+  id?: string;
+}
+
+export interface SendPayload {
+  artifact_type: ArtifactType;
+  // The possibly edited artifact the user reviewed in the preview.
+  artifact: Artifact;
+  run_id?: string | null;
+  account_id?: string | null;
+  recommendation_id?: string | null;
+  action_key?: string | null;
+}
+
+const NOT_CONFIGURED_REASON: Record<ArtifactType, string> = {
+  email: "ses_not_configured",
+  slack: "slack_not_configured",
+  crm_task: "crm_not_configured",
+};
+
+/**
+ * Really dispatch a (possibly edited) artifact through its channel via
+ * POST /execute/send. When the backend is unreachable we degrade to a graceful
+ * not-configured result so the panel guides the user to Settings instead of
+ * dead-ending or throwing.
+ */
+export async function sendArtifact(
+  payload: SendPayload,
+): Promise<SendResult> {
+  try {
+    const res = await fetch(`${API_BASE}/execute/send`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      throw new Error(`POST /execute/send failed (${res.status})`);
+    }
+    return (await res.json()) as SendResult;
+  } catch {
+    return {
+      sent: false,
+      channel: payload.artifact_type,
+      reason: NOT_CONFIGURED_REASON[payload.artifact_type],
+    };
+  }
+}
+
 /**
  * Generate an artifact from a recommendation. Surfaces the live backend result
  * when reachable; otherwise returns a local, deterministic approximation that
@@ -70,7 +135,8 @@ export async function executeAction(
   try {
     const res = await fetch(`${API_BASE}/execute`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      credentials: "include",
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
@@ -87,7 +153,11 @@ export async function listArtifacts(runId: string): Promise<AuditRecord[]> {
   try {
     const res = await fetch(
       `${API_BASE}/execute/${encodeURIComponent(runId)}`,
-      { headers: { Accept: "application/json" }, cache: "no-store" },
+      {
+        headers: authHeaders({ Accept: "application/json" }),
+        credentials: "include",
+        cache: "no-store",
+      },
     );
     if (!res.ok) {
       throw new Error(`GET /execute/${runId} failed (${res.status})`);

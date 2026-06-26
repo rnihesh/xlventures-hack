@@ -13,13 +13,13 @@ const badgeVariants = cva(
         outline: "border-border text-foreground",
         muted: "border-transparent bg-muted text-muted-foreground",
         success:
-          "border-transparent bg-emerald-500/12 text-emerald-600 ring-1 ring-inset ring-emerald-500/20 dark:text-emerald-400",
+          "border-transparent bg-primary/10 text-primary ring-1 ring-inset ring-primary/20",
         warning:
-          "border-transparent bg-amber-500/12 text-amber-600 ring-1 ring-inset ring-amber-500/20 dark:text-amber-400",
+          "border-transparent bg-primary/10 text-primary ring-1 ring-inset ring-primary/25",
         danger:
-          "border-transparent bg-rose-500/12 text-rose-600 ring-1 ring-inset ring-rose-500/20 dark:text-rose-400",
+          "border-transparent bg-destructive/10 text-destructive ring-1 ring-inset ring-destructive/20",
         info:
-          "border-transparent bg-sky-500/12 text-sky-600 ring-1 ring-inset ring-sky-500/20 dark:text-sky-400",
+          "border-transparent bg-muted text-muted-foreground ring-1 ring-inset ring-border",
       },
     },
     defaultVariants: {

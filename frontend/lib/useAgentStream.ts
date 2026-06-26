@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { authHeaders } from "@/lib/auth";
+
 // ---------------------------------------------------------------------------
 // Shared contract types (frozen). Defined here and re-exported so this slice
 // is self contained; components in this slice import them from this module.
@@ -120,7 +122,9 @@ const API_BASE =
 // decoded JSON payloads found and the leftover (incomplete) buffer tail.
 function drainFrames(buffer: string): { events: unknown[]; rest: string } {
   const events: unknown[] = [];
-  let rest = buffer;
+  // sse-starlette frames events with CRLF (\r\n\r\n). Normalize to LF so the
+  // \n\n frame split below matches; otherwise no frame is ever parsed.
+  let rest = buffer.replace(/\r\n/g, "\n");
   let sep = rest.indexOf("\n\n");
   while (sep !== -1) {
     const rawFrame = rest.slice(0, sep);
@@ -201,7 +205,8 @@ export function useAgentStream(): UseAgentStream {
       abortRef.current = controller;
       const res = await fetch(`${API_BASE}/runs/${id}/stream`, {
         method: "GET",
-        headers: { Accept: "text/event-stream" },
+        headers: authHeaders({ Accept: "text/event-stream" }),
+        credentials: "include",
         signal: controller.signal,
       });
       if (!res.ok || !res.body) {
@@ -248,7 +253,8 @@ export function useAgentStream(): UseAgentStream {
       try {
         const res = await fetch(`${API_BASE}/runs`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          credentials: "include",
           body: JSON.stringify(input),
         });
         if (!res.ok) {
@@ -276,7 +282,8 @@ export function useAgentStream(): UseAgentStream {
       try {
         const res = await fetch(`${API_BASE}/runs/${runId}/hitl`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          credentials: "include",
           body: JSON.stringify({
             decision,
             edited_action: editedAction,

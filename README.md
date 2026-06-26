@@ -12,42 +12,28 @@ Project 2 asks for an agentic decision engine. We built a domain-agnostic one. I
 
 ## Architecture overview
 
+```mermaid
+flowchart TB
+  SIG["Signals + account context"] --> PLAN["Planner (dynamic strategy, picks specialists)"]
+  PLAN --> RISK["Risk analyst"]
+  PLAN --> DRAFT["Action drafter"]
+  PLAN --> RET["Retrieval (precedent + vectors)"]
+  PLAN --> EXP["Explanation + rationale"]
+  RISK --> POL["Policy / guardrails (hard limits, approval thresholds)"]
+  DRAFT --> POL
+  RET --> POL
+  EXP --> POL
+  POL --> REC["Recommendation: NBA + ranked alternatives + confidence + explanation"]
+  REC --> HITL{{"Human-in-the-loop approval (HITL interrupt)"}}
+  HITL -->|approve / edit| EXEC["One-click execute, outcome recorded"]
+  HITL -->|reject| LEARN
+  EXEC --> LEARN["Learning loop: distill decisions + outcomes into reusable lessons and priors"]
+  LEARN -. priors .-> PLAN
+  classDef accent fill:#D97757,stroke:#C2613F,color:#ffffff
+  class PLAN,HITL accent
 ```
-                 Signals + account context
-                            |
-                    +---------------+
-                    |    Planner    |   dynamic strategy, picks specialists
-                    +---------------+
-                            |
-        +-------------------+-------------------+
-        |          |            |               |
-   +---------+ +---------+ +-----------+ +--------------+
-   | Risk    | | Action  | | Retrieval | | Explanation  |   specialist agents
-   | analyst | | drafter | | precedent | | + rationale  |
-   +---------+ +---------+ | + vectors | +--------------+
-        |          |       +-----------+        |
-        +-------------------+-------------------+
-                            |
-                  +---------------------+
-                  | Policy / guardrails |   hard limits, approval thresholds
-                  +---------------------+
-                            |
-                  +---------------------+
-                  | Recommendation:     |   NBA + ranked alternatives
-                  | NBA + confidence    |   + confidence + explanation
-                  +---------------------+
-                            |
-                  Human-in-the-loop approval (HITL interrupt)
-                            |
-                  +---------------------+
-                  | One-click execute   | -> outcome recorded
-                  +---------------------+
-                            |
-                  +---------------------+
-                  | Learning loop       |   distill yes/no + outcomes into
-                  | (memory store)      |   reusable lessons and priors
-                  +---------------------+
-```
+
+> Full diagrams (system, decision lifecycle, LangGraph orchestration, retrieval and learning loop) are in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 - **Planner + specialist agents:** a LangGraph orchestrator builds a plan per request and dispatches specialist nodes (risk analysis, action drafting, retrieval, explanation). Durable checkpointing lets a run pause at a human-approval interrupt and resume later.
 - **Memory and learning:** approvals, rejections, and downstream outcomes are stored and distilled into lessons that bias future planning and confidence scoring.
@@ -220,14 +206,7 @@ Then in another terminal start the UI (`cd frontend && npm install && npm run de
 5. **Show the learning improvement.** Record the outcome and distill it into a lesson, then refresh `/eval` to see the score move.
 6. **Swap the domain pack.** Switch to SaaS Sales or Collections to prove the same engine retargets with zero code changes.
 
-## Five-minute demo script
-
-1. **Setup (30s).** `cp .env.example .env`, then `make seed`. Start the backend (`uvicorn app.main:app --port 8000`) and frontend (`npm run dev`). Open http://localhost:3000. No API keys needed.
-2. **Pick an at-risk account (45s).** Open an account showing a usage drop. Point out the signals and history the engine sees.
-3. **Run the engine (60s).** Trigger a run and watch the trace stream: planner picks specialists, risk analysis scores the threat, the drafter proposes an action, retrieval cites a similar past account. The Next Best Action lands with a confidence dial and a plain-language rationale.
-4. **Show alternatives and what-if (60s).** Expand the ranked alternatives. Open the what-if panel, lower the usage signal, and watch confidence and ranking shift in real time.
-5. **Guardrails, approve, execute (60s).** Note the policy panel gating the action behind approval. Approve it; preview the drafted artifact; execute with one click.
-6. **Close the loop (45s).** Record the outcome, run the learning distill, and show the new lesson plus a refreshed eval score. Then switch the Domain Pack to SaaS Sales to prove the same engine retargets with zero code changes.
+For the recorded video, follow the full beat-by-beat, time-stamped runbook (0:00 to 5:00, each beat tied to a rubric criterion) in [`ARCHITECTURE.md`](ARCHITECTURE.md#5-minute-demo-script). The companion **5-minute architecture walkthrough script** (design-decision narration over the mermaid diagrams) lives in the [same file](ARCHITECTURE.md#5-minute-architecture-walkthrough-script).
 
 ## How this maps to the judging rubric
 
@@ -247,8 +226,8 @@ Then in another terminal start the UI (`cd frontend && npm install && npm run de
 
 ## Deliverables
 
-- Five-minute demo video
-- Five-minute architecture walkthrough
-- This repository (source, docs, setup)
+- **Five-minute demo video:** recorded against the time-stamped runbook in [`ARCHITECTURE.md` (5-minute demo script)](ARCHITECTURE.md#5-minute-demo-script).
+- **Five-minute architecture walkthrough:** narrated from the [`ARCHITECTURE.md` (5-minute architecture walkthrough script)](ARCHITECTURE.md#5-minute-architecture-walkthrough-script), which walks the mermaid diagrams in that file.
+- **This repository:** full source, contracts, domain packs, infra, and setup, with `ARCHITECTURE.md` as the design reference and this `README.md` as the entry point.
 
 See `docs/PLAN.md` for the phased build roadmap.

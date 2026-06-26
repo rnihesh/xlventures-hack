@@ -73,18 +73,18 @@ const VARIANTS: Record<
 > = {
   success: {
     icon: CheckCircle2,
-    accent: "border-l-emerald-500",
-    iconClass: "text-emerald-500",
+    accent: "border-l-primary",
+    iconClass: "text-primary",
   },
   error: {
     icon: AlertTriangle,
-    accent: "border-l-rose-500",
-    iconClass: "text-rose-500",
+    accent: "border-l-destructive",
+    iconClass: "text-destructive",
   },
   info: {
     icon: Info,
-    accent: "border-l-sky-500",
-    iconClass: "text-sky-500",
+    accent: "border-l-muted-foreground",
+    iconClass: "text-muted-foreground",
   },
 };
 

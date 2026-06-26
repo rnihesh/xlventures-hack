@@ -1,4 +1,4 @@
-.PHONY: dev demo down install api test seed eval migrate fmt
+.PHONY: dev demo down install api test seed eval gen-runs migrate fmt
 
 install:
 	cd backend && uv sync --extra dev
@@ -35,6 +35,12 @@ seed:
 
 eval:
 	cd backend && uv run --env-file ../.env python -m app.eval.runner
+
+# Generate REAL learning episodes by driving the planner graph in DEMO_MODE
+# (deterministic, offline). Populates /learning and /eval outcomes from genuine
+# runs and recorded human decisions, not fixtures.
+gen-runs:
+	cd backend && uv run --env-file ../.env python -m app.gen_runs --n 12
 
 migrate:
 	docker compose -f infra/docker-compose.yml exec api uv run alembic upgrade head
