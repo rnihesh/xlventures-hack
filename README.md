@@ -99,21 +99,17 @@ Copy the environment template first. Every value is optional; blanks select the 
 cp .env.example .env
 ```
 
-### Backend (uv or venv)
+### Backend (uv)
+
+The backend is a [uv](https://docs.astral.sh/uv/) project (dependencies pinned in `backend/uv.lock`).
 
 ```bash
-# with uv
 cd backend
-uv venv && source .venv/bin/activate
-uv pip install -e .
-uvicorn app.main:app --reload --port 8000
-
-# or with plain venv + pip
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -e .
-uvicorn app.main:app --reload --port 8000
+uv sync                                  # create .venv and install from the lockfile
+uv run uvicorn app.main:app --reload --port 8000
 ```
+
+`uv sync` installs runtime deps; add `--extra dev` for tests and tooling. Any `uv run <cmd>` executes inside the managed environment, so no manual venv activation is needed.
 
 The API serves on http://localhost:8000 (interactive docs at `/docs`).
 
@@ -150,7 +146,7 @@ All configuration lives in `.env` (see `.env.example`):
 ## How to seed
 
 ```bash
-make seed     # cd backend && python -m app.seed
+make seed     # cd backend && uv run python -m app.seed
 ```
 
 Loads demo accounts, signals, and precedent for the flagship Customer Success domain so the UI has something to recommend against immediately.
@@ -159,10 +155,10 @@ Loads demo accounts, signals, and precedent for the flagship Customer Success do
 
 ```bash
 # unit + integration tests
-cd backend && pytest
+cd backend && uv run pytest      # or: make test
 
 # recommendation quality eval (golden scenarios)
-make eval     # cd backend && python -m app.eval.runner
+make eval     # cd backend && uv run python -m app.eval.runner
 ```
 
 The eval harness scores components and outcomes against `backend/app/eval/golden.jsonl` and writes the latest run summary to `backend/app/eval/_last_run.json`. Both tests and eval run fully offline.

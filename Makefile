@@ -1,4 +1,7 @@
-.PHONY: dev demo down seed eval migrate fmt
+.PHONY: dev demo down install test seed eval migrate fmt
+
+install:
+	cd backend && uv sync --extra dev
 
 demo:
 	@echo "Booting Intelligent NBA backend in DEMO_MODE (deterministic, offline, no API keys)..."
@@ -11,7 +14,7 @@ demo:
 	@echo "  Frontend:  in another terminal run 'cd frontend && npm install && npm run dev' (http://localhost:3000)"
 	@echo "             set NEXT_PUBLIC_API_URL=http://localhost:8000 so the UI reaches this API."
 	@echo ""
-	cd backend && DEMO_MODE=1 uvicorn app.main:app --port 8000
+	cd backend && DEMO_MODE=1 uv run uvicorn app.main:app --port 8000
 
 dev:
 	docker compose -f infra/docker-compose.yml up
@@ -19,14 +22,17 @@ dev:
 down:
 	docker compose -f infra/docker-compose.yml down
 
+test:
+	cd backend && uv run pytest
+
 seed:
-	cd backend && python -m app.seed
+	cd backend && uv run python -m app.seed
 
 eval:
-	cd backend && python -m app.eval.runner
+	cd backend && uv run python -m app.eval.runner
 
 migrate:
-	docker compose -f infra/docker-compose.yml exec api alembic upgrade head
+	docker compose -f infra/docker-compose.yml exec api uv run alembic upgrade head
 
 fmt:
-	docker compose -f infra/docker-compose.yml run --rm api ruff format app
+	cd backend && uv run ruff format app
