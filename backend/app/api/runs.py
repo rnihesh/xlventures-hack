@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sse_starlette.sse import EventSourceResponse
 
+from app.api._org import current_org
 from app.deps import get_checkpointer
 from app.graph.planner import build_graph
 
@@ -114,12 +115,15 @@ def _envelope(run_id: str, seq: int, event_type: str, data: Dict[str, Any]) -> D
 
 
 @router.post("/runs", response_model=CreateRunOut)
-async def create_run(body: CreateRunIn) -> CreateRunOut:
-    """Create a run, store its minimal record, and return its id."""
+async def create_run(
+    body: CreateRunIn, org_id: str = Depends(current_org)
+) -> CreateRunOut:
+    """Create a run scoped to the caller's org, store it, and return its id."""
 
     run_id = str(uuid.uuid4())
     _RUNS[run_id] = {
         "run_id": run_id,
+        "org_id": org_id,
         "domain": body.domain,
         "account_id": body.account_id,
         "signal": body.signal.model_dump(),
@@ -132,13 +136,22 @@ async def create_run(body: CreateRunIn) -> CreateRunOut:
     return CreateRunOut(run_id=run_id)
 
 
-@router.get("/runs/{run_id}/stream")
-async def stream_run(run_id: str) -> EventSourceResponse:
-    """Stream the graph execution as Server Sent Events."""
+def _get_owned_run(run_id: str, org_id: str) -> Dict[str, Any]:
+    """Fetch a run the caller's org owns, or 404 (never leak other orgs' runs)."""
 
     run = _RUNS.get(run_id)
-    if run is None:
+    if run is None or run.get("org_id") != org_id:
         raise HTTPException(status_code=404, detail="run not found")
+    return run
+
+
+@router.get("/runs/{run_id}/stream")
+async def stream_run(
+    run_id: str, org_id: str = Depends(current_org)
+) -> EventSourceResponse:
+    """Stream the graph execution as Server Sent Events."""
+
+    run = _get_owned_run(run_id, org_id)
 
     async def event_generator() -> AsyncIterator[Dict[str, str]]:
         seq = 0
@@ -154,6 +167,7 @@ async def stream_run(run_id: str) -> EventSourceResponse:
 
         initial_state = {
             "run_id": run_id,
+            "org_id": run.get("org_id"),
             "domain": run["domain"],
             "account_id": run["account_id"],
             "signal": run["signal"],
@@ -275,12 +289,12 @@ async def _record_and_distill(
 
 
 @router.post("/runs/{run_id}/hitl")
-async def hitl(run_id: str, body: HitlIn) -> Dict[str, str]:
+async def hitl(
+    run_id: str, body: HitlIn, org_id: str = Depends(current_org)
+) -> Dict[str, str]:
     """Record a human in the loop decision and close the learning loop."""
 
-    run = _RUNS.get(run_id)
-    if run is None:
-        raise HTTPException(status_code=404, detail="run not found")
+    run = _get_owned_run(run_id, org_id)
     if body.decision not in {"approve", "reject", "edit"}:
         raise HTTPException(status_code=422, detail="invalid decision")
 

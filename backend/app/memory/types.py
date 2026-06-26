@@ -79,6 +79,10 @@ class Episode(BaseModel):
     id: str
     account_id: str
     domain: str
+    # Owning org for multi-tenant scoping. ``None`` means the Demo org, which
+    # owns all seeded day-zero episodes, so the learning loop treats unscoped
+    # episodes as the demo tenant's history.
+    org_id: Optional[str] = None
     situation: str
     action_key: str
     recommendation: Dict[str, Any] = Field(default_factory=dict)

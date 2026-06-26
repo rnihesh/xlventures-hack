@@ -118,16 +118,34 @@ class Memory:
             finally:
                 self._db_loaded = True
 
+    async def _embed_situation(self, text: str) -> Optional[List[float]]:
+        """Embed an episode situation for pgvector recall (best-effort).
+
+        Uses OpenAI embeddings when configured, else the deterministic offline
+        hash embedding, so persisted episode vectors are consistent between
+        write and recall. Returns ``None`` if embedding is unavailable.
+        """
+        try:
+            from app.retrieval.embeddings import embed_for_index
+
+            matrix, _ = await embed_for_index([text or ""])
+            if matrix is not None and len(matrix):
+                return matrix[0].tolist()
+        except Exception:  # noqa: BLE001 - embeddings are best-effort
+            pass
+        return None
+
     async def _load_persisted(self, repo: Any) -> None:
         """Merge DB-persisted episodes over the seeds, or seed an empty DB."""
 
         rows = await repo.list_all()
         if not rows:
             # First boot against an empty database: persist the seeded day-zero
-            # episodes so the before/after learning story survives restarts.
+            # episodes (with embeddings) so the before/after learning story and
+            # vector recall both survive restarts.
             for ep in list(self._episodes.values()):
                 try:
-                    await repo.save(ep.model_dump())
+                    await self._persist_episode(ep.id)
                 except Exception:  # noqa: BLE001
                     pass
             return
@@ -145,7 +163,7 @@ class Memory:
             run_distillation(self)
 
     async def _persist_episode(self, episode_id: str) -> None:
-        """Mirror a single episode to Postgres when persistence is enabled."""
+        """Mirror a single episode (and its embedding) to Postgres when enabled."""
 
         if self._repo is None:
             return
@@ -153,7 +171,8 @@ class Memory:
         if episode is None:
             return
         try:
-            await self._repo.save(episode.model_dump())
+            embedding = await self._embed_situation(episode.situation)
+            await self._repo.save(episode.model_dump(), embedding=embedding)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Failed to persist episode %s: %s", episode_id, exc)
 
@@ -173,6 +192,12 @@ class Memory:
         # Hydrate persisted episodes (no-op offline) so recall spans history.
         await self._ensure_db()
 
+        # Prefer a pgvector similarity search when persistence is enabled; fall
+        # back to the in-memory lexical similarity otherwise (or on any error).
+        vector_results = await self._recall_via_pgvector(account_id, situation, k)
+        if vector_results is not None:
+            return vector_results
+
         scored: List[tuple[float, Episode]] = []
         for ep in self._episodes.values():
             sim = _similarity(situation, ep.situation)
@@ -184,41 +209,82 @@ class Memory:
 
         scored.sort(key=lambda x: x[0], reverse=True)
 
-        results: List[Dict[str, Any]] = []
-        for sim, ep in scored[: max(0, k)]:
-            decision = ep.outcome.decision if ep.outcome else "pending"
-            what_changed: Optional[str] = None
-            if ep.account_id == account_id and ep.outcome is not None:
-                if ep.outcome.accepted_like:
-                    what_changed = (
-                        f"Last time we recommended '{ep.action_key}' here and it was "
-                        f"{ep.outcome.decision}; weight that action up."
-                    )
-                elif ep.preferred_action_key:
-                    what_changed = (
-                        f"Last time '{ep.action_key}' was rejected here; the team "
-                        f"preferred '{ep.preferred_action_key}'."
-                    )
-                else:
-                    what_changed = (
-                        f"Last time '{ep.action_key}' was {ep.outcome.decision} here."
-                    )
-            results.append(
-                {
-                    "episode_id": ep.id,
-                    "account_id": ep.account_id,
-                    "domain": ep.domain,
-                    "situation": ep.situation,
-                    "action_key": ep.action_key,
-                    "preferred_action_key": ep.preferred_action_key,
-                    "decision": decision,
-                    "similarity": sim,
-                    "phase": ep.phase,
-                    "what_changed": what_changed,
-                    "recommendation": ep.recommendation,
-                }
-            )
-        return results
+        return [
+            self._format_recall(ep, account_id, sim)
+            for sim, ep in scored[: max(0, k)]
+        ]
+
+    async def _recall_via_pgvector(
+        self, account_id: str, situation: str, k: int
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Vector-search recall over persisted episode embeddings.
+
+        Returns formatted results when pgvector is available and usable, or
+        ``None`` to signal the caller to use the in-memory fallback.
+        """
+        if self._repo is None or k <= 0:
+            return None
+        vec = await self._embed_situation(situation)
+        if vec is None:
+            return None
+        try:
+            rows = await self._repo.search_similar(vec, k=max(k * 4, k))
+        except Exception as exc:  # noqa: BLE001 - degrade to in-memory recall
+            logger.warning("Vector recall failed: %s", exc)
+            return None
+        if not rows:
+            return None
+
+        scored: List[tuple[float, Episode]] = []
+        for payload in rows:
+            sim = float(payload.get("similarity", 0.0))
+            try:
+                ep = Episode(**{p: v for p, v in payload.items() if p != "similarity"})
+            except Exception:  # noqa: BLE001 - skip malformed rows
+                continue
+            if ep.account_id == account_id:
+                sim = min(1.0, sim + 0.15)  # same-account boost
+            scored.append((sim, ep))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [
+            self._format_recall(ep, account_id, sim)
+            for sim, ep in scored[: max(0, k)]
+        ]
+
+    def _format_recall(
+        self, ep: Episode, account_id: str, sim: float
+    ) -> Dict[str, Any]:
+        """Shape one recalled episode into the public recall dict."""
+        decision = ep.outcome.decision if ep.outcome else "pending"
+        what_changed: Optional[str] = None
+        if ep.account_id == account_id and ep.outcome is not None:
+            if ep.outcome.accepted_like:
+                what_changed = (
+                    f"Last time we recommended '{ep.action_key}' here and it was "
+                    f"{ep.outcome.decision}; weight that action up."
+                )
+            elif ep.preferred_action_key:
+                what_changed = (
+                    f"Last time '{ep.action_key}' was rejected here; the team "
+                    f"preferred '{ep.preferred_action_key}'."
+                )
+            else:
+                what_changed = (
+                    f"Last time '{ep.action_key}' was {ep.outcome.decision} here."
+                )
+        return {
+            "episode_id": ep.id,
+            "account_id": ep.account_id,
+            "domain": ep.domain,
+            "situation": ep.situation,
+            "action_key": ep.action_key,
+            "preferred_action_key": ep.preferred_action_key,
+            "decision": decision,
+            "similarity": round(float(sim), 4),
+            "phase": ep.phase,
+            "what_changed": what_changed,
+            "recommendation": ep.recommendation,
+        }
 
     async def write_episode(
         self,
@@ -227,8 +293,13 @@ class Memory:
         situation: str,
         action_key: str,
         recommendation: Dict[str, Any],
+        org_id: Optional[str] = None,
     ) -> str:
-        """Persist a new episode and return its id."""
+        """Persist a new episode and return its id.
+
+        ``org_id`` scopes the episode to its owning tenant for the learning loop
+        (``None`` keeps it with the Demo org that owns the seeded history).
+        """
 
         await self._ensure_db()
 
@@ -237,6 +308,7 @@ class Memory:
             id=episode_id,
             account_id=account_id,
             domain=domain,
+            org_id=org_id,
             situation=situation,
             action_key=action_key,
             recommendation=recommendation or {},

@@ -20,11 +20,16 @@ from app.seed_data import load_documents
 
 from .chunking import chunk_document
 from .citations import build_evidence
-from .embeddings import cosine_rank, embed_texts, embeddings_available
+from .embeddings import cosine_rank, embed_for_index, embed_texts, embeddings_available
 from .lexical import BM25Index
 from .types import Chunk, Evidence
 
 _RRF_C = 60.0
+
+# The org that owns the seeded in-memory corpus. Multi-tenant runs pass their
+# own org_id so a run only retrieves its org's knowledge from pgvector; the
+# in-memory corpus is the Demo org's seeded knowledge.
+_DEMO_ORG = "org_demo"
 
 
 class Retriever:
@@ -38,12 +43,21 @@ class Retriever:
 
         # Lexical index is always available.
         self._bm25 = BM25Index([c.context for c in self._chunks])
+        # Map chunk id -> in-memory index so pgvector hits map back to the exact
+        # in-memory chunk (preserving span-exact citation construction).
+        self._chunk_index = {c.chunk_id: i for i, c in enumerate(self._chunks)}
 
         # Embedding state (filled lazily, guarded by a lock).
         self._use_embeddings = embeddings_available()
         self._embeddings = None  # numpy matrix or None
         self._embed_lock = asyncio.Lock()
         self._embed_attempted = False
+
+        # pgvector backend (resolved lazily). When a pool is available and the
+        # document_chunks table is populated, the embedding ranking is served by
+        # Postgres (cosine distance via <=>) instead of the in-memory matrix.
+        self._pg_repo: object | None = None
+        self._pg_checked = False
 
     # -- corpus -----------------------------------------------------------
     def _load_corpus(self) -> None:
@@ -76,6 +90,78 @@ class Retriever:
             if c.account_id == account_id or c.account_id is None
         ]
 
+    async def _ensure_vector_backend(self) -> object | None:
+        """Bind the pgvector backend if a populated table is reachable.
+
+        Resolved at most once. Returns the DocumentChunkRepository when a pool
+        is configured and ``document_chunks`` has rows for this domain, else
+        ``None`` (the caller then uses the in-memory/lexical path).
+        """
+        if self._pg_checked:
+            return self._pg_repo
+        async with self._embed_lock:
+            if self._pg_checked:
+                return self._pg_repo
+            self._pg_checked = True
+            try:
+                from app.deps import get_pool
+                from app.repositories.vectors import DocumentChunkRepository
+
+                pool = await get_pool()
+                if pool is not None:
+                    repo = DocumentChunkRepository(pool)
+                    if repo.enabled and await repo.count(self.domain) > 0:
+                        self._pg_repo = repo
+            except Exception:  # noqa: BLE001 - any failure degrades to in-memory
+                self._pg_repo = None
+            return self._pg_repo
+
+    async def _embedding_order(
+        self,
+        query: str,
+        account_id: str | None,
+        allowed: set[int],
+        pool: int,
+        org_id: str = _DEMO_ORG,
+    ) -> list[int]:
+        """Rank candidate chunk indices by embedding similarity.
+
+        Uses pgvector when available (offline-safe hash or OpenAI query vector),
+        otherwise the lazily-built in-memory embedding matrix. Results are scoped
+        to ``org_id`` on the pgvector path. Returns chunk indices (into
+        ``self._chunks``) best-first, filtered to ``allowed``.
+        """
+        backend = await self._ensure_vector_backend()
+        if backend is not None:
+            q_matrix, _ = await embed_for_index([query])
+            if q_matrix is None or not len(q_matrix):
+                return []
+            try:
+                rows = await backend.search(
+                    q_matrix[0].tolist(),
+                    account_id=account_id,
+                    domain=self.domain,
+                    org_id=org_id,
+                    k=pool,
+                )
+            except Exception:  # noqa: BLE001 - degrade to lexical only
+                return []
+            order: list[int] = []
+            for row in rows:
+                idx = self._chunk_index.get(row.get("id"))
+                if idx is not None and idx in allowed:
+                    order.append(idx)
+            return order
+
+        # In-memory fallback (OpenAI matrix only; lexical-only when offline).
+        await self._ensure_embeddings()
+        if self._use_embeddings and self._embeddings is not None:
+            q_matrix = await embed_texts([query])
+            if q_matrix is not None and len(q_matrix):
+                ranked = cosine_rank(q_matrix[0], self._embeddings, k=len(self._chunks))
+                return [i for i, _ in ranked if i in allowed][:pool]
+        return []
+
     async def _ensure_embeddings(self) -> None:
         if not self._use_embeddings or self._embeddings is not None or self._embed_attempted:
             return
@@ -99,9 +185,18 @@ class Retriever:
 
     # -- public API -------------------------------------------------------
     async def search(
-        self, query: str, account_id: str | None = None, k: int = 5
+        self,
+        query: str,
+        account_id: str | None = None,
+        k: int = 5,
+        org_id: str = _DEMO_ORG,
     ) -> list[Evidence]:
-        """Return up to ``k`` Evidence items ranked by hybrid relevance."""
+        """Return up to ``k`` Evidence items ranked by hybrid relevance.
+
+        ``org_id`` scopes the durable pgvector lookups so a run only retrieves
+        its own org's knowledge (defaults to the Demo org that owns the seeded
+        in-memory corpus).
+        """
         if not query or not query.strip() or not self._chunks:
             return []
 
@@ -115,14 +210,10 @@ class Retriever:
         lex = [(i, s) for i, s in self._bm25.search(query, k=pool) if i in allowed]
         lex_order = [i for i, _ in lex]
 
-        # Optional embedding ranking.
-        emb_order: list[int] = []
-        await self._ensure_embeddings()
-        if self._use_embeddings and self._embeddings is not None:
-            q_matrix = await embed_texts([query])
-            if q_matrix is not None and len(q_matrix):
-                ranked = cosine_rank(q_matrix[0], self._embeddings, k=len(self._chunks))
-                emb_order = [i for i, _ in ranked if i in allowed][:pool]
+        # Optional embedding ranking (pgvector when available, else in-memory).
+        emb_order = await self._embedding_order(
+            query, account_id, allowed, pool, org_id
+        )
 
         # Fuse.
         if emb_order:
@@ -150,6 +241,58 @@ class Retriever:
             if len(results) >= k:
                 break
         return results
+
+    # -- live ingestion ---------------------------------------------------
+    def add_document(
+        self,
+        *,
+        doc_id: str,
+        account_id: str | None,
+        source_type: str,
+        title: str,
+        text: str,
+    ) -> list[Chunk]:
+        """Index a new document into the live corpus so it is retrievable now.
+
+        Used by the ingestion connectors: the text is chunked with exact spans,
+        the chunks (and their source text, for span-exact citations) are
+        registered, the lexical index is rebuilt over the expanded corpus, and
+        the lazily-built in-memory embedding matrix is invalidated so the new
+        chunks are embedded on the next search (the pgvector path is served by
+        the connector's upsert). Returns the chunks added (empty when the text
+        yields none, e.g. blank input).
+        """
+        if not text or not text.strip():
+            return []
+        new_chunks = chunk_document(
+            doc_id=doc_id,
+            account_id=account_id,
+            source_type=source_type,
+            title=title,
+            text=text,
+        )
+        if not new_chunks:
+            return []
+
+        self._documents[doc_id] = text
+        base = len(self._chunks)
+        self._chunks.extend(new_chunks)
+        for offset, chunk in enumerate(new_chunks):
+            self._chunk_index[chunk.chunk_id] = base + offset
+
+        # Rebuild the lexical index so the new chunks rank immediately.
+        self._bm25 = BM25Index([c.context for c in self._chunks])
+
+        # Invalidate the in-memory embedding matrix so the expanded corpus is
+        # re-embedded lazily on the next search (OpenAI path only).
+        self._embeddings = None
+        self._embed_attempted = False
+
+        # Let the retriever re-bind the pgvector backend on the next search:
+        # a previously-empty table may now hold these freshly written chunks.
+        self._pg_checked = False
+        self._pg_repo = None
+        return new_chunks
 
 
 # Module-level singletons keyed by domain (corpus + indexes are reusable).

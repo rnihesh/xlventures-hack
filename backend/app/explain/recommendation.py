@@ -156,6 +156,118 @@ def _calibrated_confidence(state: Dict[str, Any], action: Dict[str, Any]) -> Dic
     return {"score": score, "method": "self_consistency+verbalized", "label": label}
 
 
+# Candidate information gaps. Each entry is a fact that, if known, would change
+# or strengthen the recommendation. ``keywords`` are scanned across the run
+# corpus (evidence, signal, account context): if NONE appear, the fact is
+# considered missing and the gap is surfaced. Order here is the surfaced order.
+_GAP_CANDIDATES: List[Dict[str, Any]] = [
+    {
+        "keywords": ["usage", "active", "seats", "logins", "login", "adoption", "telemetry", "engagement"],
+        "gap": "No recent product usage data",
+        "why_it_matters": "Usage trend is the strongest leading indicator of churn and sizes the urgency of the play.",
+        "suggested_source": "Product analytics / telemetry",
+    },
+    {
+        "keywords": ["renewal", "renew", "contract end", "term", "expiry", "expiration"],
+        "gap": "Renewal date and timeline unknown",
+        "why_it_matters": "Timing determines how urgent the action is and which play fits the renewal window.",
+        "suggested_source": "CRM / contract record",
+    },
+    {
+        "keywords": ["sponsor", "executive", "champion", "buyer", "stakeholder", "exec"],
+        "gap": "No executive sponsor identified",
+        "why_it_matters": "Without a named sponsor, outreach may never reach a decision maker who can act.",
+        "suggested_source": "CRM relationship map",
+    },
+    {
+        "keywords": ["ticket", "support", "incident", "bug", "escalation", "csat", "outage"],
+        "gap": "Support and incident history not available",
+        "why_it_matters": "Unresolved issues are often the true churn driver behind a usage decline.",
+        "suggested_source": "Support / ticketing system",
+    },
+    {
+        "keywords": ["arr", "contract value", "revenue", "spend", "mrr", "tier", "plan"],
+        "gap": "Account value (ARR) not in context",
+        "why_it_matters": "Deal size sets how much investment and seniority the chosen play justifies.",
+        "suggested_source": "CRM / billing",
+    },
+    {
+        "keywords": ["competitor", "competition", "switch", "alternative", "vendor", "displace"],
+        "gap": "No signal on competitive pressure",
+        "why_it_matters": "An active competitor evaluation changes the save strategy and concession ceiling.",
+        "suggested_source": "CRM notes / sales conversations",
+    },
+]
+
+# Maximum gaps to surface so the section stays focused, not noisy.
+_MAX_GAPS = 4
+
+
+def _gap_corpus(state: Dict[str, Any], evidence: List[Dict[str, Any]], signal_content: str) -> str:
+    """Concatenate everything the engine actually knows into one searchable blob."""
+
+    parts: List[str] = [signal_content or ""]
+    for ev in evidence:
+        parts.append(str(ev.get("claim", "")))
+        parts.append(str(ev.get("snippet", "")))
+        parts.append(str(ev.get("source_type", "")))
+        parts.append(str(ev.get("source_id", "")))
+    risks = state.get("risks") or {}
+    for key in ("supporting_signals", "contradicting_signals"):
+        for s in risks.get(key) or []:
+            parts.append(str(s))
+    # Account context can arrive under any of several keys depending on caller.
+    for key in ("account", "account_profile", "context", "profile"):
+        ctx = state.get(key)
+        if isinstance(ctx, dict):
+            for k, v in ctx.items():
+                parts.append(str(k))
+                parts.append(str(v))
+        elif ctx:
+            parts.append(str(ctx))
+    return " ".join(parts).lower()
+
+
+def _missing_information(
+    state: Dict[str, Any],
+    evidence: List[Dict[str, Any]],
+    signal_content: str,
+) -> List[Dict[str, Any]]:
+    """Identify concrete missing facts: what the evidence and context do NOT contain.
+
+    Deterministic and offline: derived purely from keyword coverage over the run
+    corpus, so the same state always yields the same gaps. Mirrors workflow step
+    three (name opportunities, risks, AND missing information).
+    """
+
+    corpus = _gap_corpus(state, evidence, signal_content)
+    gaps: List[Dict[str, Any]] = []
+    for candidate in _GAP_CANDIDATES:
+        if any(kw in corpus for kw in candidate["keywords"]):
+            continue
+        gaps.append(
+            {
+                "gap": candidate["gap"],
+                "why_it_matters": candidate["why_it_matters"],
+                "suggested_source": candidate["suggested_source"],
+            }
+        )
+
+    # Meta gap: a case built only on confirming signals is under-tested. Surface
+    # it when retrieval gathered no disconfirming evidence at all.
+    risks = state.get("risks") or {}
+    if not (risks.get("contradicting_signals") or []):
+        gaps.append(
+            {
+                "gap": "No disconfirming evidence gathered",
+                "why_it_matters": "The case rests only on supporting signals; a counter-signal would calibrate confidence up or down.",
+                "suggested_source": "Cross-check sentiment, usage, and recent conversations",
+            }
+        )
+
+    return gaps[:_MAX_GAPS]
+
+
 def _verbalized_rationale(
     llm: Any,
     account_id: str,
@@ -239,6 +351,9 @@ def build_recommendation(state: Dict[str, Any], llm: Any) -> Dict[str, Any]:
     # Top-3 ranked alternatives (chosen play plus runner-ups with why_not).
     alternatives = _build_alternatives(state)
 
+    # What we still need to know: concrete facts absent from evidence and context.
+    missing_information = _missing_information(state, evidence, signal_content)
+
     # Counterfactual: contrast the recommended play with the runner-up.
     candidates = state.get("candidate_actions") or []
     runner_up = next((c for c in candidates if not c.get("chosen")), None)
@@ -277,6 +392,9 @@ def build_recommendation(state: Dict[str, Any], llm: Any) -> Dict[str, Any]:
         # Extra field: ranked candidates the engine weighed before choosing.
         # Kept outside the schema-required set so the contract stays intact.
         "alternatives": alternatives,
+        # Extra field: missing information (workflow step three). Each entry is
+        # {gap, why_it_matters, suggested_source}. Also outside the required set.
+        "missing_information": missing_information,
         "status": "proposed",
         "created_at": _now_iso(),
     }

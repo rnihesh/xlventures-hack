@@ -57,8 +57,74 @@ _BASE_VALUE = {
     "send_proposal": 0.73,
 }
 
+# Relative execution effort per action (0..1). Used for the "effort vs impact"
+# note so a reviewer can weigh payoff against the work each play requires.
+_EFFORT = {
+    "monitor_no_action": 0.1,
+    "launch_adoption_campaign": 0.45,
+    "initiate_renewal_motion": 0.4,
+    "schedule_executive_business_review": 0.55,
+    "identify_new_champion": 0.6,
+    "assign_onboarding_taskforce": 0.7,
+    "open_executive_escalation": 0.75,
+    "offer_save_concession": 0.65,
+    "propose_expansion_offer": 0.6,
+    "resolve_billing_dispute": 0.55,
+    "re_engage_buyer": 0.35,
+    "send_proposal": 0.5,
+    # collections
+    "send_payment_reminder": 0.15,
+    "send_dunning_notice": 0.3,
+    "schedule_collection_call": 0.45,
+    "negotiate_payment_plan": 0.6,
+    "secure_promise_to_pay": 0.4,
+    "open_dispute_case": 0.55,
+    "place_credit_hold": 0.6,
+    "adjust_credit_terms": 0.65,
+    "offer_settlement": 0.75,
+    "escalate_to_agency": 0.7,
+    "recommend_writeoff": 0.6,
+}
+
 # How many ranked candidates to expose as user-facing alternatives.
 _MAX_ALTERNATIVES = 3
+
+
+def _bucket(value: float) -> str:
+    """Coarse low/medium/high label for a 0..1 value."""
+
+    if value >= 0.66:
+        return "high"
+    if value >= 0.4:
+        return "medium"
+    return "low"
+
+
+def _effort_impact(action_key: str, score: float) -> Dict[str, Any]:
+    """Return an effort vs impact read for a candidate: labels plus a note."""
+
+    effort = _EFFORT.get(action_key, 0.5)
+    effort_label = _bucket(effort)
+    impact_label = _bucket(score)
+    # Payoff ratio: impact earned per unit of effort. Above 1 reads as efficient.
+    ratio = round(score / effort, 2) if effort > 0 else None
+
+    if impact_label == "high" and effort_label in ("low", "medium"):
+        note = f"{impact_label.title()} impact for {effort_label} effort: an efficient play."
+    elif impact_label == "low" and effort_label == "high":
+        note = f"{impact_label.title()} impact for {effort_label} effort: hard to justify now."
+    elif impact_label == effort_label:
+        note = f"{impact_label.title()} impact balanced against {effort_label} effort."
+    else:
+        note = f"{impact_label.title()} impact for {effort_label} effort."
+
+    return {
+        "effort": round(effort, 2),
+        "effort_label": effort_label,
+        "impact_label": impact_label,
+        "payoff_ratio": ratio,
+        "effort_impact_note": note,
+    }
 
 
 def _eligible_actions(pack: DomainPack, decision_point: str) -> List[Action]:
@@ -115,6 +181,13 @@ def _episode_boost(episodes: List[Dict[str, Any]], action_key: str) -> float:
     return boost
 
 
+def _with_note(text: str, candidate: Dict[str, Any]) -> str:
+    """Append the candidate's effort-vs-impact note to a reason string."""
+
+    note = candidate.get("effort_impact_note")
+    return f"{text} {note}" if note else text
+
+
 def _runner_up_why_not(chosen: Dict[str, Any], alt: Dict[str, Any]) -> str:
     """Explain, in one line, why this eligible play lost to the chosen one."""
 
@@ -143,7 +216,11 @@ def _candidate_rationale(candidate: Dict[str, Any]) -> str:
         bits.append("accepted on similar accounts before")
     if candidate.get("risk_term", 0.0) > 0 and candidate["key"] != "monitor_no_action":
         bits.append("scales with the current risk magnitude")
-    return "; ".join(bits) + "."
+    rationale = "; ".join(bits) + "."
+    note = candidate.get("effort_impact_note")
+    if note:
+        rationale = f"{rationale} {note}"
+    return rationale
 
 
 def build_alternatives(candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -172,10 +249,20 @@ def build_alternatives(candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]
                 "score": candidate["score"],
                 "rationale": (
                     "Highest expected value given risk magnitude and learned preferences."
+                    + (
+                        f" {candidate['effort_impact_note']}"
+                        if candidate.get("effort_impact_note")
+                        else ""
+                    )
                     if is_chosen
                     else _candidate_rationale(candidate)
                 ),
                 "why_not": None if is_chosen else _runner_up_why_not(chosen, candidate),
+                "effort_impact": {
+                    "effort_label": candidate.get("effort_label"),
+                    "impact_label": candidate.get("impact_label"),
+                    "note": candidate.get("effort_impact_note"),
+                },
                 "chosen": is_chosen,
             }
         )
@@ -221,30 +308,42 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
         pref = _preference_boost(preferences, action.key)
         epi = _episode_boost(episodes, action.key)
         score = max(0.02, min(0.99, round(base + risk_term + pref + epi, 3)))
-        candidates.append(
-            {
-                "key": action.key,
-                "title": action.title,
-                "description": action.description,
-                "eligibility": action.eligibility,
-                "score": score,
-                "base_value": base,
-                "risk_term": round(risk_term, 3),
-                "preference_boost": round(pref, 3),
-                "episode_boost": round(epi, 3),
-            }
-        )
+        candidate = {
+            "key": action.key,
+            "title": action.title,
+            "description": action.description,
+            "eligibility": action.eligibility,
+            "score": score,
+            "base_value": base,
+            "risk_term": round(risk_term, 3),
+            "preference_boost": round(pref, 3),
+            "episode_boost": round(epi, 3),
+        }
+        candidate.update(_effort_impact(action.key, score))
+        candidates.append(candidate)
 
-    candidates.sort(key=lambda c: c["score"], reverse=True)
+    # Primary sort by expected value. Ties are broken by learned memory (a play
+    # the team has favored or accepted before wins), then by raw base value, so
+    # the learning loop also shows up when two plays are otherwise even.
+    candidates.sort(
+        key=lambda c: (
+            c["score"],
+            round(c["preference_boost"] + c["episode_boost"], 3),
+            c["base_value"],
+        ),
+        reverse=True,
+    )
 
     # Annotate the runner-ups with a short "why not" reason on the full list.
     if candidates:
         chosen = candidates[0]
         chosen["chosen"] = True
-        chosen["reason"] = "Highest expected value given risk magnitude and learned preferences."
+        chosen["reason"] = _with_note(
+            "Highest expected value given risk magnitude and learned preferences.", chosen
+        )
         for alt in candidates[1:]:
             alt["chosen"] = False
-            alt["reason"] = _runner_up_why_not(chosen, alt)
+            alt["reason"] = _with_note(_runner_up_why_not(chosen, alt), alt)
 
     # Compact, ranked alternatives for the recommendation object and UI.
     alternatives = build_alternatives(candidates)
@@ -277,7 +376,14 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
                 + (candidates[0]["key"] if candidates else "none"),
                 {
                     "candidates": [
-                        {"key": c["key"], "score": c["score"], "chosen": c.get("chosen", False)}
+                        {
+                            "key": c["key"],
+                            "score": c["score"],
+                            "chosen": c.get("chosen", False),
+                            "effort_label": c.get("effort_label"),
+                            "impact_label": c.get("impact_label"),
+                            "effort_impact_note": c.get("effort_impact_note"),
+                        }
                         for c in candidates
                     ],
                     "alternatives": [

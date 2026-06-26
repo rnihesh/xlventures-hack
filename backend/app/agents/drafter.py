@@ -7,6 +7,8 @@ so the run always ends in something actionable rather than advice.
 
 from __future__ import annotations
 
+import asyncio
+
 from typing import Any, Dict
 
 from app.agents import make_step
@@ -76,7 +78,7 @@ def _template_draft(state: Dict[str, Any], action: Dict[str, Any]) -> str:
 )
 async def node(state: Dict[str, Any]) -> Dict[str, Any]:
     action = _chosen(state)
-    llm_body = _llm_draft(state, action)
+    llm_body = await asyncio.to_thread(_llm_draft, state, action)
     body = llm_body or _template_draft(state, action)
     source = "llm" if llm_body else "template"
 

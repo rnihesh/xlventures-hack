@@ -18,9 +18,12 @@ router = APIRouter(tags=["domains"])
 
 @router.get("/domains")
 async def get_domains() -> List[Dict[str, Any]]:
-    """Return a summary of every domain pack on disk."""
+    """Return a summary of every domain pack on disk, flagship first."""
 
-    return list_packs()
+    # Customer Success is the flagship domain, so it leads the list.
+    packs = list_packs()
+    packs.sort(key=lambda p: (p.get("key") != "customer_success", p.get("key", "")))
+    return packs
 
 
 @router.get("/domains/{domain_key}")

@@ -16,7 +16,9 @@ the learning loop can later record an outcome against it.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+import asyncio
+
+from typing import Any, Dict, List, Tuple
 
 from langgraph.graph import END, START, StateGraph
 
@@ -86,17 +88,74 @@ def _classify_decision_point(pack: Any, signal: Dict[str, Any]) -> str:
     return next(iter(pack.decision_points), "general_review")
 
 
-def _select_capabilities(decision_point: str) -> List[str]:
-    """Pick which specialists to run for a decision point.
+# Per decision-point routing profiles. Each entry names the specialist roster
+# for that situation plus a one-line rationale. The roster is intersected with
+# the registered pipeline at run time, so a profile can reference a specialist
+# that is not installed without breaking the graph. Decision points absent here
+# fall back to the full standard flow.
+_FULL = ["retrieval", "risk_scorer", "play_recommender", "outcome_simulator", "drafter"]
 
-    All registered pipeline capabilities run by default. Pure-monitoring points
-    skip the drafter (no outreach artifact needed).
+_ROUTING: Dict[str, Dict[str, Any]] = {
+    # Opportunities: size the upside (simulate) and prepare outreach to capture it.
+    "expansion_signal": {
+        "caps": _FULL,
+        "rationale": "Expansion opportunity: rank plays, simulate the upside, and draft outreach to act on it.",
+    },
+    "closing_signal": {
+        "caps": _FULL,
+        "rationale": "Closing opportunity: rank plays, project velocity, and draft the proposal outreach.",
+    },
+    # Escalations are urgent: prioritize a drafted response over KPI simulation.
+    "escalation": {
+        "caps": ["retrieval", "risk_scorer", "play_recommender", "drafter"],
+        "rationale": "Escalation: move fast to a grounded, drafted response and skip slower KPI simulation.",
+    },
+    "high_value_recovery": {
+        "caps": ["retrieval", "risk_scorer", "play_recommender", "drafter"],
+        "rationale": "High-value recovery: prioritize a relationship-aware, drafted outreach over simulation.",
+    },
+    "pre_writeoff": {
+        "caps": ["retrieval", "risk_scorer", "play_recommender"],
+        "rationale": "Pre-write-off: focus on evidence and the recovery decision; no outreach drafted here.",
+    },
+    # Credit / dispute reviews are internal analysis, not customer outreach.
+    "credit_risk_review": {
+        "caps": ["retrieval", "risk_scorer", "play_recommender", "outcome_simulator"],
+        "rationale": "Credit review: quantify exposure and the treatment decision; outreach is not drafted.",
+    },
+    "dispute_resolution": {
+        "caps": ["retrieval", "risk_scorer", "play_recommender"],
+        "rationale": "Dispute: ground the case and decide routing before any dunning outreach.",
+    },
+    # Pure monitoring: analyze and rank, but produce no outreach artifact.
+    "general_review": {
+        "caps": ["retrieval", "risk_scorer", "play_recommender"],
+        "rationale": "General review: retrieve, score, and rank options without drafting outreach.",
+    },
+}
+
+_DEFAULT_RATIONALE = (
+    "Standard decision flow: retrieve evidence, score risk, rank plays, "
+    "simulate impact, and draft outreach."
+)
+
+
+def _select_plan(decision_point: str) -> Tuple[List[str], str]:
+    """Choose the specialist roster and rationale for a decision point.
+
+    Routing is genuinely dynamic: expansion and escalation, for example, pull
+    different specialists. The chosen roster is intersected with the registered
+    pipeline so the graph topology stays stable while the active set varies.
     """
 
-    caps = [c for c in _PIPELINE if AGENTS.has(c)]
-    if decision_point in ("general_review",):
-        caps = [c for c in caps if c != "drafter"]
-    return caps
+    profile = _ROUTING.get(decision_point)
+    template = profile["caps"] if profile else _FULL
+    rationale = profile["rationale"] if profile else _DEFAULT_RATIONALE
+    caps = [c for c in template if c in _PIPELINE and AGENTS.has(c)]
+    if not caps:
+        # Never leave the run with no specialists: fall back to whatever is registered.
+        caps = [c for c in _PIPELINE if AGENTS.has(c)]
+    return caps, rationale
 
 
 async def planner_node(state: RunState) -> Dict[str, Any]:
@@ -107,7 +166,7 @@ async def planner_node(state: RunState) -> Dict[str, Any]:
     pack = load_pack(domain)
 
     decision_point = _classify_decision_point(pack, signal)
-    capabilities = _select_capabilities(decision_point)
+    capabilities, plan_rationale = _select_plan(decision_point)
 
     dp = pack.decision_points.get(decision_point)
     dp_label = dp.label if dp else decision_point
@@ -121,27 +180,36 @@ async def planner_node(state: RunState) -> Dict[str, Any]:
     fallback = "\n".join(
         f"Run {cap.replace('_', ' ')}" for cap in capabilities + ["critic"]
     )
-    raw = _safe_llm_text(prompt, fallback)
+    raw = await asyncio.to_thread(_safe_llm_text, prompt, fallback)
     plan = [line.strip(" -*0123456789.") for line in raw.splitlines() if line.strip()]
     if not plan:
         plan = [s.strip() for s in fallback.splitlines()]
 
+    roster = ", ".join(capabilities) or "critic only"
     return {
         "decision_point": decision_point,
         "domain_pack_key": domain,
         "capabilities": capabilities,
         "plan": plan,
         "messages": [
-            {"role": "planner", "content": f"Classified as {dp_label}; planned {len(capabilities)} specialists."}
+            {
+                "role": "planner",
+                "content": (
+                    f"Classified as {dp_label}; routed {len(capabilities)} specialists "
+                    f"({roster}). {plan_rationale}"
+                ),
+            }
         ],
         "steps": [
             make_step(
                 "planner",
-                f"Classified decision point: {dp_label}",
+                f"Classified decision point: {dp_label}; routed {len(capabilities)} specialists",
                 {
                     "decision_point": decision_point,
                     "capabilities": capabilities + ["critic"],
                     "plan": plan,
+                    "plan_rationale": plan_rationale,
+                    "routing": {"roster": capabilities, "rationale": plan_rationale},
                 },
             )
         ],

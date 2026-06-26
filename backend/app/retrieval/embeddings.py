@@ -8,6 +8,9 @@ degrades gracefully rather than raising.
 
 from __future__ import annotations
 
+import hashlib
+import re
+
 from app.config import settings
 
 try:  # numpy is optional at runtime
@@ -19,7 +22,13 @@ except Exception:  # pragma: no cover - environment without numpy
     _HAS_NUMPY = False
 
 _EMBED_MODEL = "text-embedding-3-small"
+# Output dimension of the OpenAI model above; the pgvector columns and the
+# deterministic offline fallback below all use this exact width so vectors are
+# interchangeable between the two encoders.
+EMBED_DIM = 1536
 _OPENAI_URL = (settings.openai_base_url or "https://api.openai.com/v1").rstrip("/")
+
+_TOKEN_RE = re.compile(r"[a-z0-9]+")
 
 
 def embeddings_available() -> bool:
@@ -54,6 +63,53 @@ async def embed_texts(texts: list[str]):
         return matrix
     except Exception:
         return None
+
+
+def _hash_embed_one(text: str):
+    """Deterministic bag-of-tokens hashed embedding, L2-normalized.
+
+    A signed feature-hashing trick maps each token into one of ``EMBED_DIM``
+    buckets. The result is reproducible across processes (so an offline ingest
+    and an offline query produce matchable vectors) and lives in the same
+    geometry as the OpenAI vectors (unit norm, cosine-comparable).
+    """
+    vec = np.zeros(EMBED_DIM, dtype="float32")
+    for tok in _TOKEN_RE.findall((text or "").lower()):
+        digest = hashlib.blake2b(tok.encode("utf-8"), digest_size=8).digest()
+        idx = int.from_bytes(digest[:4], "big") % EMBED_DIM
+        sign = 1.0 if (digest[4] & 1) else -1.0
+        vec[idx] += sign
+    norm = float(np.linalg.norm(vec))
+    if norm > 0.0:
+        vec /= norm
+    return vec
+
+
+def hash_embed(texts: list[str]):
+    """Deterministic offline embeddings for ``texts`` as an ``(n, EMBED_DIM)``
+    matrix, or ``None`` when numpy is unavailable."""
+    if not _HAS_NUMPY or not texts:
+        return None
+    return np.asarray([_hash_embed_one(t) for t in texts], dtype="float32")
+
+
+async def embed_for_index(texts: list[str]) -> tuple[object | None, str]:
+    """Embed ``texts`` for indexing/querying, returning ``(matrix, method)``.
+
+    Prefers real OpenAI embeddings when a key is configured; otherwise falls
+    back to the deterministic local hash embedding so ingestion and pgvector
+    queries still work fully offline. ``method`` is ``"openai"``, ``"hash"`` or
+    ``"none"`` (numpy missing / empty input).
+    """
+    if not texts:
+        return None, "none"
+    matrix = await embed_texts(texts)
+    if matrix is not None:
+        return matrix, "openai"
+    fallback = hash_embed(texts)
+    if fallback is not None:
+        return fallback, "hash"
+    return None, "none"
 
 
 def cosine_rank(query_vec, matrix, k: int = 10) -> list[tuple[int, float]]:

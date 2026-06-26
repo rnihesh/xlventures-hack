@@ -19,11 +19,17 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.actions import ARTIFACT_TYPES, generate_artifact
 from app.actions.generators import _llm_available
+from app.api._org import current_org
+from app.config import settings
+from app.repositories import connectors as connectors_repo
+from app.services import email as email_service
+from app.services import google_oauth
+from app.services import slack as slack_service
 
 router = APIRouter(tags=["execute"])
 
@@ -60,6 +66,29 @@ class ExecuteIn(BaseModel):
 class ExecuteOut(BaseModel):
     artifact: Dict[str, Any]
     audit: Dict[str, Any]
+
+
+class SendIn(BaseModel):
+    """Body for POST /execute/send.
+
+    ``artifact_type`` is the channel to send through (``email`` via SES,
+    ``gmail`` / ``google`` via the Gmail API, ``slack`` via webhook). ``artifact``
+    is the generated content (e.g. ``{subject, body}`` for email, ``{message}``
+    for slack). ``account_id`` supplies the recipient context; ``run_id`` ties
+    the send to a stored run for auditing.
+    """
+
+    artifact_type: str = Field(..., description="email | gmail | google | slack")
+    artifact: Dict[str, Any] = Field(default_factory=dict)
+    account_id: Optional[str] = None
+    run_id: Optional[str] = None
+
+
+class SendOut(BaseModel):
+    sent: bool
+    reason: Optional[str] = None
+    detail: Optional[Any] = None
+    channel: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -164,3 +193,107 @@ async def list_artifacts(run_id: str) -> List[Dict[str, Any]]:
 
     records = _ARTIFACTS.get(run_id, [])
     return list(reversed(records))
+
+
+# ---------------------------------------------------------------------------
+# Real send (used when the user clicks Send)
+# ---------------------------------------------------------------------------
+
+
+def _recipient_email(artifact: Dict[str, Any], account: Dict[str, Any]) -> Optional[str]:
+    """Resolve the recipient email from the artifact, then the account profile."""
+
+    to = artifact.get("to") or artifact.get("recipient")
+    if to:
+        return str(to)
+    profile = account.get("profile") if isinstance(account, dict) else None
+    if isinstance(profile, dict):
+        for key in ("email", "contact_email", "owner_email"):
+            if profile.get(key):
+                return str(profile[key])
+    for key in ("email", "contact_email"):
+        if account.get(key):
+            return str(account[key])
+    return None
+
+
+def _slack_text(artifact: Dict[str, Any]) -> str:
+    """Resolve the message text from a slack (or generic) artifact."""
+
+    return str(
+        artifact.get("message")
+        or artifact.get("text")
+        or artifact.get("body")
+        or ""
+    )
+
+
+@router.post("/execute/send", response_model=SendOut)
+async def execute_send(
+    body: SendIn,
+    org_id: str = Depends(current_org),
+) -> SendOut:
+    """Actually send an artifact through the org's configured channel.
+
+    Looks up the org connector for the channel and sends for real (email via
+    SES, slack via webhook, gmail via the stored Google token). Offline or
+    unconfigured channels return ``{sent: False, reason: '... not configured'}``
+    rather than raising, so the click-to-send flow never crashes.
+    """
+
+    artifact = body.artifact or {}
+    account = _lookup_account(body.account_id)
+    kind = body.artifact_type.lower().strip()
+
+    result: Dict[str, Any]
+
+    if kind in ("email", "gmail", "google"):
+        # All email sends go over SES from the single platform sender. There is
+        # no per-org sender configuration; Google is a sign-in method, not a mail
+        # connector.
+        to = _recipient_email(artifact, account)
+        if not to:
+            result = {"sent": False, "reason": "no_recipient"}
+        else:
+            result = email_service.send_email(
+                to=to,
+                subject=str(artifact.get("subject") or "(no subject)"),
+                body=str(artifact.get("body") or ""),
+                sender=settings.ses_sender_email,
+            )
+        channel = "email"
+
+    elif kind == "slack":
+        connector = await connectors_repo.get(org_id, "slack")
+        config = (connector or {}).get("config") or {}
+        result = slack_service.post_message(
+            config.get("webhook_url"), _slack_text(artifact)
+        )
+        channel = "slack"
+
+    else:
+        raise HTTPException(
+            status_code=422,
+            detail="invalid artifact_type; expected one of email | gmail | google | slack",
+        )
+
+    # Record an audit entry so the send shows up alongside generated artifacts.
+    audit: Dict[str, Any] = {
+        "id": str(uuid.uuid4()),
+        "run_id": body.run_id,
+        "account_id": body.account_id,
+        "channel": channel,
+        "action": "send",
+        "sent": bool(result.get("sent")),
+        "reason": result.get("reason"),
+        "created_at": _now_iso(),
+    }
+    store_key = body.run_id or _UNATTACHED_KEY
+    _ARTIFACTS.setdefault(store_key, []).append(audit)
+
+    return SendOut(
+        sent=bool(result.get("sent")),
+        reason=result.get("reason"),
+        detail=result.get("detail") or result.get("message_id"),
+        channel=channel,
+    )
