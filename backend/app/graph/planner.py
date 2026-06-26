@@ -1,36 +1,41 @@
-"""LangGraph planner graph for the walking skeleton.
+"""LangGraph planner graph.
 
-A real, end to end multi node flow:
+A real, end to end multi node flow driven by the domain pack and the agent
+registry:
 
-    planner -> retrieve -> analyze -> recommend -> critic -> END
+    planner -> retrieval -> risk_scorer -> play_recommender ->
+    outcome_simulator -> drafter -> critic -> hitl_gate -> commit -> END
 
-Each node appends a step record to state. The planner and recommend nodes use
-`get_llm`, with graceful fallbacks so the graph runs even without an LLM key.
+The planner reads the domain pack's ``planner_prompt`` and ``decision_points``
+to classify the signal and select which specialists to run. Specialist nodes are
+resolved from the registry by capability, so the graph topology is stable while
+the selected roster is dynamic. The commit node writes an episode to memory so
+the learning loop can later record an outcome against it.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from langgraph.graph import END, START, StateGraph
 
+# Importing the agents package registers every specialist into AGENTS.
+import app.agents  # noqa: F401
+from app.agents import make_step, safe_get_memory
 from app.deps import get_llm
-from app.explain.recommendation import build_recommendation
+from app.packs.loader import load_pack
+from app.packs.registry import AGENTS
 from app.graph.state import RunState
 
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _step(node: str, summary: str, data: Dict[str, Any] | None = None) -> Dict[str, Any]:
-    return {
-        "node": node,
-        "summary": summary,
-        "ts": _now_iso(),
-        "data": data or {},
-    }
+# The ordered specialist pipeline. Critic always runs; the others are gated by
+# the planner's capability selection.
+_PIPELINE = [
+    "retrieval",
+    "risk_scorer",
+    "play_recommender",
+    "outcome_simulator",
+    "drafter",
+]
 
 
 def _safe_llm_text(prompt: str, fallback: str) -> str:
@@ -38,7 +43,7 @@ def _safe_llm_text(prompt: str, fallback: str) -> str:
 
     try:
         llm = get_llm()
-    except Exception:
+    except Exception:  # noqa: BLE001
         return fallback
     if llm is None:
         return fallback
@@ -47,140 +52,178 @@ def _safe_llm_text(prompt: str, fallback: str) -> str:
         text = getattr(result, "content", result)
         if isinstance(text, str) and text.strip():
             return text.strip()
-    except Exception:
+    except Exception:  # noqa: BLE001
         return fallback
     return fallback
 
 
-def planner_node(state: RunState) -> Dict[str, Any]:
-    """Decompose the signal into a short ordered plan."""
+def _classify_decision_point(pack: Any, signal: Dict[str, Any]) -> str:
+    """Map the incoming signal to a decision point from the pack."""
 
-    account_id = state.get("account_id", "unknown-account")
-    signal = state.get("signal") or {}
-    signal_content = signal.get("content", "Churn risk signal detected.")
+    signal_type = (signal.get("type") or "").strip()
+    if signal_type:
+        dp = pack.decision_point_for_signal(signal_type)
+        if dp:
+            return dp
+
+    # Fall back to a content keyword match against decision point labels.
+    content = (signal.get("content") or "").lower()
+    for dp_key, dp in pack.decision_points.items():
+        if dp.label and dp.label.lower() in content:
+            return dp_key
+        for trigger in dp.trigger_signals:
+            if trigger.replace("_", " ") in content:
+                return dp_key
+
+    # Default to a renewal/risk style point if present, else the first one.
+    for preferred in ("renewal_risk", "health_drop", "deal_stall"):
+        if preferred in pack.decision_points:
+            return preferred
+    return next(iter(pack.decision_points), "general_review")
+
+
+def _select_capabilities(decision_point: str) -> List[str]:
+    """Pick which specialists to run for a decision point.
+
+    All registered pipeline capabilities run by default. Pure-monitoring points
+    skip the drafter (no outreach artifact needed).
+    """
+
+    caps = [c for c in _PIPELINE if AGENTS.has(c)]
+    if decision_point in ("general_review",):
+        caps = [c for c in caps if c != "drafter"]
+    return caps
+
+
+async def planner_node(state: RunState) -> Dict[str, Any]:
+    """Classify the signal, select specialists, and draft the plan."""
+
+    domain = state.get("domain", "customer_success")
+    signal = dict(state.get("signal") or {})
+    pack = load_pack(domain)
+
+    decision_point = _classify_decision_point(pack, signal)
+    capabilities = _select_capabilities(decision_point)
+
+    dp = pack.decision_points.get(decision_point)
+    dp_label = dp.label if dp else decision_point
 
     prompt = (
-        "You are a planning supervisor for a Customer Success decision engine. "
-        f"Account: {account_id}. Signal: {signal_content}. "
-        "List 4 short imperative steps (retrieve evidence, assess risk, "
-        "recommend a play, critique). Reply as a newline separated list."
+        f"{pack.planner_prompt}\n\n"
+        f"Account signal: {signal.get('content', '')}. "
+        f"Classified decision point: {dp_label}. "
+        "List the ordered specialist steps to run as a newline separated list."
     )
-    fallback = (
-        "Retrieve account evidence\n"
-        "Assess churn risk and opportunity\n"
-        "Recommend the next best action\n"
-        "Critique the recommendation for faithfulness"
+    fallback = "\n".join(
+        f"Run {cap.replace('_', ' ')}" for cap in capabilities + ["critic"]
     )
     raw = _safe_llm_text(prompt, fallback)
-    plan: List[str] = [line.strip(" -*0123456789.") for line in raw.splitlines() if line.strip()]
+    plan = [line.strip(" -*0123456789.") for line in raw.splitlines() if line.strip()]
     if not plan:
         plan = [s.strip() for s in fallback.splitlines()]
 
     return {
+        "decision_point": decision_point,
+        "domain_pack_key": domain,
+        "capabilities": capabilities,
         "plan": plan,
-        "messages": [{"role": "planner", "content": "Plan drafted."}],
-        "steps": [_step("planner", "Drafted a 4 step plan", {"plan": plan})],
-    }
-
-
-def retrieve_node(state: RunState) -> Dict[str, Any]:
-    """Return a couple of plausible, span citable evidence snippets."""
-
-    account_id = state.get("account_id", "unknown-account")
-    snippet_a = (
-        "Product usage for this account dropped 38% quarter over quarter, with "
-        "weekly active seats falling from 120 to 74."
-    )
-    snippet_b = (
-        "The economic buyer has not attended a business review in 2 quarters and "
-        "the renewal is 95 days out."
-    )
-    evidence = [
-        {
-            "claim": "Usage is declining sharply ahead of renewal.",
-            "source_id": f"telemetry:{account_id}:q-usage",
-            "source_type": "product_telemetry",
-            "snippet": snippet_a,
-            "span": {"start": 0, "end": 38},
-        },
-        {
-            "claim": "Executive sponsor engagement has lapsed.",
-            "source_id": f"crm:{account_id}:engagement",
-            "source_type": "crm_activity",
-            "snippet": snippet_b,
-            "span": {"start": 0, "end": 49},
-        },
-    ]
-    return {
-        "evidence": evidence,
+        "messages": [
+            {"role": "planner", "content": f"Classified as {dp_label}; planned {len(capabilities)} specialists."}
+        ],
         "steps": [
-            _step(
-                "retrieve",
-                f"Retrieved {len(evidence)} evidence snippets",
-                {"evidence_count": len(evidence)},
+            make_step(
+                "planner",
+                f"Classified decision point: {dp_label}",
+                {
+                    "decision_point": decision_point,
+                    "capabilities": capabilities + ["critic"],
+                    "plan": plan,
+                },
             )
         ],
     }
 
 
-def analyze_node(state: RunState) -> Dict[str, Any]:
-    """Classify the situation as a risk or opportunity."""
+def _make_specialist_node(capability: str):
+    """Wrap a registered specialist so it is skipped when not selected."""
 
-    risk = {
-        "type": "risk",
-        "summary": (
-            "Declining usage plus a disengaged executive sponsor inside the "
-            "renewal window indicates compounding churn risk."
-        ),
-    }
+    async def _node(state: RunState) -> Dict[str, Any]:
+        caps = state.get("capabilities") or []
+        if capability not in caps:
+            return {
+                "steps": [
+                    make_step(capability, f"Skipped {capability}", {"skipped": True})
+                ]
+            }
+        card = AGENTS.get(capability)
+        return await card.node(dict(state))
+
+    _node.__name__ = f"{capability}_node"
+    return _node
+
+
+async def critic_node(state: RunState) -> Dict[str, Any]:
+    """Run the critic specialist (always on)."""
+
+    card = AGENTS.get("critic")
+    return await card.node(dict(state))
+
+
+async def hitl_gate_node(state: RunState) -> Dict[str, Any]:
+    """Record whether the recommendation routes to a human.
+
+    The actual interrupt is surfaced to the UI as a ``hitl.required`` event by
+    the runs API based on the critic verdict; this node records the routing in
+    the trace so the decision is auditable.
+    """
+
+    critic = state.get("critic") or {}
+    requires_hitl = bool(critic.get("requires_hitl"))
+    summary = "Routed to human approval" if requires_hitl else "Auto-approved (reversible, high confidence)"
     return {
-        "risk_opportunity": risk,
-        "steps": [_step("analyze", "Classified as churn risk", risk)],
-    }
-
-
-def recommend_node(state: RunState) -> Dict[str, Any]:
-    """Produce the Explainable Recommendation Object."""
-
-    try:
-        llm = get_llm()
-    except Exception:
-        llm = None
-    recommendation = build_recommendation(dict(state), llm)
-    return {
-        "recommendation": recommendation,
-        "messages": [{"role": "recommender", "content": recommendation["action"]["title"]}],
+        "messages": [{"role": "hitl_gate", "content": summary}],
         "steps": [
-            _step(
-                "recommend",
-                f"Recommended action: {recommendation['action']['key']}",
-                {"action_key": recommendation["action"]["key"]},
-            )
+            make_step("hitl_gate", summary, {"requires_hitl": requires_hitl})
         ],
     }
 
 
-def critic_node(state: RunState) -> Dict[str, Any]:
-    """Verify faithfulness and confirm whether HITL is required."""
+async def commit_node(state: RunState) -> Dict[str, Any]:
+    """Write an episode to memory so an outcome can be recorded later."""
 
     recommendation = state.get("recommendation") or {}
-    confidence = (recommendation.get("confidence") or {}).get("score", 0.0)
-    evidence = recommendation.get("evidence") or []
-    faithful = len(evidence) > 0
-    requires_hitl = (
-        recommendation.get("risk_opportunity", {}).get("type") == "risk"
-        or confidence < 0.85
-    )
-    critic = {
-        "faithful": faithful,
-        "confidence_reviewed": confidence,
-        "requires_hitl": requires_hitl,
-        "verdict": "approved_for_review" if faithful else "needs_replan",
-    }
+    account_id = state.get("account_id", "unknown-account")
+    domain = state.get("domain", "customer_success")
+    decision_point = state.get("decision_point", "")
+    signal = state.get("signal") or {}
+    situation = f"{decision_point}: {signal.get('content', '')}".strip()
+    action_key = (recommendation.get("action") or {}).get("key", "")
+
+    episode_id = None
+    memory = await safe_get_memory()
+    if memory is not None and recommendation:
+        try:
+            episode_id = await memory.write_episode(
+                account_id=account_id,
+                domain=domain,
+                situation=situation,
+                action_key=action_key,
+                recommendation=recommendation,
+            )
+        except Exception:  # noqa: BLE001 - never fail the run on a memory write
+            episode_id = None
+
     return {
-        "critic": critic,
-        "messages": [{"role": "critic", "content": critic["verdict"]}],
-        "steps": [_step("critic", "Critiqued recommendation", critic)],
+        "episode_id": episode_id,
+        "steps": [
+            make_step(
+                "commit",
+                "Wrote decision episode to memory"
+                if episode_id
+                else "Decision recorded (memory unavailable)",
+                {"episode_id": episode_id, "action_key": action_key},
+            )
+        ],
     }
 
 
@@ -190,16 +233,16 @@ def build_graph(checkpointer: Any):
     graph = StateGraph(RunState)
 
     graph.add_node("planner", planner_node)
-    graph.add_node("retrieve", retrieve_node)
-    graph.add_node("analyze", analyze_node)
-    graph.add_node("recommend", recommend_node)
+    for capability in _PIPELINE:
+        graph.add_node(capability, _make_specialist_node(capability))
     graph.add_node("critic", critic_node)
+    graph.add_node("hitl_gate", hitl_gate_node)
+    graph.add_node("commit", commit_node)
 
     graph.add_edge(START, "planner")
-    graph.add_edge("planner", "retrieve")
-    graph.add_edge("retrieve", "analyze")
-    graph.add_edge("analyze", "recommend")
-    graph.add_edge("recommend", "critic")
-    graph.add_edge("critic", END)
+    ordered = ["planner", *_PIPELINE, "critic", "hitl_gate", "commit"]
+    for src, dst in zip(ordered, ordered[1:]):
+        graph.add_edge(src, dst)
+    graph.add_edge("commit", END)
 
     return graph.compile(checkpointer=checkpointer)
