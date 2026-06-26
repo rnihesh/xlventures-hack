@@ -1,310 +1,1258 @@
 [
   {
-    "id": "DOC-1001-MN",
+    "id": "DOC-ACC-1001-MN",
     "account_id": "ACC-1001",
     "source_type": "meeting_notes",
-    "title": "Northwind Logistics - Weekly CS Sync (2026-06-18)",
-    "text": "Attendees: Priya Nair (CSM), Northwind absent.\nFlag: Northwind did not join the scheduled sync for the second week in a row.\n\nUsage trend: Weekly active users fell from 96 to 59 over the last month, a 38% drop month over month against 120 licensed seats. The decline started right after their carrier API migration on May 28.\n\nRoot cause hypothesis: The TMS-to-platform integration began failing silently after Northwind's carrier changed its tracking API. Shipment sync jobs are erroring, so dispatchers stopped logging in.\n\nRelationship risk: Our champion, Ops Director Karim Haddad, left Northwind on June 5. No replacement sponsor has been identified. The remaining admin is a junior analyst with limited authority.\n\nRenewal context: Contract renews 2026-10-15 at 180k ARR. Health score dropped to 42 (high risk). Recommended next step is an executive re-engagement plus an integration fix sprint before usage erodes further."
+    "title": "Northwind Logistics - Weekly CS Sync",
+    "text": "Attendees: Priya Nair (CSM); Ravi Menon (customer).\nContext: Northwind Logistics is at 20k ARR across 16 licensed seats, renewing 2026-11-04. Seat utilisation is 56% (9 of 16).\nDiscussion: A six-hour sev-1 outage during quarter-end close. Root cause hypothesis: a failed deploy degraded the primary data pipeline.\nAgreed next step: deliver RCA in 48h, an SLA credit, and a weekly exec check-in. Owner: Priya Nair."
   },
   {
-    "id": "DOC-1001-CT",
+    "id": "DOC-ACC-1001-CT",
     "account_id": "ACC-1001",
     "source_type": "call_transcript",
-    "title": "Northwind Logistics - Support Bridge Call (2026-06-12)",
-    "text": "Analyst (Northwind): Honestly half my dispatch team gave up on the tool. The shipment statuses stopped updating about two weeks ago and nobody told us why.\n\nCSM (Priya): I'm sorry, that lines up with the carrier API change on May 28. Our sync jobs started failing right after.\n\nAnalyst: Right. And with Karim gone there's no one here pushing people to use it. I'm just keeping the lights on.\n\nCSM: Understood. If we fix the integration this week and I get 30 minutes with your VP of Operations, would that help rebuild momentum?\n\nAnalyst: It would have to. Otherwise people are exporting to spreadsheets again, which is exactly what we bought you to stop."
+    "title": "Northwind Logistics - Customer Call",
+    "text": "Customer (Ravi Menon): An outage during our close window is unacceptable; we are reviewing alternatives.\nCSM (Priya Nair): Understood. That lines up with a six-hour Sev-1 outage during quarter-end close. If we deliver RCA in 48h, an SLA credit, and a weekly exec check-in, would that put us back on track?\nCustomer (Ravi Menon): It would help. Let us see the plan and timeline.\nCSM (Priya Nair): I will send a written plan today and confirm the 2026-11-04 renewal path."
   },
   {
-    "id": "DOC-1001-ST",
+    "id": "DOC-ACC-1001-ST",
     "account_id": "ACC-1001",
     "source_type": "support_tickets",
     "title": "Northwind Logistics - Open Support Tickets",
-    "text": "Ticket NW-4471 (Priority: High, Status: Open). Title: Shipment sync jobs failing since May 28. Description: All scheduled TMS sync jobs return 502 from the carrier endpoint after Northwind switched carrier tracking providers. 4,200 shipments are stale. Engineering confirmed a connector mapping change is required.\n\nTicket NW-4480 (Priority: Medium, Status: Open). Title: Dispatchers cannot see live ETA. Description: Because syncs fail, ETA fields are blank. Workaround is manual CSV export. Customer frustration noted.\n\nTicket NW-4488 (Priority: Low, Status: Open). Title: Remove offboarded user Karim Haddad. Description: Champion departed; please revoke admin access and reassign ownership."
+    "text": "Ticket 1001-4526 (Priority: Critical, Status: Open). Title: Sev-1 outage during quarter close. Description: Reported by Ingrid Solberg; a failed deploy degraded the primary data pipeline. Engineering and CS are coordinating on deliver RCA in 48h, an SLA credit, and a weekly exec check-in."
   },
   {
-    "id": "DOC-1001-CRM",
+    "id": "DOC-ACC-1001-CRM",
     "account_id": "ACC-1001",
     "source_type": "crm_notes",
     "title": "Northwind Logistics - CRM Account Notes",
-    "text": "Stage: At-risk. Sentiment: Negative and trending down.\nKey contacts: Karim Haddad (Ops Director, CHAMPION - departed 2026-06-05); Lena Ortiz (Junior Ops Analyst, day-to-day admin, low authority); VP Operations seat currently vacant per LinkedIn.\nARR 180k, 120 seats, renewal 2026-10-15.\nLatest health drivers: login frequency -38% MoM, broken TMS integration, champion loss, no executive sponsor.\nOpen risk: If integration is not restored and a new sponsor secured within 30 days, forecast a downgrade or non-renewal. Save motion required."
+    "text": "Stage: at_risk. Sentiment: strongly_negative.\nKey contacts: Ravi Menon (primary), Ingrid Solberg (day-to-day admin), Karim Haddad (executive sponsor).\nARR 20k, 16 seats, renewal 2026-11-04, health 30.\nActive signals: support_ticket_spike, negative_sentiment, nps_detractor.\nOpen risk and motion: A Sev-1 outage during quarter-end triggered a formal executive escalation with explicit churn language. Highest-priority account this week: same-day VP apology, RCA within 48 hours, a remediation roadmap, proactive SLA credit, and a weekly exec check-in before the 2026-11-04 renewal."
   },
   {
-    "id": "DOC-1001-UN",
+    "id": "DOC-ACC-1001-US",
     "account_id": "ACC-1001",
-    "source_type": "usage_notes",
-    "title": "Northwind Logistics - Product Usage Telemetry (trailing 8 weeks)",
-    "text": "Weekly active users (WAU) by week: 96, 94, 91, 88, 71, 64, 59, 57. The break point is week 5, which aligns with the carrier API change on May 28. Logins from the dispatch team dropped from a daily average of 41 to 12. Core feature usage: shipment-tracking views down 61%, ETA dashboard opens down 74%, automated-status webhooks firing at 8% of prior volume because the sync jobs are erroring. Seat utilization fell from 80% (96 of 120) to 48% (57 of 120). Two power users (both dispatchers) have not logged in for 21 days. No usage decline in the finance module, which does not depend on the carrier integration, confirming the issue is integration-specific rather than a broad disengagement. Recommendation flag raised automatically: WAU down 38% MoM crosses the 20% health-drop threshold."
+    "source_type": "usage_summary",
+    "title": "Northwind Logistics - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 210, 208, 205, 201, 0, 188, 190, 192. Seat utilisation is 56% (9 of 16 licensed seats). This usage pattern is consistent with a six-hour Sev-1 outage during quarter-end close. Recommendation flag: Sev-1 outage during quarter close; exec escalation open."
   },
   {
-    "id": "DOC-1001-SR",
+    "id": "DOC-ACC-1001-SR",
     "account_id": "ACC-1001",
     "source_type": "survey_response",
-    "title": "Northwind Logistics - CSAT Survey (2026-06-13)",
-    "text": "Survey type: Post-support-interaction CSAT. Score: 2 of 5. Respondent: Lena Ortiz (Junior Ops Analyst).\nVerbatim comment: 'The tool stopped showing live shipment status two weeks ago and we lost a lot of time before anyone explained why. When our director left there was no one to chase it. I need this fixed before peak season or my team will go back to spreadsheets.'\nDriver tags: reliability, integration, sponsor-loss. This is the lowest CSAT recorded for the account since onboarding."
+    "title": "Northwind Logistics - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 1 of 5. Respondent: Ingrid Solberg.\nVerbatim: 'An outage during our close window is unacceptable; we are reviewing alternatives.'\nThis reading is consistent with the account's strongly_negative sentiment."
   },
   {
-    "id": "DOC-1001-BL",
+    "id": "DOC-ACC-1001-BL",
     "account_id": "ACC-1001",
     "source_type": "billing_events",
     "title": "Northwind Logistics - Billing and Invoice History",
-    "text": "Invoice INV-NW-0426 (annual, 180,000) issued 2026-04-15, status PAID on 2026-04-22, no disputes. Payment history is clean: all prior invoices paid within terms. No billing dispute is open. Renewal invoice for the 2026-10-15 term has not yet been issued. Note for the renewal motion: there is no commercial or payment friction here, the risk is product reliability and relationship, so a save should lead with the integration fix and sponsor re-engagement rather than any pricing concession."
+    "text": "Annual invoice for 20k issued and paid within terms; payment history is clean with no open billing dispute. The renewal invoice for the 2026-11-04 term has not yet been issued. Note for the motion: there is no payment friction, so the play should lead with deliver RCA in 48h, an SLA credit, and a weekly exec check-in rather than a pricing concession."
   },
   {
-    "id": "DOC-1002-MN",
+    "id": "DOC-ACC-1002-MN",
     "account_id": "ACC-1002",
     "source_type": "meeting_notes",
-    "title": "Helios Analytics - Quarterly Business Review (2026-06-10)",
-    "text": "Attendees: Marcus Lee (CSM), Helios VP Data (economic buyer), 2 team leads.\nHeadline: Helios has hit 95% seat utilization, 86 of 90 licensed seats active weekly. Three additional teams (Marketing Ops, Finance, and a new EU data team) are running unsanctioned pilots in shared workspaces.\n\nValue realized: Helios reports cutting dashboard build time by 60% and retiring two legacy BI tools. The VP called the platform standard tooling for analytics across the org.\n\nExpansion signals: They requested enterprise SSO and SCIM provisioning to onboard the new teams cleanly, asked about volume pricing above 150 seats, and confirmed FY budget is approved. NPS from the economic buyer is 9.\n\nNext step: Build a 60-seat expansion proposal with SSO/SCIM included and a volume discount tier. This is a textbook product-qualified expansion."
+    "title": "Helios Analytics - Weekly CS Sync",
+    "text": "Attendees: Marcus Lee (CSM); Yuki Tanaka (customer).\nContext: Helios Analytics is at 144k ARR across 60 licensed seats, renewing 2026-09-19. Seat utilisation is 52% (31 of 60).\nDiscussion: A six-hour sev-1 outage during quarter-end close. Root cause hypothesis: a failed deploy degraded the primary data pipeline.\nAgreed next step: deliver RCA in 48h, an SLA credit, and a weekly exec check-in. Owner: Marcus Lee."
   },
   {
-    "id": "DOC-1002-CT",
+    "id": "DOC-ACC-1002-CT",
     "account_id": "ACC-1002",
     "source_type": "call_transcript",
-    "title": "Helios Analytics - Expansion Discovery Call (2026-06-16)",
-    "text": "VP Data (Helios): We are basically out of seats. Marketing and Finance keep borrowing logins, which I know isn't ideal.\n\nCSM (Marcus): That's a great problem. We can formalize it. How many people across those teams?\n\nVP Data: Probably 45 to 60 once you add the new EU data group. And I'll need SSO and automated provisioning, I'm not adding 60 users by hand.\n\nCSM: Understood, SSO and SCIM come with the enterprise tier. If I bring a 60-seat proposal with volume pricing, is budget there for this fiscal year?\n\nVP Data: Budget's approved. Get me a number and I can move fast. We already consider you our standard."
+    "title": "Helios Analytics - Customer Call",
+    "text": "Customer (Yuki Tanaka): An outage during our close window is unacceptable; we are reviewing alternatives.\nCSM (Marcus Lee): Understood. That lines up with a six-hour Sev-1 outage during quarter-end close. If we deliver RCA in 48h, an SLA credit, and a weekly exec check-in, would that put us back on track?\nCustomer (Yuki Tanaka): It would help. Let us see the plan and timeline.\nCSM (Marcus Lee): I will send a written plan today and confirm the 2026-09-19 renewal path."
   },
   {
-    "id": "DOC-1002-ST",
+    "id": "DOC-ACC-1002-ST",
     "account_id": "ACC-1002",
     "source_type": "support_tickets",
-    "title": "Helios Analytics - Feature & Provisioning Requests",
-    "text": "Ticket HE-3310 (Priority: Medium, Status: Open). Title: Enable SCIM auto-provisioning. Description: Customer wants automated user provisioning/deprovisioning ahead of a 60-seat rollout. Requires enterprise plan.\n\nTicket HE-3315 (Priority: Low, Status: Open). Title: Increase concurrent query limit. Description: Heavy usage from power users occasionally hits the workspace query cap. Healthy signal of deep adoption.\n\nTicket HE-3320 (Priority: Low, Status: Resolved). Title: Add EU data residency workspace. Description: New EU team needs an EU-hosted workspace. Resolved with eu-west region enablement."
+    "title": "Helios Analytics - Open Support Tickets",
+    "text": "Ticket 1002-4580 (Priority: Critical, Status: Open). Title: Sev-1 outage during quarter close. Description: Reported by Nadia Petrosyan; a failed deploy degraded the primary data pipeline. Engineering and CS are coordinating on deliver RCA in 48h, an SLA credit, and a weekly exec check-in."
   },
   {
-    "id": "DOC-1002-CRM",
+    "id": "DOC-ACC-1002-CRM",
     "account_id": "ACC-1002",
     "source_type": "crm_notes",
     "title": "Helios Analytics - CRM Account Notes",
-    "text": "Stage: Expansion. Sentiment: Very positive.\nKey contacts: VP Data (economic buyer, NPS 9, advocate); two team leads (power users).\nARR 240k, 90 seats, 95% utilization, renewal 2027-02-01.\nExpansion drivers: seat saturation (86/90 active), 3 teams piloting, SSO/SCIM requested, volume pricing inquiry, FY budget approved.\nOpportunity: 60-seat upsell on enterprise tier, est. +150k ARR. PQL criteria met. Also a strong reference/case-study candidate."
+    "text": "Stage: at_risk. Sentiment: strongly_negative.\nKey contacts: Yuki Tanaka (primary), Nadia Petrosyan (day-to-day admin), Omar Khalil (executive sponsor).\nARR 144k, 60 seats, renewal 2026-09-19, health 40.\nActive signals: support_ticket_spike, negative_sentiment, nps_detractor.\nOpen risk and motion: A Sev-1 outage during quarter-end triggered a formal executive escalation with explicit churn language. Highest-priority account this week: same-day VP apology, RCA within 48 hours, a remediation roadmap, proactive SLA credit, and a weekly exec check-in before the 2026-09-19 renewal."
   },
   {
-    "id": "DOC-1002-UN",
+    "id": "DOC-ACC-1002-US",
     "account_id": "ACC-1002",
-    "source_type": "usage_notes",
-    "title": "Helios Analytics - Product Usage Telemetry (trailing 8 weeks)",
-    "text": "Weekly active users (WAU) by week: 78, 80, 82, 83, 85, 85, 86, 86. Seat utilization is at 95% (86 of 90 licensed seats active weekly) and rising. Borrowed-login activity detected: 14 distinct device fingerprints map to shared service accounts across Marketing Ops, Finance, and the new EU data team, a strong signal of unsanctioned expansion. Power-user cohort (top 10%) runs an average of 47 sessions per week and frequently hits the concurrent-query cap. Two legacy BI integrations were disconnected this quarter, consistent with the customer's claim that they retired two competing tools. Adoption breadth score is 96 of 100. This is textbook product-qualified expansion: organic pull, seat saturation, and a tier-mapped need for SSO/SCIM."
+    "source_type": "usage_summary",
+    "title": "Helios Analytics - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 210, 208, 205, 201, 0, 188, 190, 192. Seat utilisation is 52% (31 of 60 licensed seats). This usage pattern is consistent with a six-hour Sev-1 outage during quarter-end close. Recommendation flag: Sev-1 outage during quarter close; exec escalation open."
   },
   {
-    "id": "DOC-1002-SR",
+    "id": "DOC-ACC-1002-SR",
     "account_id": "ACC-1002",
     "source_type": "survey_response",
-    "title": "Helios Analytics - NPS Survey (2026-06-08)",
-    "text": "Survey type: Relationship NPS. Score: 9 (Promoter). Respondent: VP Data (economic buyer).\nVerbatim comment: 'This is now our standard analytics tooling. The team would revolt if we took it away. We just need enterprise SSO and a clean way to add the other departments asking for seats.'\nDriver tags: value-realized, advocacy, expansion-intent. Respondent opted in as a reference and to a case study on dashboard-build-time reduction."
+    "title": "Helios Analytics - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 1 of 5. Respondent: Nadia Petrosyan.\nVerbatim: 'An outage during our close window is unacceptable; we are reviewing alternatives.'\nThis reading is consistent with the account's strongly_negative sentiment."
   },
   {
-    "id": "DOC-1003-MN",
+    "id": "DOC-ACC-1002-BL",
+    "account_id": "ACC-1002",
+    "source_type": "billing_events",
+    "title": "Helios Analytics - Billing and Invoice History",
+    "text": "Annual invoice for 144k issued and paid within terms; payment history is clean with no open billing dispute. The renewal invoice for the 2026-09-19 term has not yet been issued. Note for the motion: there is no payment friction, so the play should lead with deliver RCA in 48h, an SLA credit, and a weekly exec check-in rather than a pricing concession."
+  },
+  {
+    "id": "DOC-ACC-1002-EML",
+    "account_id": "ACC-1002",
+    "source_type": "crm_notes",
+    "title": "Helios Analytics - Stakeholder Email Recap",
+    "text": "From Marcus Lee to Omar Khalil: Recapping our position on Helios Analytics. A six-hour sev-1 outage during quarter-end close. We propose to deliver RCA in 48h, an SLA credit, and a weekly exec check-in and will review progress at the next checkpoint ahead of the 2026-09-19 renewal."
+  },
+  {
+    "id": "DOC-ACC-1003-MN",
     "account_id": "ACC-1003",
     "source_type": "meeting_notes",
-    "title": "Brightpath Education - Onboarding Checkpoint Day 45 (2026-06-15)",
-    "text": "Attendees: Dana Whitfield (CSM), Brightpath IT admin.\nStatus: Day 45 of onboarding. Only 2 of 7 onboarding milestones are complete. Target by day 45 is 5 of 7, so the account is behind plan.\n\nBlockers: SSO configuration has not been started; the IT admin has been pulled into semester-start systems work. Only 18 of 60 purchased seats are provisioned. The historical student data import is still pending because no one has exported the source files.\n\nEngagement: Two scheduled training sessions had no-shows. The executive sponsor (Director of Digital Learning) has been hard to reach during the back-to-school crunch.\n\nRisk: Time-to-value is slipping. If activation does not accelerate, first-value will land after the busy season, raising churn risk at the 2026-12-01 renewal. Recommend an onboarding rescue: assign an implementation specialist, set a 2-week milestone sprint, and secure 30 minutes with the sponsor."
+    "title": "Brightpath Education - Weekly CS Sync",
+    "text": "Attendees: Dana Whitfield (CSM); Felix Wagner (customer).\nContext: Brightpath Education is at 264k ARR across 233 licensed seats, renewing 2026-11-12. Seat utilisation is 53% (124 of 233).\nDiscussion: Carrier api change broke the core integration on may 28. Root cause hypothesis: sync jobs began failing silently after a third-party API change.\nAgreed next step: restore the integration this week and book a VP re-engagement. Owner: Dana Whitfield."
   },
   {
-    "id": "DOC-1003-CT",
+    "id": "DOC-ACC-1003-CT",
     "account_id": "ACC-1003",
     "source_type": "call_transcript",
-    "title": "Brightpath Education - Onboarding Call (2026-06-09)",
-    "text": "IT Admin (Brightpath): I want to get this live, I just have zero bandwidth. Semester systems come first this month.\n\nCSM (Dana): Totally fair. What if we take SSO and the data import off your plate? I can bring in an implementation specialist to do the heavy lifting.\n\nIT Admin: That would unblock me. The data export is the scary part, it's years of student records.\n\nCSM: We'll template it. Can you give us read access and 30 minutes with the Director of Digital Learning to confirm priorities?\n\nIT Admin: I can try. She's slammed, but if we show a quick win she'll pay attention."
+    "title": "Brightpath Education - Customer Call",
+    "text": "Customer (Felix Wagner): The tool stopped showing live data and we lost time before anyone explained why.\nCSM (Dana Whitfield): Understood. That lines up with carrier API change broke the core integration on May 28. If we restore the integration this week and book a VP re-engagement, would that put us back on track?\nCustomer (Felix Wagner): It would help. Let us see the plan and timeline.\nCSM (Dana Whitfield): I will send a written plan today and confirm the 2026-11-12 renewal path."
   },
   {
-    "id": "DOC-1003-ST",
+    "id": "DOC-ACC-1003-ST",
     "account_id": "ACC-1003",
     "source_type": "support_tickets",
-    "title": "Brightpath Education - Onboarding Tickets",
-    "text": "Ticket BP-2201 (Priority: Medium, Status: Open). Title: SSO not configured. Description: SAML setup not started; users are on manual passwords. Blocking bulk provisioning of remaining 42 seats.\n\nTicket BP-2205 (Priority: Medium, Status: Open). Title: Historical data import pending. Description: Customer has not provided source export of student records. Import templates shared; awaiting files.\n\nTicket BP-2208 (Priority: Low, Status: Open). Title: Reschedule training. Description: Two training sessions had no-shows. Requesting recorded async option plus one live session post-semester-start."
+    "title": "Brightpath Education - Open Support Tickets",
+    "text": "Ticket 1003-4946 (Priority: High, Status: Open). Title: Integration sync jobs failing since May 28. Description: Reported by Paul Adler; sync jobs began failing silently after a third-party API change. Engineering and CS are coordinating on restore the integration this week and book a VP re-engagement."
   },
   {
-    "id": "DOC-1003-CRM",
+    "id": "DOC-ACC-1003-CRM",
     "account_id": "ACC-1003",
     "source_type": "crm_notes",
     "title": "Brightpath Education - CRM Account Notes",
-    "text": "Stage: Onboarding (stalled). Sentiment: Neutral, cooperative but capacity-constrained.\nKey contacts: Director of Digital Learning (sponsor, low availability); IT admin (willing but overloaded).\nARR 96k, 60 seats (18 provisioned), renewal 2026-12-01.\nStall drivers: 2 of 7 milestones at day 45, SSO unconfigured, data import pending, training no-shows, sponsor distracted by semester start.\nPlan: Onboarding acceleration play. Assign implementation specialist, 2-week milestone sprint, async training, sponsor checkpoint."
+    "text": "Stage: at_risk. Sentiment: negative.\nKey contacts: Felix Wagner (primary), Paul Adler (day-to-day admin), Wendy Zhao (executive sponsor).\nARR 264k, 233 seats, renewal 2026-11-12, health 41.\nActive signals: usage_drop, login_decline, champion_departure.\nOpen risk and motion: Usage fell sharply after an integration broke and the champion departed. Seat utilisation is 53% (124 of 233). Risk is product-reliability and relationship, not commercial: it needs an integration fix sprint plus executive re-engagement before the 2026-11-12 renewal."
   },
   {
-    "id": "DOC-1003-UN",
+    "id": "DOC-ACC-1003-US",
     "account_id": "ACC-1003",
-    "source_type": "usage_notes",
-    "title": "Brightpath Education - Onboarding Telemetry Day 45",
-    "text": "Provisioned seats: 18 of 60 (30%). Weekly active users: 11, concentrated in a single pilot department. Milestones complete: 2 of 7 (account created, first course imported). Outstanding milestones: SSO configuration, bulk seat provisioning, historical data import, admin training certification, first live student cohort. Training attendance: 2 scheduled sessions, both no-shows. Login recency: the executive sponsor (Director of Digital Learning) has logged in once in 45 days. Time-to-value model projects first realized value at day 78 on the current trajectory, which is past the back-to-school window and 48 days beyond the 30-day target. This is a clear onboarding-stall pattern driven by customer-side capacity, not product fit."
+    "source_type": "usage_summary",
+    "title": "Brightpath Education - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 96, 94, 91, 88, 71, 64, 59, 57. Seat utilisation is 53% (124 of 233 licensed seats). This usage pattern is consistent with carrier API change broke the core integration on May 28. Recommendation flag: Weekly active users down 40% MoM."
   },
   {
-    "id": "DOC-1004-MN",
+    "id": "DOC-ACC-1004-MN",
     "account_id": "ACC-1004",
     "source_type": "meeting_notes",
-    "title": "Atlas Manufacturing - Renewal Strategy Sync (2026-06-14)",
-    "text": "Attendees: Sofia Romero (CSM), Atlas procurement lead.\nRenewal clock: Contract renews 2026-08-30, 65 days out, at 320k ARR across 200 seats.\n\nThreat: A newly hired VP of Operations is running a competitive evaluation against Forgeline and has asked procurement to benchmark pricing. Procurement is pushing for a 12% discount to renew.\n\nUsage reality: Product usage is actually solid, 180 of 200 seats active, strong shop-floor adoption. The risk is relationship and economics, not value. We have missed the last two Quarterly Business Reviews, so the new VP has no view of the ROI we deliver.\n\nStrategy: Re-establish the executive relationship before negotiating price. Build an ROI summary (downtime reduced, throughput gained), schedule an executive business review with the new VP, and prepare a multi-year option that protects ARR while addressing the discount ask."
+    "title": "Atlas Manufacturing - Weekly CS Sync",
+    "text": "Attendees: Sofia Romero (CSM); Diego Castro (customer).\nContext: Atlas Manufacturing is at 539k ARR across 216 licensed seats, renewing 2026-08-13. Seat utilisation is 44% (96 of 216).\nDiscussion: Carrier api change broke the core integration on may 28. Root cause hypothesis: sync jobs began failing silently after a third-party API change.\nAgreed next step: restore the integration this week and book a VP re-engagement. Owner: Sofia Romero."
   },
   {
-    "id": "DOC-1004-CT",
+    "id": "DOC-ACC-1004-CT",
     "account_id": "ACC-1004",
     "source_type": "call_transcript",
-    "title": "Atlas Manufacturing - Procurement Call (2026-06-17)",
-    "text": "Procurement (Atlas): The new VP wants options on the table. We're looking at Forgeline and we'd need at least 12% off to stay.\n\nCSM (Sofia): I hear you on price. Before we get there, has the VP seen what the platform has delivered, the downtime reduction and throughput gains?\n\nProcurement: Honestly, no. He just started. He sees a line item.\n\nCSM: Then let's fix that first. If I bring an ROI review and the VP still wants to talk commercials, I'd rather discuss a multi-year structure than a flat discount. Can you get me 30 minutes with him?\n\nProcurement: If you can show hard numbers, I'll get you the meeting."
+    "title": "Atlas Manufacturing - Customer Call",
+    "text": "Customer (Diego Castro): The tool stopped showing live data and we lost time before anyone explained why.\nCSM (Sofia Romero): Understood. That lines up with carrier API change broke the core integration on May 28. If we restore the integration this week and book a VP re-engagement, would that put us back on track?\nCustomer (Diego Castro): It would help. Let us see the plan and timeline.\nCSM (Sofia Romero): I will send a written plan today and confirm the 2026-08-13 renewal path."
   },
   {
-    "id": "DOC-1004-ST",
+    "id": "DOC-ACC-1004-ST",
     "account_id": "ACC-1004",
     "source_type": "support_tickets",
-    "title": "Atlas Manufacturing - Support History",
-    "text": "Ticket AT-5102 (Priority: Low, Status: Resolved). Title: Add throughput dashboard widget. Description: Shop-floor managers requested a throughput trend widget. Delivered; positive feedback.\n\nTicket AT-5110 (Priority: Low, Status: Resolved). Title: SSO group mapping update. Description: Mapped new plant teams to roles. Resolved same day.\n\nNote: Support volume is low and healthy. No product blockers. Renewal risk is commercial and relationship-driven, not technical."
+    "title": "Atlas Manufacturing - Open Support Tickets",
+    "text": "Ticket 1004-4611 (Priority: High, Status: Open). Title: Integration sync jobs failing since May 28. Description: Reported by Sven Larsson; sync jobs began failing silently after a third-party API change. Engineering and CS are coordinating on restore the integration this week and book a VP re-engagement."
   },
   {
-    "id": "DOC-1004-CRM",
+    "id": "DOC-ACC-1004-CRM",
     "account_id": "ACC-1004",
     "source_type": "crm_notes",
     "title": "Atlas Manufacturing - CRM Account Notes",
-    "text": "Stage: Renewal at risk. Sentiment: Mixed; users happy, new exec skeptical.\nKey contacts: VP Operations (new, evaluating Forgeline, no relationship yet); procurement lead (pushing 12% discount); plant managers (active power users).\nARR 320k, 200 seats (180 active), renewal 2026-08-30 (65 days).\nRisk drivers: competitive eval, price pressure, two missed QBRs, weak executive relationship despite strong usage.\nPlan: Renewal risk mitigation. ROI business review with new VP, then multi-year proposal instead of flat discount."
+    "text": "Stage: at_risk. Sentiment: negative.\nKey contacts: Diego Castro (primary), Sven Larsson (day-to-day admin), Karim Haddad (executive sponsor).\nARR 539k, 216 seats, renewal 2026-08-13, health 45.\nActive signals: usage_drop, login_decline, champion_departure.\nOpen risk and motion: Usage fell sharply after an integration broke and the champion departed. Seat utilisation is 44% (96 of 216). Risk is product-reliability and relationship, not commercial: it needs an integration fix sprint plus executive re-engagement before the 2026-08-13 renewal."
   },
   {
-    "id": "DOC-1004-UN",
+    "id": "DOC-ACC-1004-US",
     "account_id": "ACC-1004",
-    "source_type": "usage_notes",
-    "title": "Atlas Manufacturing - Product Usage Telemetry (trailing 8 weeks)",
-    "text": "Weekly active users are stable and strong: 178 to 182 across the period, 180 of 200 seats active weekly (90% utilization). Shop-floor adoption is deep: throughput dashboard opened daily by 38 plant managers, downtime-logging workflow used across all 4 plants. No usage decline anywhere in the product. The data clearly shows the renewal risk is NOT a value or adoption problem: usage and breadth scores are healthy (88 of 100). The risk is relationship and commercial, driven by a new VP with no relationship and a procurement-led competitive evaluation. Any save motion should foreground the realized ROI (downtime reduced, throughput gained) rather than re-onboarding."
+    "source_type": "usage_summary",
+    "title": "Atlas Manufacturing - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 96, 94, 91, 88, 71, 64, 59, 57. Seat utilisation is 44% (96 of 216 licensed seats). This usage pattern is consistent with carrier API change broke the core integration on May 28. Recommendation flag: Weekly active users down 34% MoM."
   },
   {
-    "id": "DOC-1004-BL",
+    "id": "DOC-ACC-1004-SR",
+    "account_id": "ACC-1004",
+    "source_type": "survey_response",
+    "title": "Atlas Manufacturing - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 2 of 5. Respondent: Sven Larsson.\nVerbatim: 'The tool stopped showing live data and we lost time before anyone explained why.'\nThis reading is consistent with the account's negative sentiment."
+  },
+  {
+    "id": "DOC-ACC-1004-BL",
     "account_id": "ACC-1004",
     "source_type": "billing_events",
-    "title": "Atlas Manufacturing - Billing and ROI Summary",
-    "text": "Invoice INV-AT-0331 (annual, 320,000) issued 2026-03-01, PAID 2026-03-18, terms net-30, no disputes. Payment history is clean across 3 prior terms. Quantified value delivered this contract year (from product telemetry and customer-confirmed figures): unplanned downtime reduced 22% (approx 140 machine-hours per plant per quarter), throughput up 9%. Procurement is requesting a 12% discount to renew. Recommended commercial posture: counter the flat discount with a 2-year term at a smaller blended concession, anchored on the ROI summary above. No billing dispute exists; the negotiation is purely competitive and relationship-driven."
+    "title": "Atlas Manufacturing - Billing and Invoice History",
+    "text": "Annual invoice for 539k issued and paid within terms; payment history is clean with no open billing dispute. The renewal invoice for the 2026-08-13 term has not yet been issued. Note for the motion: there is no payment friction, so the play should lead with restore the integration this week and book a VP re-engagement rather than a pricing concession."
   },
   {
-    "id": "DOC-1005-MN",
+    "id": "DOC-ACC-1004-EML",
+    "account_id": "ACC-1004",
+    "source_type": "crm_notes",
+    "title": "Atlas Manufacturing - Stakeholder Email Recap",
+    "text": "From Sofia Romero to Karim Haddad: Recapping our position on Atlas Manufacturing. Carrier api change broke the core integration on may 28. We propose to restore the integration this week and book a VP re-engagement and will review progress at the next checkpoint ahead of the 2026-08-13 renewal."
+  },
+  {
+    "id": "DOC-ACC-1005-MN",
     "account_id": "ACC-1005",
     "source_type": "meeting_notes",
-    "title": "Vertex Financial - Incident Escalation Review (2026-06-20)",
-    "text": "Attendees: James Okafor (CSM), Vertex CTO, Vertex Head of Ops, our VP Customer Success.\nIncident: A Sev-1 outage on 2026-06-19 caused a 6-hour service disruption during Vertex's quarter-end close, the worst possible window. Root cause was a failed regional database failover.\n\nImpact: Vertex's close was delayed; their CTO has opened a formal executive escalation. CSAT on the latest interaction dropped to 2 of 5. Trust is damaged and the word churn was used on the call.\n\nCommercials: Renewal is 2026-09-20 at 410k ARR. Vertex is requesting SLA credits and a written root-cause analysis (RCA) with a remediation plan and timeline.\n\nResponse plan: Executive escalation play. Same-day apology from our VP, RCA within 48 hours, a concrete reliability remediation roadmap, proactive SLA credit offer, and a weekly executive check-in until trust is restored. This is the highest-priority account this week."
+    "title": "Vertex Financial - Weekly CS Sync",
+    "text": "Attendees: James Okafor (CSM); Lena Ortiz (customer).\nContext: Vertex Financial is at 217k ARR across 88 licensed seats, renewing 2026-11-14. Seat utilisation is 57% (50 of 88).\nDiscussion: Carrier api change broke the core integration on may 28. Root cause hypothesis: sync jobs began failing silently after a third-party API change.\nAgreed next step: restore the integration this week and book a VP re-engagement. Owner: James Okafor."
   },
   {
-    "id": "DOC-1005-CT",
+    "id": "DOC-ACC-1005-CT",
     "account_id": "ACC-1005",
     "source_type": "call_transcript",
-    "title": "Vertex Financial - Escalation Call (2026-06-19)",
-    "text": "CTO (Vertex): Six hours down during quarter close is not acceptable. My board is asking questions and I don't have answers.\n\nCSM (James): You're right, and I'm not going to minimize it. We failed you at the worst possible time. Our VP wants to speak with you today.\n\nCTO: I need a real root-cause analysis, not a status page. And I expect SLA credits.\n\nCSM: You'll have a written RCA within 48 hours, a remediation roadmap, and we'll proactively apply SLA credits. I'll set a weekly executive check-in until you trust us again.\n\nCTO: Fine. But understand we are now evaluating whether to renew in September."
+    "title": "Vertex Financial - Customer Call",
+    "text": "Customer (Lena Ortiz): The tool stopped showing live data and we lost time before anyone explained why.\nCSM (James Okafor): Understood. That lines up with carrier API change broke the core integration on May 28. If we restore the integration this week and book a VP re-engagement, would that put us back on track?\nCustomer (Lena Ortiz): It would help. Let us see the plan and timeline.\nCSM (James Okafor): I will send a written plan today and confirm the 2026-11-14 renewal path."
   },
   {
-    "id": "DOC-1005-ST",
+    "id": "DOC-ACC-1005-ST",
     "account_id": "ACC-1005",
     "source_type": "support_tickets",
-    "title": "Vertex Financial - Incident Tickets",
-    "text": "Ticket VX-9001 (Priority: Sev-1, Status: Resolved-Pending-RCA). Title: 6-hour outage during quarter close. Description: Regional failover failed; primary DB unreachable 14:10-20:05 UTC on 2026-06-19. Service restored after manual failover. RCA owed to customer within 48 hours.\n\nTicket VX-9002 (Priority: High, Status: Open). Title: SLA credit calculation. Description: Customer requesting credits for breached uptime SLA. Finance to confirm amount.\n\nTicket VX-9003 (Priority: High, Status: Open). Title: Reliability remediation roadmap. Description: Customer requests written remediation plan with dates: multi-region active-active, automated failover tests, and status comms improvements."
+    "title": "Vertex Financial - Open Support Tickets",
+    "text": "Ticket 1005-4420 (Priority: High, Status: Open). Title: Integration sync jobs failing since May 28. Description: Reported by Grace Owens; sync jobs began failing silently after a third-party API change. Engineering and CS are coordinating on restore the integration this week and book a VP re-engagement."
   },
   {
-    "id": "DOC-1005-CRM",
+    "id": "DOC-ACC-1005-CRM",
     "account_id": "ACC-1005",
     "source_type": "crm_notes",
     "title": "Vertex Financial - CRM Account Notes",
-    "text": "Stage: Escalation / churn risk. Sentiment: Strongly negative.\nKey contacts: CTO (escalation owner, threatening non-renewal); Head of Ops (impacted); economic buyer aligned with CTO.\nARR 410k, 150 seats, renewal 2026-09-20 (critical, 92 days). Health 38.\nEscalation drivers: Sev-1 6-hour outage during quarter close, failed regional failover, CSAT 2/5, SLA credit and RCA demands, explicit churn language.\nPlan: Executive escalation play. VP apology same day, RCA in 48h, remediation roadmap, proactive SLA credits, weekly exec check-in."
+    "text": "Stage: at_risk. Sentiment: negative.\nKey contacts: Lena Ortiz (primary), Grace Owens (day-to-day admin), Ravi Menon (executive sponsor).\nARR 217k, 88 seats, renewal 2026-11-14, health 46.\nActive signals: usage_drop, login_decline, champion_departure.\nOpen risk and motion: Usage fell sharply after an integration broke and the champion departed. Seat utilisation is 57% (50 of 88). Risk is product-reliability and relationship, not commercial: it needs an integration fix sprint plus executive re-engagement before the 2026-11-14 renewal."
   },
   {
-    "id": "DOC-1005-SR",
+    "id": "DOC-ACC-1005-US",
+    "account_id": "ACC-1005",
+    "source_type": "usage_summary",
+    "title": "Vertex Financial - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 96, 94, 91, 88, 71, 64, 59, 57. Seat utilisation is 57% (50 of 88 licensed seats). This usage pattern is consistent with carrier API change broke the core integration on May 28. Recommendation flag: Weekly active users down 38% MoM."
+  },
+  {
+    "id": "DOC-ACC-1005-SR",
     "account_id": "ACC-1005",
     "source_type": "survey_response",
-    "title": "Vertex Financial - Post-Incident CSAT (2026-06-19)",
-    "text": "Survey type: Post-incident CSAT. Score: 2 of 5. Respondent: Vertex Head of Ops.\nVerbatim comment: 'A six-hour outage during quarter-end close is the single worst time this could happen. We delayed our close and I had to explain it upward. I need a real root-cause analysis and a credible reliability plan, or we will look elsewhere at renewal in September.'\nDriver tags: reliability, trust, churn-risk. This score is down from a 4 of 5 on the prior quarter's relationship survey, a sharp reversal tied entirely to the Sev-1 incident."
+    "title": "Vertex Financial - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 2 of 5. Respondent: Grace Owens.\nVerbatim: 'The tool stopped showing live data and we lost time before anyone explained why.'\nThis reading is consistent with the account's negative sentiment."
   },
   {
-    "id": "DOC-1005-BL",
-    "account_id": "ACC-1005",
-    "source_type": "billing_events",
-    "title": "Vertex Financial - Billing and SLA Credit Status",
-    "text": "Invoice INV-VX-0220 (annual, 410,000) issued 2026-02-20, PAID 2026-03-05, net-15 terms, historically prompt. Open item: SLA credit request tied to ticket VX-9002. The 2026-06-19 outage (5 hours 55 minutes of downtime) breaches the contractual 99.9% monthly uptime SLA; finance has modeled a service credit of approximately 8,500 (one month at the tiered breach rate). Recommendation: proactively offer the SLA credit before the customer escalates the demand, as a good-faith gesture inside the escalation play. No payment dispute exists; this is a contractual credit, not a collections matter."
-  },
-  {
-    "id": "DOC-1006-MN",
+    "id": "DOC-ACC-1006-MN",
     "account_id": "ACC-1006",
     "source_type": "meeting_notes",
-    "title": "Cobalt Retail Group - Monthly Check-in (2026-06-11)",
-    "text": "Attendees: Elena Petrova (CSM), Cobalt economic buyer.\nStatus: Healthy and steady. Usage is consistent, core features adopted across 75 seats, NPS 9 from the economic buyer who called the rollout one of their smoothest software adoptions.\n\nFeedback: One minor feature request, a configurable store-comparison view. Logged for product.\n\nAdvocacy: The buyer offered to act as a reference and is open to a short case study on inventory accuracy improvements. Renewal 2027-01-10, no risk indicators. Good candidate to nurture into expansion later once new store regions come online."
+    "title": "Cobalt Retail Group - Weekly CS Sync",
+    "text": "Attendees: Elena Petrova (CSM); Lena Ortiz (customer).\nContext: Cobalt Retail Group is at 546k ARR across 250 licensed seats, renewing 2026-09-09. Seat utilisation is 47% (117 of 250).\nDiscussion: Carrier api change broke the core integration on may 28. Root cause hypothesis: sync jobs began failing silently after a third-party API change.\nAgreed next step: restore the integration this week and book a VP re-engagement. Owner: Elena Petrova."
   },
   {
-    "id": "DOC-1006-CRM",
+    "id": "DOC-ACC-1006-CT",
+    "account_id": "ACC-1006",
+    "source_type": "call_transcript",
+    "title": "Cobalt Retail Group - Customer Call",
+    "text": "Customer (Lena Ortiz): The tool stopped showing live data and we lost time before anyone explained why.\nCSM (Elena Petrova): Understood. That lines up with carrier API change broke the core integration on May 28. If we restore the integration this week and book a VP re-engagement, would that put us back on track?\nCustomer (Lena Ortiz): It would help. Let us see the plan and timeline.\nCSM (Elena Petrova): I will send a written plan today and confirm the 2026-09-09 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1006-ST",
+    "account_id": "ACC-1006",
+    "source_type": "support_tickets",
+    "title": "Cobalt Retail Group - Open Support Tickets",
+    "text": "Ticket 1006-4623 (Priority: High, Status: Open). Title: Integration sync jobs failing since May 28. Description: Reported by Tom Becker; sync jobs began failing silently after a third-party API change. Engineering and CS are coordinating on restore the integration this week and book a VP re-engagement."
+  },
+  {
+    "id": "DOC-ACC-1006-CRM",
     "account_id": "ACC-1006",
     "source_type": "crm_notes",
     "title": "Cobalt Retail Group - CRM Account Notes",
-    "text": "Stage: Healthy / nurture. Sentiment: Positive.\nKey contacts: Economic buyer (advocate, NPS 9, reference-willing).\nARR 145k, 75 seats, renewal 2027-01-10, health 79.\nDrivers: steady usage, strong satisfaction, one minor feature request logged, reference and case-study opportunity. No churn risk. Future expansion possible as new store regions launch."
+    "text": "Stage: at_risk. Sentiment: negative.\nKey contacts: Lena Ortiz (primary), Tom Becker (day-to-day admin), Nadia Petrosyan (executive sponsor).\nARR 546k, 250 seats, renewal 2026-09-09, health 47.\nActive signals: usage_drop, login_decline, champion_departure.\nOpen risk and motion: Usage fell sharply after an integration broke and the champion departed. Seat utilisation is 47% (117 of 250). Risk is product-reliability and relationship, not commercial: it needs an integration fix sprint plus executive re-engagement before the 2026-09-09 renewal."
   },
   {
-    "id": "DOC-1006-UN",
+    "id": "DOC-ACC-1006-US",
     "account_id": "ACC-1006",
-    "source_type": "usage_notes",
-    "title": "Cobalt Retail Group - Product Usage Telemetry (trailing 8 weeks)",
-    "text": "Weekly active users are flat and healthy: 70 to 73 across the period, 73 of 75 seats active weekly (97% utilization). Core feature adoption is broad and even across stores, with no concentration risk. One enhancement request logged (configurable store-comparison view), no errors or reliability issues. Health score 79, stable. Expansion watch: the customer mentioned three new store regions launching in Q4; if seat demand follows, this becomes a future product-qualified expansion candidate. For now the correct posture is nurture and reference cultivation, not an active save or upsell motion."
+    "source_type": "usage_summary",
+    "title": "Cobalt Retail Group - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 96, 94, 91, 88, 71, 64, 59, 57. Seat utilisation is 47% (117 of 250 licensed seats). This usage pattern is consistent with carrier API change broke the core integration on May 28. Recommendation flag: Weekly active users down 33% MoM."
+  },
+  {
+    "id": "DOC-ACC-1006-SR",
+    "account_id": "ACC-1006",
+    "source_type": "survey_response",
+    "title": "Cobalt Retail Group - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 2 of 5. Respondent: Tom Becker.\nVerbatim: 'The tool stopped showing live data and we lost time before anyone explained why.'\nThis reading is consistent with the account's negative sentiment."
+  },
+  {
+    "id": "DOC-ACC-1007-MN",
+    "account_id": "ACC-1007",
+    "source_type": "meeting_notes",
+    "title": "Meridian Health Systems - Weekly CS Sync",
+    "text": "Attendees: Tara Mensah (CSM); Felix Wagner (customer).\nContext: Meridian Health Systems is at 138k ARR across 63 licensed seats, renewing 2026-08-13. Seat utilisation is 79% (50 of 63).\nDiscussion: A new vp opened a competitive evaluation. Root cause hypothesis: leadership change with no executive relationship to the platform.\nAgreed next step: run an ROI business review, then propose a multi-year structure. Owner: Tara Mensah."
+  },
+  {
+    "id": "DOC-ACC-1007-CT",
+    "account_id": "ACC-1007",
+    "source_type": "call_transcript",
+    "title": "Meridian Health Systems - Customer Call",
+    "text": "Customer (Felix Wagner): The product works well; the question is price and the new VP's preferences.\nCSM (Tara Mensah): Understood. That lines up with a new VP opened a competitive evaluation. If we run an ROI business review, then propose a multi-year structure, would that put us back on track?\nCustomer (Felix Wagner): It would help. Let us see the plan and timeline.\nCSM (Tara Mensah): I will send a written plan today and confirm the 2026-08-13 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1007-ST",
+    "account_id": "ACC-1007",
+    "source_type": "support_tickets",
+    "title": "Meridian Health Systems - Open Support Tickets",
+    "text": "Ticket 1007-4686 (Priority: Medium, Status: Open). Title: Procurement requesting a renewal discount. Description: Reported by Grace Owens; leadership change with no executive relationship to the platform. Engineering and CS are coordinating on run an ROI business review, then propose a multi-year structure."
+  },
+  {
+    "id": "DOC-ACC-1007-CRM",
+    "account_id": "ACC-1007",
+    "source_type": "crm_notes",
+    "title": "Meridian Health Systems - CRM Account Notes",
+    "text": "Stage: renewal. Sentiment: mixed.\nKey contacts: Felix Wagner (primary), Grace Owens (day-to-day admin), Ravi Menon (executive sponsor).\nARR 138k, 63 seats, renewal 2026-08-13, health 55.\nActive signals: renewal_window_open, qbr_missed, competitor_eval.\nOpen risk and motion: Strong adoption (79% of seats active) but a newly hired VP with no relationship is running a competitive evaluation and procurement wants a discount. The risk is relationship and commercial, not value. Lead with an ROI business review, then counter with a multi-year structure before the 2026-08-13 renewal."
+  },
+  {
+    "id": "DOC-ACC-1007-US",
+    "account_id": "ACC-1007",
+    "source_type": "usage_summary",
+    "title": "Meridian Health Systems - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 171, 173, 170, 174, 172, 175, 176, 174. Seat utilisation is 79% (50 of 63 licensed seats). This usage pattern is consistent with a new VP opened a competitive evaluation. Recommendation flag: Renewal in 54 days; new VP evaluating competitor."
+  },
+  {
+    "id": "DOC-ACC-1007-SR",
+    "account_id": "ACC-1007",
+    "source_type": "survey_response",
+    "title": "Meridian Health Systems - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 4 of 5. Respondent: Grace Owens.\nVerbatim: 'The product works well; the question is price and the new VP's preferences.'\nThis reading is consistent with the account's mixed sentiment."
+  },
+  {
+    "id": "DOC-ACC-1007-BL",
+    "account_id": "ACC-1007",
+    "source_type": "billing_events",
+    "title": "Meridian Health Systems - Billing and Invoice History",
+    "text": "Annual invoice for 138k issued and paid within terms; payment history is clean with no open billing dispute. The renewal invoice for the 2026-08-13 term has not yet been issued. Note for the motion: there is no payment friction, so the play should lead with run an ROI business review, then propose a multi-year structure rather than a pricing concession."
+  },
+  {
+    "id": "DOC-ACC-1007-EML",
+    "account_id": "ACC-1007",
+    "source_type": "crm_notes",
+    "title": "Meridian Health Systems - Stakeholder Email Recap",
+    "text": "From Tara Mensah to Ravi Menon: Recapping our position on Meridian Health Systems. A new vp opened a competitive evaluation. We propose to run an ROI business review, then propose a multi-year structure and will review progress at the next checkpoint ahead of the 2026-08-13 renewal."
+  },
+  {
+    "id": "DOC-ACC-1008-MN",
+    "account_id": "ACC-1008",
+    "source_type": "meeting_notes",
+    "title": "Voyage Hospitality - Weekly CS Sync",
+    "text": "Attendees: Devon Pierce (CSM); Omar Khalil (customer).\nContext: Voyage Hospitality is at 261k ARR across 161 licensed seats, renewing 2026-10-19. Seat utilisation is 64% (103 of 161).\nDiscussion: A new vp opened a competitive evaluation. Root cause hypothesis: leadership change with no executive relationship to the platform.\nAgreed next step: run an ROI business review, then propose a multi-year structure. Owner: Devon Pierce."
+  },
+  {
+    "id": "DOC-ACC-1008-CT",
+    "account_id": "ACC-1008",
+    "source_type": "call_transcript",
+    "title": "Voyage Hospitality - Customer Call",
+    "text": "Customer (Omar Khalil): The product works well; the question is price and the new VP's preferences.\nCSM (Devon Pierce): Understood. That lines up with a new VP opened a competitive evaluation. If we run an ROI business review, then propose a multi-year structure, would that put us back on track?\nCustomer (Omar Khalil): It would help. Let us see the plan and timeline.\nCSM (Devon Pierce): I will send a written plan today and confirm the 2026-10-19 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1008-ST",
+    "account_id": "ACC-1008",
+    "source_type": "support_tickets",
+    "title": "Voyage Hospitality - Open Support Tickets",
+    "text": "Ticket 1008-4699 (Priority: Medium, Status: Open). Title: Procurement requesting a renewal discount. Description: Reported by Wendy Zhao; leadership change with no executive relationship to the platform. Engineering and CS are coordinating on run an ROI business review, then propose a multi-year structure."
+  },
+  {
+    "id": "DOC-ACC-1008-CRM",
+    "account_id": "ACC-1008",
+    "source_type": "crm_notes",
+    "title": "Voyage Hospitality - CRM Account Notes",
+    "text": "Stage: renewal. Sentiment: mixed.\nKey contacts: Omar Khalil (primary), Wendy Zhao (day-to-day admin), Sara Lindqvist (executive sponsor).\nARR 261k, 161 seats, renewal 2026-10-19, health 54.\nActive signals: renewal_window_open, qbr_missed, competitor_eval.\nOpen risk and motion: Strong adoption (64% of seats active) but a newly hired VP with no relationship is running a competitive evaluation and procurement wants a discount. The risk is relationship and commercial, not value. Lead with an ROI business review, then counter with a multi-year structure before the 2026-10-19 renewal."
+  },
+  {
+    "id": "DOC-ACC-1008-US",
+    "account_id": "ACC-1008",
+    "source_type": "usage_summary",
+    "title": "Voyage Hospitality - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 171, 173, 170, 174, 172, 175, 176, 174. Seat utilisation is 64% (103 of 161 licensed seats). This usage pattern is consistent with a new VP opened a competitive evaluation. Recommendation flag: Renewal in 78 days; new VP evaluating competitor."
+  },
+  {
+    "id": "DOC-ACC-1008-SR",
+    "account_id": "ACC-1008",
+    "source_type": "survey_response",
+    "title": "Voyage Hospitality - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 4 of 5. Respondent: Wendy Zhao.\nVerbatim: 'The product works well; the question is price and the new VP's preferences.'\nThis reading is consistent with the account's mixed sentiment."
+  },
+  {
+    "id": "DOC-ACC-1008-BL",
+    "account_id": "ACC-1008",
+    "source_type": "billing_events",
+    "title": "Voyage Hospitality - Billing and Invoice History",
+    "text": "Annual invoice for 261k issued and paid within terms; payment history is clean with no open billing dispute. The renewal invoice for the 2026-10-19 term has not yet been issued. Note for the motion: there is no payment friction, so the play should lead with run an ROI business review, then propose a multi-year structure rather than a pricing concession."
+  },
+  {
+    "id": "DOC-ACC-1009-MN",
+    "account_id": "ACC-1009",
+    "source_type": "meeting_notes",
+    "title": "Sentinel Insurance - Weekly CS Sync",
+    "text": "Attendees: Hana Kim (CSM); Lena Ortiz (customer).\nContext: Sentinel Insurance is at 271k ARR across 129 licensed seats, renewing 2026-10-01. Seat utilisation is 70% (90 of 129).\nDiscussion: A new vp opened a competitive evaluation. Root cause hypothesis: leadership change with no executive relationship to the platform.\nAgreed next step: run an ROI business review, then propose a multi-year structure. Owner: Hana Kim."
+  },
+  {
+    "id": "DOC-ACC-1009-CT",
+    "account_id": "ACC-1009",
+    "source_type": "call_transcript",
+    "title": "Sentinel Insurance - Customer Call",
+    "text": "Customer (Lena Ortiz): The product works well; the question is price and the new VP's preferences.\nCSM (Hana Kim): Understood. That lines up with a new VP opened a competitive evaluation. If we run an ROI business review, then propose a multi-year structure, would that put us back on track?\nCustomer (Lena Ortiz): It would help. Let us see the plan and timeline.\nCSM (Hana Kim): I will send a written plan today and confirm the 2026-10-01 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1009-ST",
+    "account_id": "ACC-1009",
+    "source_type": "support_tickets",
+    "title": "Sentinel Insurance - Open Support Tickets",
+    "text": "Ticket 1009-4479 (Priority: Medium, Status: Open). Title: Procurement requesting a renewal discount. Description: Reported by Omar Khalil; leadership change with no executive relationship to the platform. Engineering and CS are coordinating on run an ROI business review, then propose a multi-year structure."
+  },
+  {
+    "id": "DOC-ACC-1009-CRM",
+    "account_id": "ACC-1009",
+    "source_type": "crm_notes",
+    "title": "Sentinel Insurance - CRM Account Notes",
+    "text": "Stage: renewal. Sentiment: mixed.\nKey contacts: Lena Ortiz (primary), Omar Khalil (day-to-day admin), Carlos Mendez (executive sponsor).\nARR 271k, 129 seats, renewal 2026-10-01, health 49.\nActive signals: renewal_window_open, qbr_missed, competitor_eval.\nOpen risk and motion: Strong adoption (70% of seats active) but a newly hired VP with no relationship is running a competitive evaluation and procurement wants a discount. The risk is relationship and commercial, not value. Lead with an ROI business review, then counter with a multi-year structure before the 2026-10-01 renewal."
+  },
+  {
+    "id": "DOC-ACC-1009-US",
+    "account_id": "ACC-1009",
+    "source_type": "usage_summary",
+    "title": "Sentinel Insurance - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 171, 173, 170, 174, 172, 175, 176, 174. Seat utilisation is 70% (90 of 129 licensed seats). This usage pattern is consistent with a new VP opened a competitive evaluation. Recommendation flag: Renewal in 69 days; new VP evaluating competitor."
+  },
+  {
+    "id": "DOC-ACC-1009-SR",
+    "account_id": "ACC-1009",
+    "source_type": "survey_response",
+    "title": "Sentinel Insurance - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 4 of 5. Respondent: Omar Khalil.\nVerbatim: 'The product works well; the question is price and the new VP's preferences.'\nThis reading is consistent with the account's mixed sentiment."
+  },
+  {
+    "id": "DOC-ACC-1009-BL",
+    "account_id": "ACC-1009",
+    "source_type": "billing_events",
+    "title": "Sentinel Insurance - Billing and Invoice History",
+    "text": "Annual invoice for 271k issued and paid within terms; payment history is clean with no open billing dispute. The renewal invoice for the 2026-10-01 term has not yet been issued. Note for the motion: there is no payment friction, so the play should lead with run an ROI business review, then propose a multi-year structure rather than a pricing concession."
+  },
+  {
+    "id": "DOC-ACC-1009-EML",
+    "account_id": "ACC-1009",
+    "source_type": "crm_notes",
+    "title": "Sentinel Insurance - Stakeholder Email Recap",
+    "text": "From Hana Kim to Carlos Mendez: Recapping our position on Sentinel Insurance. A new vp opened a competitive evaluation. We propose to run an ROI business review, then propose a multi-year structure and will review progress at the next checkpoint ahead of the 2026-10-01 renewal."
+  },
+  {
+    "id": "DOC-ACC-1010-MN",
+    "account_id": "ACC-1010",
+    "source_type": "meeting_notes",
+    "title": "Lumen Telecom - Weekly CS Sync",
+    "text": "Attendees: Mateo Alvarez (CSM); Carlos Mendez (customer).\nContext: Lumen Telecom is at 458k ARR across 135 licensed seats, renewing 2026-10-10. Seat utilisation is 81% (109 of 135).\nDiscussion: A new vp opened a competitive evaluation. Root cause hypothesis: leadership change with no executive relationship to the platform.\nAgreed next step: run an ROI business review, then propose a multi-year structure. Owner: Mateo Alvarez."
+  },
+  {
+    "id": "DOC-ACC-1010-CT",
+    "account_id": "ACC-1010",
+    "source_type": "call_transcript",
+    "title": "Lumen Telecom - Customer Call",
+    "text": "Customer (Carlos Mendez): The product works well; the question is price and the new VP's preferences.\nCSM (Mateo Alvarez): Understood. That lines up with a new VP opened a competitive evaluation. If we run an ROI business review, then propose a multi-year structure, would that put us back on track?\nCustomer (Carlos Mendez): It would help. Let us see the plan and timeline.\nCSM (Mateo Alvarez): I will send a written plan today and confirm the 2026-10-10 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1010-ST",
+    "account_id": "ACC-1010",
+    "source_type": "support_tickets",
+    "title": "Lumen Telecom - Open Support Tickets",
+    "text": "Ticket 1010-4886 (Priority: Medium, Status: Open). Title: Procurement requesting a renewal discount. Description: Reported by Bianca Rossi; leadership change with no executive relationship to the platform. Engineering and CS are coordinating on run an ROI business review, then propose a multi-year structure."
+  },
+  {
+    "id": "DOC-ACC-1010-CRM",
+    "account_id": "ACC-1010",
+    "source_type": "crm_notes",
+    "title": "Lumen Telecom - CRM Account Notes",
+    "text": "Stage: renewal. Sentiment: mixed.\nKey contacts: Carlos Mendez (primary), Bianca Rossi (day-to-day admin), Maya Chen (executive sponsor).\nARR 458k, 135 seats, renewal 2026-10-10, health 45.\nActive signals: renewal_window_open, qbr_missed, competitor_eval.\nOpen risk and motion: Strong adoption (81% of seats active) but a newly hired VP with no relationship is running a competitive evaluation and procurement wants a discount. The risk is relationship and commercial, not value. Lead with an ROI business review, then counter with a multi-year structure before the 2026-10-10 renewal."
+  },
+  {
+    "id": "DOC-ACC-1010-US",
+    "account_id": "ACC-1010",
+    "source_type": "usage_summary",
+    "title": "Lumen Telecom - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 171, 173, 170, 174, 172, 175, 176, 174. Seat utilisation is 81% (109 of 135 licensed seats). This usage pattern is consistent with a new VP opened a competitive evaluation. Recommendation flag: Renewal in 79 days; new VP evaluating competitor."
+  },
+  {
+    "id": "DOC-ACC-1011-MN",
+    "account_id": "ACC-1011",
+    "source_type": "meeting_notes",
+    "title": "Cascade Media - Weekly CS Sync",
+    "text": "Attendees: Aisha Bello (CSM); Nadia Petrosyan (customer).\nContext: Cascade Media is at 460k ARR across 122 licensed seats, renewing 2026-12-27. Seat utilisation is 35% (43 of 122).\nDiscussion: Onboarding milestones slipped past the day-45 plan. Root cause hypothesis: the customer admin lacks bandwidth to drive configuration.\nAgreed next step: assign an implementation specialist and run a two-week sprint. Owner: Aisha Bello."
+  },
+  {
+    "id": "DOC-ACC-1011-CT",
+    "account_id": "ACC-1011",
+    "source_type": "call_transcript",
+    "title": "Cascade Media - Customer Call",
+    "text": "Customer (Nadia Petrosyan): We are keen but stretched thin; we need more hands-on help to go live.\nCSM (Aisha Bello): Understood. That lines up with onboarding milestones slipped past the day-45 plan. If we assign an implementation specialist and run a two-week sprint, would that put us back on track?\nCustomer (Nadia Petrosyan): It would help. Let us see the plan and timeline.\nCSM (Aisha Bello): I will send a written plan today and confirm the 2026-12-27 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1011-ST",
+    "account_id": "ACC-1011",
+    "source_type": "support_tickets",
+    "title": "Cascade Media - Open Support Tickets",
+    "text": "Ticket 1011-4462 (Priority: Medium, Status: Open). Title: Onboarding milestones behind plan at day 45. Description: Reported by Diego Castro; the customer admin lacks bandwidth to drive configuration. Engineering and CS are coordinating on assign an implementation specialist and run a two-week sprint."
+  },
+  {
+    "id": "DOC-ACC-1011-CRM",
+    "account_id": "ACC-1011",
+    "source_type": "crm_notes",
+    "title": "Cascade Media - CRM Account Notes",
+    "text": "Stage: onboarding. Sentiment: neutral.\nKey contacts: Nadia Petrosyan (primary), Diego Castro (day-to-day admin), Paul Adler (executive sponsor).\nARR 460k, 122 seats, renewal 2026-12-27, health 59.\nActive signals: onboarding_milestone_late, login_decline, qbr_missed.\nOpen risk and motion: Onboarding is behind plan at day 45 because the customer's admin is consumed by other work. Cooperative but capacity-constrained, with only 35% of seats active. Needs an onboarding rescue: an implementation specialist, a two-week milestone sprint, async training, and a sponsor checkpoint."
+  },
+  {
+    "id": "DOC-ACC-1011-US",
+    "account_id": "ACC-1011",
+    "source_type": "usage_summary",
+    "title": "Cascade Media - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 8, 9, 11, 10, 12, 11, 13, 12. Seat utilisation is 35% (43 of 122 licensed seats). This usage pattern is consistent with onboarding milestones slipped past the day-45 plan. Recommendation flag: Day-45 onboarding: 2 of 7 milestones complete."
+  },
+  {
+    "id": "DOC-ACC-1011-SR",
+    "account_id": "ACC-1011",
+    "source_type": "survey_response",
+    "title": "Cascade Media - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 3 of 5. Respondent: Diego Castro.\nVerbatim: 'We are keen but stretched thin; we need more hands-on help to go live.'\nThis reading is consistent with the account's neutral sentiment."
+  },
+  {
+    "id": "DOC-ACC-1012-MN",
+    "account_id": "ACC-1012",
+    "source_type": "meeting_notes",
+    "title": "Aurora Energy - Weekly CS Sync",
+    "text": "Attendees: Lukas Novak (CSM); Bianca Rossi (customer).\nContext: Aurora Energy is at 590k ARR across 282 licensed seats, renewing 2026-11-23. Seat utilisation is 35% (98 of 282).\nDiscussion: Onboarding milestones slipped past the day-45 plan. Root cause hypothesis: the customer admin lacks bandwidth to drive configuration.\nAgreed next step: assign an implementation specialist and run a two-week sprint. Owner: Lukas Novak."
+  },
+  {
+    "id": "DOC-ACC-1012-CT",
+    "account_id": "ACC-1012",
+    "source_type": "call_transcript",
+    "title": "Aurora Energy - Customer Call",
+    "text": "Customer (Bianca Rossi): We are keen but stretched thin; we need more hands-on help to go live.\nCSM (Lukas Novak): Understood. That lines up with onboarding milestones slipped past the day-45 plan. If we assign an implementation specialist and run a two-week sprint, would that put us back on track?\nCustomer (Bianca Rossi): It would help. Let us see the plan and timeline.\nCSM (Lukas Novak): I will send a written plan today and confirm the 2026-11-23 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1012-ST",
+    "account_id": "ACC-1012",
+    "source_type": "support_tickets",
+    "title": "Aurora Energy - Open Support Tickets",
+    "text": "Ticket 1012-4616 (Priority: Medium, Status: Open). Title: Onboarding milestones behind plan at day 45. Description: Reported by Sven Larsson; the customer admin lacks bandwidth to drive configuration. Engineering and CS are coordinating on assign an implementation specialist and run a two-week sprint."
+  },
+  {
+    "id": "DOC-ACC-1012-CRM",
+    "account_id": "ACC-1012",
+    "source_type": "crm_notes",
+    "title": "Aurora Energy - CRM Account Notes",
+    "text": "Stage: onboarding. Sentiment: neutral.\nKey contacts: Bianca Rossi (primary), Sven Larsson (day-to-day admin), Ravi Menon (executive sponsor).\nARR 590k, 282 seats, renewal 2026-11-23, health 55.\nActive signals: onboarding_milestone_late, login_decline, qbr_missed.\nOpen risk and motion: Onboarding is behind plan at day 45 because the customer's admin is consumed by other work. Cooperative but capacity-constrained, with only 35% of seats active. Needs an onboarding rescue: an implementation specialist, a two-week milestone sprint, async training, and a sponsor checkpoint."
+  },
+  {
+    "id": "DOC-ACC-1012-US",
+    "account_id": "ACC-1012",
+    "source_type": "usage_summary",
+    "title": "Aurora Energy - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 8, 9, 11, 10, 12, 11, 13, 12. Seat utilisation is 35% (98 of 282 licensed seats). This usage pattern is consistent with onboarding milestones slipped past the day-45 plan. Recommendation flag: Day-45 onboarding: 3 of 7 milestones complete."
+  },
+  {
+    "id": "DOC-ACC-1012-SR",
+    "account_id": "ACC-1012",
+    "source_type": "survey_response",
+    "title": "Aurora Energy - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 3 of 5. Respondent: Sven Larsson.\nVerbatim: 'We are keen but stretched thin; we need more hands-on help to go live.'\nThis reading is consistent with the account's neutral sentiment."
+  },
+  {
+    "id": "DOC-ACC-1012-BL",
+    "account_id": "ACC-1012",
+    "source_type": "billing_events",
+    "title": "Aurora Energy - Billing and Invoice History",
+    "text": "Annual invoice for 590k issued and paid within terms; payment history is clean with no open billing dispute. The renewal invoice for the 2026-11-23 term has not yet been issued. Note for the motion: there is no payment friction, so the play should lead with assign an implementation specialist and run a two-week sprint rather than a pricing concession."
+  },
+  {
+    "id": "DOC-ACC-1013-MN",
+    "account_id": "ACC-1013",
+    "source_type": "meeting_notes",
+    "title": "Keystone Advisory - Weekly CS Sync",
+    "text": "Attendees: Priya Nair (CSM); Felix Wagner (customer).\nContext: Keystone Advisory is at 44k ARR across 21 licensed seats, renewing 2026-12-26. Seat utilisation is 33% (7 of 21).\nDiscussion: Onboarding milestones slipped past the day-45 plan. Root cause hypothesis: the customer admin lacks bandwidth to drive configuration.\nAgreed next step: assign an implementation specialist and run a two-week sprint. Owner: Priya Nair."
+  },
+  {
+    "id": "DOC-ACC-1013-CT",
+    "account_id": "ACC-1013",
+    "source_type": "call_transcript",
+    "title": "Keystone Advisory - Customer Call",
+    "text": "Customer (Felix Wagner): We are keen but stretched thin; we need more hands-on help to go live.\nCSM (Priya Nair): Understood. That lines up with onboarding milestones slipped past the day-45 plan. If we assign an implementation specialist and run a two-week sprint, would that put us back on track?\nCustomer (Felix Wagner): It would help. Let us see the plan and timeline.\nCSM (Priya Nair): I will send a written plan today and confirm the 2026-12-26 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1013-ST",
+    "account_id": "ACC-1013",
+    "source_type": "support_tickets",
+    "title": "Keystone Advisory - Open Support Tickets",
+    "text": "Ticket 1013-4845 (Priority: Medium, Status: Open). Title: Onboarding milestones behind plan at day 45. Description: Reported by Nadia Petrosyan; the customer admin lacks bandwidth to drive configuration. Engineering and CS are coordinating on assign an implementation specialist and run a two-week sprint."
+  },
+  {
+    "id": "DOC-ACC-1013-CRM",
+    "account_id": "ACC-1013",
+    "source_type": "crm_notes",
+    "title": "Keystone Advisory - CRM Account Notes",
+    "text": "Stage: onboarding. Sentiment: neutral.\nKey contacts: Felix Wagner (primary), Nadia Petrosyan (day-to-day admin), Ingrid Solberg (executive sponsor).\nARR 44k, 21 seats, renewal 2026-12-26, health 61.\nActive signals: onboarding_milestone_late, login_decline, qbr_missed.\nOpen risk and motion: Onboarding is behind plan at day 45 because the customer's admin is consumed by other work. Cooperative but capacity-constrained, with only 33% of seats active. Needs an onboarding rescue: an implementation specialist, a two-week milestone sprint, async training, and a sponsor checkpoint."
+  },
+  {
+    "id": "DOC-ACC-1013-US",
+    "account_id": "ACC-1013",
+    "source_type": "usage_summary",
+    "title": "Keystone Advisory - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 8, 9, 11, 10, 12, 11, 13, 12. Seat utilisation is 33% (7 of 21 licensed seats). This usage pattern is consistent with onboarding milestones slipped past the day-45 plan. Recommendation flag: Day-45 onboarding: 2 of 7 milestones complete."
+  },
+  {
+    "id": "DOC-ACC-1013-SR",
+    "account_id": "ACC-1013",
+    "source_type": "survey_response",
+    "title": "Keystone Advisory - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 3 of 5. Respondent: Nadia Petrosyan.\nVerbatim: 'We are keen but stretched thin; we need more hands-on help to go live.'\nThis reading is consistent with the account's neutral sentiment."
+  },
+  {
+    "id": "DOC-ACC-1014-MN",
+    "account_id": "ACC-1014",
+    "source_type": "meeting_notes",
+    "title": "Pixel Forge Games - Weekly CS Sync",
+    "text": "Attendees: Marcus Lee (CSM); Wendy Zhao (customer).\nContext: Pixel Forge Games is at 217k ARR across 87 licensed seats, renewing 2026-12-22. Seat utilisation is 80% (70 of 87).\nDiscussion: The analytics module was adopted then abandoned. Root cause hypothesis: teams never received enablement on the advanced module.\nAgreed next step: launch an in-app adoption campaign and a live enablement session. Owner: Marcus Lee."
+  },
+  {
+    "id": "DOC-ACC-1014-CT",
+    "account_id": "ACC-1014",
+    "source_type": "call_transcript",
+    "title": "Pixel Forge Games - Customer Call",
+    "text": "Customer (Wendy Zhao): The basics are great; we just never got the analytics piece working for us.\nCSM (Marcus Lee): Understood. That lines up with the analytics module was adopted then abandoned. If we launch an in-app adoption campaign and a live enablement session, would that put us back on track?\nCustomer (Wendy Zhao): It would help. Let us see the plan and timeline.\nCSM (Marcus Lee): I will send a written plan today and confirm the 2026-12-22 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1014-ST",
+    "account_id": "ACC-1014",
+    "source_type": "support_tickets",
+    "title": "Pixel Forge Games - Open Support Tickets",
+    "text": "Ticket 1014-4857 (Priority: Low, Status: Open). Title: Request for analytics module training. Description: Reported by Maya Chen; teams never received enablement on the advanced module. Engineering and CS are coordinating on launch an in-app adoption campaign and a live enablement session."
+  },
+  {
+    "id": "DOC-ACC-1014-CRM",
+    "account_id": "ACC-1014",
+    "source_type": "crm_notes",
+    "title": "Pixel Forge Games - CRM Account Notes",
+    "text": "Stage: adoption. Sentiment: neutral.\nKey contacts: Wendy Zhao (primary), Maya Chen (day-to-day admin), Yuki Tanaka (executive sponsor).\nARR 217k, 87 seats, renewal 2026-12-22, health 66.\nActive signals: feature_abandonment, login_decline.\nOpen risk and motion: Core product is sticky but the analytics module never landed, so value is partial and a renewal case is thin. Seat utilisation is 80%. Needs a targeted adoption campaign and an enablement session on the underused module before 2026-12-22."
+  },
+  {
+    "id": "DOC-ACC-1014-US",
+    "account_id": "ACC-1014",
+    "source_type": "usage_summary",
+    "title": "Pixel Forge Games - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 84, 86, 85, 83, 80, 79, 78, 77. Seat utilisation is 80% (70 of 87 licensed seats). This usage pattern is consistent with the analytics module was adopted then abandoned. Recommendation flag: Analytics module adoption reversed; logins down 12% MoM."
+  },
+  {
+    "id": "DOC-ACC-1014-SR",
+    "account_id": "ACC-1014",
+    "source_type": "survey_response",
+    "title": "Pixel Forge Games - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 4 of 5. Respondent: Maya Chen.\nVerbatim: 'The basics are great; we just never got the analytics piece working for us.'\nThis reading is consistent with the account's neutral sentiment."
+  },
+  {
+    "id": "DOC-ACC-1014-BL",
+    "account_id": "ACC-1014",
+    "source_type": "billing_events",
+    "title": "Pixel Forge Games - Billing and Invoice History",
+    "text": "Annual invoice for 217k issued and paid within terms; payment history is clean with no open billing dispute. The renewal invoice for the 2026-12-22 term has not yet been issued. Note for the motion: there is no payment friction, so the play should lead with launch an in-app adoption campaign and a live enablement session rather than a pricing concession."
+  },
+  {
+    "id": "DOC-ACC-1014-EML",
+    "account_id": "ACC-1014",
+    "source_type": "crm_notes",
+    "title": "Pixel Forge Games - Stakeholder Email Recap",
+    "text": "From Marcus Lee to Yuki Tanaka: Recapping our position on Pixel Forge Games. The analytics module was adopted then abandoned. We propose to launch an in-app adoption campaign and a live enablement session and will review progress at the next checkpoint ahead of the 2026-12-22 renewal."
+  },
+  {
+    "id": "DOC-ACC-1015-MN",
+    "account_id": "ACC-1015",
+    "source_type": "meeting_notes",
+    "title": "Harvest AgTech - Weekly CS Sync",
+    "text": "Attendees: Dana Whitfield (CSM); Diego Castro (customer).\nContext: Harvest AgTech is at 61k ARR across 34 licensed seats, renewing 2027-01-25. Seat utilisation is 65% (22 of 34).\nDiscussion: The analytics module was adopted then abandoned. Root cause hypothesis: teams never received enablement on the advanced module.\nAgreed next step: launch an in-app adoption campaign and a live enablement session. Owner: Dana Whitfield."
+  },
+  {
+    "id": "DOC-ACC-1015-CT",
+    "account_id": "ACC-1015",
+    "source_type": "call_transcript",
+    "title": "Harvest AgTech - Customer Call",
+    "text": "Customer (Diego Castro): The basics are great; we just never got the analytics piece working for us.\nCSM (Dana Whitfield): Understood. That lines up with the analytics module was adopted then abandoned. If we launch an in-app adoption campaign and a live enablement session, would that put us back on track?\nCustomer (Diego Castro): It would help. Let us see the plan and timeline.\nCSM (Dana Whitfield): I will send a written plan today and confirm the 2027-01-25 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1015-ST",
+    "account_id": "ACC-1015",
+    "source_type": "support_tickets",
+    "title": "Harvest AgTech - Open Support Tickets",
+    "text": "Ticket 1015-4466 (Priority: Low, Status: Open). Title: Request for analytics module training. Description: Reported by Maya Chen; teams never received enablement on the advanced module. Engineering and CS are coordinating on launch an in-app adoption campaign and a live enablement session."
+  },
+  {
+    "id": "DOC-ACC-1015-CRM",
+    "account_id": "ACC-1015",
+    "source_type": "crm_notes",
+    "title": "Harvest AgTech - CRM Account Notes",
+    "text": "Stage: adoption. Sentiment: neutral.\nKey contacts: Diego Castro (primary), Maya Chen (day-to-day admin), Nadia Petrosyan (executive sponsor).\nARR 61k, 34 seats, renewal 2027-01-25, health 68.\nActive signals: feature_abandonment, login_decline.\nOpen risk and motion: Core product is sticky but the analytics module never landed, so value is partial and a renewal case is thin. Seat utilisation is 65%. Needs a targeted adoption campaign and an enablement session on the underused module before 2027-01-25."
+  },
+  {
+    "id": "DOC-ACC-1015-US",
+    "account_id": "ACC-1015",
+    "source_type": "usage_summary",
+    "title": "Harvest AgTech - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 84, 86, 85, 83, 80, 79, 78, 77. Seat utilisation is 65% (22 of 34 licensed seats). This usage pattern is consistent with the analytics module was adopted then abandoned. Recommendation flag: Analytics module adoption reversed; logins down 12% MoM."
+  },
+  {
+    "id": "DOC-ACC-1016-MN",
+    "account_id": "ACC-1016",
+    "source_type": "meeting_notes",
+    "title": "Ironclad Construction - Weekly CS Sync",
+    "text": "Attendees: Sofia Romero (CSM); Sara Lindqvist (customer).\nContext: Ironclad Construction is at 398k ARR across 173 licensed seats, renewing 2026-11-13. Seat utilisation is 76% (132 of 173).\nDiscussion: The analytics module was adopted then abandoned. Root cause hypothesis: teams never received enablement on the advanced module.\nAgreed next step: launch an in-app adoption campaign and a live enablement session. Owner: Sofia Romero."
+  },
+  {
+    "id": "DOC-ACC-1016-CT",
+    "account_id": "ACC-1016",
+    "source_type": "call_transcript",
+    "title": "Ironclad Construction - Customer Call",
+    "text": "Customer (Sara Lindqvist): The basics are great; we just never got the analytics piece working for us.\nCSM (Sofia Romero): Understood. That lines up with the analytics module was adopted then abandoned. If we launch an in-app adoption campaign and a live enablement session, would that put us back on track?\nCustomer (Sara Lindqvist): It would help. Let us see the plan and timeline.\nCSM (Sofia Romero): I will send a written plan today and confirm the 2026-11-13 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1016-ST",
+    "account_id": "ACC-1016",
+    "source_type": "support_tickets",
+    "title": "Ironclad Construction - Open Support Tickets",
+    "text": "Ticket 1016-4636 (Priority: Low, Status: Open). Title: Request for analytics module training. Description: Reported by Ingrid Solberg; teams never received enablement on the advanced module. Engineering and CS are coordinating on launch an in-app adoption campaign and a live enablement session."
+  },
+  {
+    "id": "DOC-ACC-1016-CRM",
+    "account_id": "ACC-1016",
+    "source_type": "crm_notes",
+    "title": "Ironclad Construction - CRM Account Notes",
+    "text": "Stage: adoption. Sentiment: neutral.\nKey contacts: Sara Lindqvist (primary), Ingrid Solberg (day-to-day admin), Sven Larsson (executive sponsor).\nARR 398k, 173 seats, renewal 2026-11-13, health 59.\nActive signals: feature_abandonment, login_decline.\nOpen risk and motion: Core product is sticky but the analytics module never landed, so value is partial and a renewal case is thin. Seat utilisation is 76%. Needs a targeted adoption campaign and an enablement session on the underused module before 2026-11-13."
+  },
+  {
+    "id": "DOC-ACC-1016-US",
+    "account_id": "ACC-1016",
+    "source_type": "usage_summary",
+    "title": "Ironclad Construction - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 84, 86, 85, 83, 80, 79, 78, 77. Seat utilisation is 76% (132 of 173 licensed seats). This usage pattern is consistent with the analytics module was adopted then abandoned. Recommendation flag: Analytics module adoption reversed; logins down 12% MoM."
+  },
+  {
+    "id": "DOC-ACC-1016-SR",
+    "account_id": "ACC-1016",
+    "source_type": "survey_response",
+    "title": "Ironclad Construction - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 4 of 5. Respondent: Ingrid Solberg.\nVerbatim: 'The basics are great; we just never got the analytics piece working for us.'\nThis reading is consistent with the account's neutral sentiment."
+  },
+  {
+    "id": "DOC-ACC-1017-MN",
+    "account_id": "ACC-1017",
+    "source_type": "meeting_notes",
+    "title": "Beacon Marketing Cloud - Weekly CS Sync",
+    "text": "Attendees: James Okafor (CSM); Nadia Petrosyan (customer).\nContext: Beacon Marketing Cloud is at 164k ARR across 57 licensed seats, renewing 2027-02-02. Seat utilisation is 67% (38 of 57).\nDiscussion: The primary champion moved to a different team. Root cause hypothesis: relationship concentration on a single departed stakeholder.\nAgreed next step: re-map stakeholders and run a value recap with the new sponsor. Owner: James Okafor."
+  },
+  {
+    "id": "DOC-ACC-1017-CT",
+    "account_id": "ACC-1017",
+    "source_type": "call_transcript",
+    "title": "Beacon Marketing Cloud - Customer Call",
+    "text": "Customer (Nadia Petrosyan): Things still work; I am just getting up to speed as the new owner.\nCSM (James Okafor): Understood. That lines up with the primary champion moved to a different team. If we re-map stakeholders and run a value recap with the new sponsor, would that put us back on track?\nCustomer (Nadia Petrosyan): It would help. Let us see the plan and timeline.\nCSM (James Okafor): I will send a written plan today and confirm the 2027-02-02 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1017-ST",
+    "account_id": "ACC-1017",
+    "source_type": "support_tickets",
+    "title": "Beacon Marketing Cloud - Open Support Tickets",
+    "text": "Ticket 1017-4459 (Priority: Low, Status: Open). Title: Reassign account contacts after champion change. Description: Reported by Karim Haddad; relationship concentration on a single departed stakeholder. Engineering and CS are coordinating on re-map stakeholders and run a value recap with the new sponsor."
+  },
+  {
+    "id": "DOC-ACC-1017-CRM",
+    "account_id": "ACC-1017",
+    "source_type": "crm_notes",
+    "title": "Beacon Marketing Cloud - CRM Account Notes",
+    "text": "Stage: adoption. Sentiment: mixed.\nKey contacts: Nadia Petrosyan (primary), Karim Haddad (day-to-day admin), Wendy Zhao (executive sponsor).\nARR 164k, 57 seats, renewal 2027-02-02, health 62.\nActive signals: champion_departure, stakeholder_change.\nOpen risk and motion: The day-to-day champion changed roles and a new sponsor is not yet mapped, leaving the relationship thin even though usage holds at 67%. Needs a fast stakeholder re-mapping and a value recap with the incoming owner before momentum fades."
+  },
+  {
+    "id": "DOC-ACC-1017-US",
+    "account_id": "ACC-1017",
+    "source_type": "usage_summary",
+    "title": "Beacon Marketing Cloud - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 120, 121, 119, 122, 120, 118, 121, 120. Seat utilisation is 67% (38 of 57 licensed seats). This usage pattern is consistent with the primary champion moved to a different team. Recommendation flag: Primary champion moved roles; new sponsor unmapped."
+  },
+  {
+    "id": "DOC-ACC-1017-SR",
+    "account_id": "ACC-1017",
+    "source_type": "survey_response",
+    "title": "Beacon Marketing Cloud - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 4 of 5. Respondent: Karim Haddad.\nVerbatim: 'Things still work; I am just getting up to speed as the new owner.'\nThis reading is consistent with the account's mixed sentiment."
+  },
+  {
+    "id": "DOC-ACC-1017-BL",
+    "account_id": "ACC-1017",
+    "source_type": "billing_events",
+    "title": "Beacon Marketing Cloud - Billing and Invoice History",
+    "text": "Annual invoice for 164k issued and paid within terms; payment history is clean with no open billing dispute. The renewal invoice for the 2027-02-02 term has not yet been issued. Note for the motion: there is no payment friction, so the play should lead with re-map stakeholders and run a value recap with the new sponsor rather than a pricing concession."
+  },
+  {
+    "id": "DOC-ACC-1017-EML",
+    "account_id": "ACC-1017",
+    "source_type": "crm_notes",
+    "title": "Beacon Marketing Cloud - Stakeholder Email Recap",
+    "text": "From James Okafor to Wendy Zhao: Recapping our position on Beacon Marketing Cloud. The primary champion moved to a different team. We propose to re-map stakeholders and run a value recap with the new sponsor and will review progress at the next checkpoint ahead of the 2027-02-02 renewal."
+  },
+  {
+    "id": "DOC-ACC-1018-MN",
+    "account_id": "ACC-1018",
+    "source_type": "meeting_notes",
+    "title": "Citadel Security - Weekly CS Sync",
+    "text": "Attendees: Elena Petrova (CSM); Nadia Petrosyan (customer).\nContext: Citadel Security is at 195k ARR across 88 licensed seats, renewing 2026-12-16. Seat utilisation is 80% (70 of 88).\nDiscussion: The primary champion moved to a different team. Root cause hypothesis: relationship concentration on a single departed stakeholder.\nAgreed next step: re-map stakeholders and run a value recap with the new sponsor. Owner: Elena Petrova."
+  },
+  {
+    "id": "DOC-ACC-1018-CT",
+    "account_id": "ACC-1018",
+    "source_type": "call_transcript",
+    "title": "Citadel Security - Customer Call",
+    "text": "Customer (Nadia Petrosyan): Things still work; I am just getting up to speed as the new owner.\nCSM (Elena Petrova): Understood. That lines up with the primary champion moved to a different team. If we re-map stakeholders and run a value recap with the new sponsor, would that put us back on track?\nCustomer (Nadia Petrosyan): It would help. Let us see the plan and timeline.\nCSM (Elena Petrova): I will send a written plan today and confirm the 2026-12-16 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1018-ST",
+    "account_id": "ACC-1018",
+    "source_type": "support_tickets",
+    "title": "Citadel Security - Open Support Tickets",
+    "text": "Ticket 1018-4610 (Priority: Low, Status: Open). Title: Reassign account contacts after champion change. Description: Reported by Maya Chen; relationship concentration on a single departed stakeholder. Engineering and CS are coordinating on re-map stakeholders and run a value recap with the new sponsor."
+  },
+  {
+    "id": "DOC-ACC-1018-CRM",
+    "account_id": "ACC-1018",
+    "source_type": "crm_notes",
+    "title": "Citadel Security - CRM Account Notes",
+    "text": "Stage: adoption. Sentiment: mixed.\nKey contacts: Nadia Petrosyan (primary), Maya Chen (day-to-day admin), Lena Ortiz (executive sponsor).\nARR 195k, 88 seats, renewal 2026-12-16, health 60.\nActive signals: champion_departure, stakeholder_change.\nOpen risk and motion: The day-to-day champion changed roles and a new sponsor is not yet mapped, leaving the relationship thin even though usage holds at 80%. Needs a fast stakeholder re-mapping and a value recap with the incoming owner before momentum fades."
+  },
+  {
+    "id": "DOC-ACC-1018-US",
+    "account_id": "ACC-1018",
+    "source_type": "usage_summary",
+    "title": "Citadel Security - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 120, 121, 119, 122, 120, 118, 121, 120. Seat utilisation is 80% (70 of 88 licensed seats). This usage pattern is consistent with the primary champion moved to a different team. Recommendation flag: Primary champion moved roles; new sponsor unmapped."
+  },
+  {
+    "id": "DOC-ACC-1019-MN",
+    "account_id": "ACC-1019",
+    "source_type": "meeting_notes",
+    "title": "Anchor Realty - Weekly CS Sync",
+    "text": "Attendees: Tara Mensah (CSM); Sven Larsson (customer).\nContext: Anchor Realty is at 132k ARR across 113 licensed seats, renewing 2026-12-25. Seat utilisation is 64% (72 of 113).\nDiscussion: The primary champion moved to a different team. Root cause hypothesis: relationship concentration on a single departed stakeholder.\nAgreed next step: re-map stakeholders and run a value recap with the new sponsor. Owner: Tara Mensah."
+  },
+  {
+    "id": "DOC-ACC-1019-CT",
+    "account_id": "ACC-1019",
+    "source_type": "call_transcript",
+    "title": "Anchor Realty - Customer Call",
+    "text": "Customer (Sven Larsson): Things still work; I am just getting up to speed as the new owner.\nCSM (Tara Mensah): Understood. That lines up with the primary champion moved to a different team. If we re-map stakeholders and run a value recap with the new sponsor, would that put us back on track?\nCustomer (Sven Larsson): It would help. Let us see the plan and timeline.\nCSM (Tara Mensah): I will send a written plan today and confirm the 2026-12-25 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1019-ST",
+    "account_id": "ACC-1019",
+    "source_type": "support_tickets",
+    "title": "Anchor Realty - Open Support Tickets",
+    "text": "Ticket 1019-4841 (Priority: Low, Status: Open). Title: Reassign account contacts after champion change. Description: Reported by Carlos Mendez; relationship concentration on a single departed stakeholder. Engineering and CS are coordinating on re-map stakeholders and run a value recap with the new sponsor."
+  },
+  {
+    "id": "DOC-ACC-1019-CRM",
+    "account_id": "ACC-1019",
+    "source_type": "crm_notes",
+    "title": "Anchor Realty - CRM Account Notes",
+    "text": "Stage: adoption. Sentiment: mixed.\nKey contacts: Sven Larsson (primary), Carlos Mendez (day-to-day admin), Karim Haddad (executive sponsor).\nARR 132k, 113 seats, renewal 2026-12-25, health 62.\nActive signals: champion_departure, stakeholder_change.\nOpen risk and motion: The day-to-day champion changed roles and a new sponsor is not yet mapped, leaving the relationship thin even though usage holds at 64%. Needs a fast stakeholder re-mapping and a value recap with the incoming owner before momentum fades."
+  },
+  {
+    "id": "DOC-ACC-1019-US",
+    "account_id": "ACC-1019",
+    "source_type": "usage_summary",
+    "title": "Anchor Realty - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 120, 121, 119, 122, 120, 118, 121, 120. Seat utilisation is 64% (72 of 113 licensed seats). This usage pattern is consistent with the primary champion moved to a different team. Recommendation flag: Primary champion moved roles; new sponsor unmapped."
+  },
+  {
+    "id": "DOC-ACC-1020-MN",
+    "account_id": "ACC-1020",
+    "source_type": "meeting_notes",
+    "title": "Helix Biolabs - Weekly CS Sync",
+    "text": "Attendees: Devon Pierce (CSM); Wendy Zhao (customer).\nContext: Helix Biolabs is at 441k ARR across 260 licensed seats, renewing 2027-02-23. Seat utilisation is 95% (247 of 260).\nDiscussion: Seat saturation at 95% with 3 teams piloting. Root cause hypothesis: demonstrated value driving unsanctioned cross-team adoption.\nAgreed next step: build a 73-seat expansion proposal with SSO/SCIM included. Owner: Devon Pierce."
+  },
+  {
+    "id": "DOC-ACC-1020-CT",
+    "account_id": "ACC-1020",
+    "source_type": "call_transcript",
+    "title": "Helix Biolabs - Customer Call",
+    "text": "Customer (Wendy Zhao): We consider you standard tooling; we are basically out of seats.\nCSM (Devon Pierce): Understood. That lines up with seat saturation at 95% with 3 teams piloting. If we build a 73-seat expansion proposal with SSO/SCIM included, would that put us back on track?\nCustomer (Wendy Zhao): It would help. Let us see the plan and timeline.\nCSM (Devon Pierce): I will send a written plan today and confirm the 2027-02-23 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1020-ST",
+    "account_id": "ACC-1020",
+    "source_type": "support_tickets",
+    "title": "Helix Biolabs - Open Support Tickets",
+    "text": "Ticket 1020-4831 (Priority: Medium, Status: Open). Title: Enable SSO/SCIM ahead of a seat expansion. Description: Reported by Lena Ortiz; demonstrated value driving unsanctioned cross-team adoption. Engineering and CS are coordinating on build a 73-seat expansion proposal with SSO/SCIM included."
+  },
+  {
+    "id": "DOC-ACC-1020-CRM",
+    "account_id": "ACC-1020",
+    "source_type": "crm_notes",
+    "title": "Helix Biolabs - CRM Account Notes",
+    "text": "Stage: expansion. Sentiment: very_positive.\nKey contacts: Wendy Zhao (primary), Lena Ortiz (day-to-day admin), Omar Khalil (executive sponsor).\nARR 441k, 260 seats, renewal 2027-02-23, health 83.\nActive signals: seat_growth, expansion_intent.\nOpen risk and motion: Seat-saturated promoter with several teams borrowing logins and an approved budget. Utilisation is 95% (247 of 260). A product-qualified expansion worth roughly +73 seats, plus a reference and case-study opportunity."
+  },
+  {
+    "id": "DOC-ACC-1020-US",
+    "account_id": "ACC-1020",
+    "source_type": "usage_summary",
+    "title": "Helix Biolabs - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 241, 242, 243, 244, 245, 246, 247, 247. Seat utilisation is 95% (247 of 260 licensed seats). This usage pattern is consistent with seat saturation at 95% with 3 teams piloting. Recommendation flag: Hit 95% seat utilisation; 4 new teams piloting."
+  },
+  {
+    "id": "DOC-ACC-1020-SR",
+    "account_id": "ACC-1020",
+    "source_type": "survey_response",
+    "title": "Helix Biolabs - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 5 of 5. Respondent: Lena Ortiz.\nVerbatim: 'We consider you standard tooling; we are basically out of seats.'\nThis reading is consistent with the account's very_positive sentiment."
+  },
+  {
+    "id": "DOC-ACC-1020-BL",
+    "account_id": "ACC-1020",
+    "source_type": "billing_events",
+    "title": "Helix Biolabs - Billing and Invoice History",
+    "text": "Annual invoice for 441k issued and paid within terms; payment history is clean with no open billing dispute. The renewal invoice for the 2027-02-23 term has not yet been issued. Note for the motion: there is no payment friction, so the play should lead with build a 73-seat expansion proposal with SSO/SCIM included rather than a pricing concession."
+  },
+  {
+    "id": "DOC-ACC-1021-MN",
+    "account_id": "ACC-1021",
+    "source_type": "meeting_notes",
+    "title": "Summit Freight - Weekly CS Sync",
+    "text": "Attendees: Hana Kim (CSM); Karim Haddad (customer).\nContext: Summit Freight is at 27k ARR across 27 licensed seats, renewing 2027-02-20. Seat utilisation is 96% (26 of 27).\nDiscussion: Seat saturation at 96% with 4 teams piloting. Root cause hypothesis: demonstrated value driving unsanctioned cross-team adoption.\nAgreed next step: build a 68-seat expansion proposal with SSO/SCIM included. Owner: Hana Kim."
+  },
+  {
+    "id": "DOC-ACC-1021-CT",
+    "account_id": "ACC-1021",
+    "source_type": "call_transcript",
+    "title": "Summit Freight - Customer Call",
+    "text": "Customer (Karim Haddad): We consider you standard tooling; we are basically out of seats.\nCSM (Hana Kim): Understood. That lines up with seat saturation at 96% with 4 teams piloting. If we build a 68-seat expansion proposal with SSO/SCIM included, would that put us back on track?\nCustomer (Karim Haddad): It would help. Let us see the plan and timeline.\nCSM (Hana Kim): I will send a written plan today and confirm the 2027-02-20 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1021-ST",
+    "account_id": "ACC-1021",
+    "source_type": "support_tickets",
+    "title": "Summit Freight - Open Support Tickets",
+    "text": "Ticket 1021-4722 (Priority: Medium, Status: Open). Title: Enable SSO/SCIM ahead of a seat expansion. Description: Reported by Paul Adler; demonstrated value driving unsanctioned cross-team adoption. Engineering and CS are coordinating on build a 68-seat expansion proposal with SSO/SCIM included."
+  },
+  {
+    "id": "DOC-ACC-1021-CRM",
+    "account_id": "ACC-1021",
+    "source_type": "crm_notes",
+    "title": "Summit Freight - CRM Account Notes",
+    "text": "Stage: expansion. Sentiment: very_positive.\nKey contacts: Karim Haddad (primary), Paul Adler (day-to-day admin), Sven Larsson (executive sponsor).\nARR 27k, 27 seats, renewal 2027-02-20, health 90.\nActive signals: seat_growth, expansion_intent.\nOpen risk and motion: Seat-saturated promoter with several teams borrowing logins and an approved budget. Utilisation is 96% (26 of 27). A product-qualified expansion worth roughly +68 seats, plus a reference and case-study opportunity."
+  },
+  {
+    "id": "DOC-ACC-1021-US",
+    "account_id": "ACC-1021",
+    "source_type": "usage_summary",
+    "title": "Summit Freight - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 20, 21, 22, 23, 24, 25, 26, 26. Seat utilisation is 96% (26 of 27 licensed seats). This usage pattern is consistent with seat saturation at 96% with 4 teams piloting. Recommendation flag: Hit 96% seat utilisation; 4 new teams piloting."
+  },
+  {
+    "id": "DOC-ACC-1021-SR",
+    "account_id": "ACC-1021",
+    "source_type": "survey_response",
+    "title": "Summit Freight - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 5 of 5. Respondent: Paul Adler.\nVerbatim: 'We consider you standard tooling; we are basically out of seats.'\nThis reading is consistent with the account's very_positive sentiment."
+  },
+  {
+    "id": "DOC-ACC-1021-BL",
+    "account_id": "ACC-1021",
+    "source_type": "billing_events",
+    "title": "Summit Freight - Billing and Invoice History",
+    "text": "Annual invoice for 27k issued and paid within terms; payment history is clean with no open billing dispute. The renewal invoice for the 2027-02-20 term has not yet been issued. Note for the motion: there is no payment friction, so the play should lead with build a 68-seat expansion proposal with SSO/SCIM included rather than a pricing concession."
+  },
+  {
+    "id": "DOC-ACC-1022-MN",
+    "account_id": "ACC-1022",
+    "source_type": "meeting_notes",
+    "title": "Orchard Learning - Weekly CS Sync",
+    "text": "Attendees: Mateo Alvarez (CSM); Tom Becker (customer).\nContext: Orchard Learning is at 21k ARR across 36 licensed seats, renewing 2027-05-24. Seat utilisation is 94% (34 of 36).\nDiscussion: Seat saturation at 94% with 2 teams piloting. Root cause hypothesis: demonstrated value driving unsanctioned cross-team adoption.\nAgreed next step: build a 74-seat expansion proposal with SSO/SCIM included. Owner: Mateo Alvarez."
+  },
+  {
+    "id": "DOC-ACC-1022-CT",
+    "account_id": "ACC-1022",
+    "source_type": "call_transcript",
+    "title": "Orchard Learning - Customer Call",
+    "text": "Customer (Tom Becker): We consider you standard tooling; we are basically out of seats.\nCSM (Mateo Alvarez): Understood. That lines up with seat saturation at 94% with 2 teams piloting. If we build a 74-seat expansion proposal with SSO/SCIM included, would that put us back on track?\nCustomer (Tom Becker): It would help. Let us see the plan and timeline.\nCSM (Mateo Alvarez): I will send a written plan today and confirm the 2027-05-24 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1022-ST",
+    "account_id": "ACC-1022",
+    "source_type": "support_tickets",
+    "title": "Orchard Learning - Open Support Tickets",
+    "text": "Ticket 1022-4825 (Priority: Medium, Status: Open). Title: Enable SSO/SCIM ahead of a seat expansion. Description: Reported by Paul Adler; demonstrated value driving unsanctioned cross-team adoption. Engineering and CS are coordinating on build a 74-seat expansion proposal with SSO/SCIM included."
+  },
+  {
+    "id": "DOC-ACC-1022-CRM",
+    "account_id": "ACC-1022",
+    "source_type": "crm_notes",
+    "title": "Orchard Learning - CRM Account Notes",
+    "text": "Stage: expansion. Sentiment: very_positive.\nKey contacts: Tom Becker (primary), Paul Adler (day-to-day admin), Carlos Mendez (executive sponsor).\nARR 21k, 36 seats, renewal 2027-05-24, health 86.\nActive signals: seat_growth, expansion_intent.\nOpen risk and motion: Seat-saturated promoter with several teams borrowing logins and an approved budget. Utilisation is 94% (34 of 36). A product-qualified expansion worth roughly +74 seats, plus a reference and case-study opportunity."
+  },
+  {
+    "id": "DOC-ACC-1022-US",
+    "account_id": "ACC-1022",
+    "source_type": "usage_summary",
+    "title": "Orchard Learning - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 28, 29, 30, 31, 32, 33, 34, 34. Seat utilisation is 94% (34 of 36 licensed seats). This usage pattern is consistent with seat saturation at 94% with 2 teams piloting. Recommendation flag: Hit 94% seat utilisation; 4 new teams piloting."
+  },
+  {
+    "id": "DOC-ACC-1022-SR",
+    "account_id": "ACC-1022",
+    "source_type": "survey_response",
+    "title": "Orchard Learning - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 5 of 5. Respondent: Paul Adler.\nVerbatim: 'We consider you standard tooling; we are basically out of seats.'\nThis reading is consistent with the account's very_positive sentiment."
+  },
+  {
+    "id": "DOC-ACC-1022-BL",
+    "account_id": "ACC-1022",
+    "source_type": "billing_events",
+    "title": "Orchard Learning - Billing and Invoice History",
+    "text": "Annual invoice for 21k issued and paid within terms; payment history is clean with no open billing dispute. The renewal invoice for the 2027-05-24 term has not yet been issued. Note for the motion: there is no payment friction, so the play should lead with build a 74-seat expansion proposal with SSO/SCIM included rather than a pricing concession."
+  },
+  {
+    "id": "DOC-ACC-1023-MN",
+    "account_id": "ACC-1023",
+    "source_type": "meeting_notes",
+    "title": "Quartz Robotics - Weekly CS Sync",
+    "text": "Attendees: Aisha Bello (CSM); Omar Khalil (customer).\nContext: Quartz Robotics is at 176k ARR across 67 licensed seats, renewing 2027-05-08. Seat utilisation is 93% (62 of 67).\nDiscussion: No material risk event this quarter. Root cause hypothesis: n/a, the account is healthy.\nAgreed next step: nurture the relationship and line up a Q4 expansion conversation. Owner: Aisha Bello."
+  },
+  {
+    "id": "DOC-ACC-1023-CT",
+    "account_id": "ACC-1023",
+    "source_type": "call_transcript",
+    "title": "Quartz Robotics - Customer Call",
+    "text": "Customer (Omar Khalil): Solid product and responsive team; we would happily be a reference.\nCSM (Aisha Bello): Understood. That lines up with no material risk event this quarter. If we nurture the relationship and line up a Q4 expansion conversation, would that put us back on track?\nCustomer (Omar Khalil): It would help. Let us see the plan and timeline.\nCSM (Aisha Bello): I will send a written plan today and confirm the 2027-05-08 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1023-ST",
+    "account_id": "ACC-1023",
+    "source_type": "support_tickets",
+    "title": "Quartz Robotics - Open Support Tickets",
+    "text": "Ticket 1023-4543 (Priority: Low, Status: Open). Title: Minor enhancement request on reporting export. Description: Reported by Paul Adler; n/a, the account is healthy. Engineering and CS are coordinating on nurture the relationship and line up a Q4 expansion conversation."
+  },
+  {
+    "id": "DOC-ACC-1023-CRM",
+    "account_id": "ACC-1023",
+    "source_type": "crm_notes",
+    "title": "Quartz Robotics - CRM Account Notes",
+    "text": "Stage: established. Sentiment: positive.\nKey contacts: Omar Khalil (primary), Paul Adler (day-to-day admin), Maya Chen (executive sponsor).\nARR 176k, 67 seats, renewal 2027-05-08, health 75.\nActive signals: none.\nOpen risk and motion: Healthy, steady account with a reference-willing promoter and one minor enhancement request. Utilisation is 93%. No churn risk: a future expansion candidate to nurture rather than an active save today."
+  },
+  {
+    "id": "DOC-ACC-1023-US",
+    "account_id": "ACC-1023",
+    "source_type": "usage_summary",
+    "title": "Quartz Robotics - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 59, 60, 61, 62, 62, 62, 62, 62. Seat utilisation is 93% (62 of 67 licensed seats). This usage pattern is consistent with no material risk event this quarter. Recommendation flag: Steady usage; strong NPS from economic buyer."
+  },
+  {
+    "id": "DOC-ACC-1024-MN",
+    "account_id": "ACC-1024",
+    "source_type": "meeting_notes",
+    "title": "Tideway Bank - Weekly CS Sync",
+    "text": "Attendees: Lukas Novak (CSM); Karim Haddad (customer).\nContext: Tideway Bank is at 383k ARR across 275 licensed seats, renewing 2027-06-04. Seat utilisation is 95% (260 of 275).\nDiscussion: No material risk event this quarter. Root cause hypothesis: n/a, the account is healthy.\nAgreed next step: nurture the relationship and line up a Q4 expansion conversation. Owner: Lukas Novak."
+  },
+  {
+    "id": "DOC-ACC-1024-CT",
+    "account_id": "ACC-1024",
+    "source_type": "call_transcript",
+    "title": "Tideway Bank - Customer Call",
+    "text": "Customer (Karim Haddad): Solid product and responsive team; we would happily be a reference.\nCSM (Lukas Novak): Understood. That lines up with no material risk event this quarter. If we nurture the relationship and line up a Q4 expansion conversation, would that put us back on track?\nCustomer (Karim Haddad): It would help. Let us see the plan and timeline.\nCSM (Lukas Novak): I will send a written plan today and confirm the 2027-06-04 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1024-ST",
+    "account_id": "ACC-1024",
+    "source_type": "support_tickets",
+    "title": "Tideway Bank - Open Support Tickets",
+    "text": "Ticket 1024-4510 (Priority: Low, Status: Open). Title: Minor enhancement request on reporting export. Description: Reported by Tom Becker; n/a, the account is healthy. Engineering and CS are coordinating on nurture the relationship and line up a Q4 expansion conversation."
+  },
+  {
+    "id": "DOC-ACC-1024-CRM",
+    "account_id": "ACC-1024",
+    "source_type": "crm_notes",
+    "title": "Tideway Bank - CRM Account Notes",
+    "text": "Stage: established. Sentiment: positive.\nKey contacts: Karim Haddad (primary), Tom Becker (day-to-day admin), Diego Castro (executive sponsor).\nARR 383k, 275 seats, renewal 2027-06-04, health 83.\nActive signals: none.\nOpen risk and motion: Healthy, steady account with a reference-willing promoter and one minor enhancement request. Utilisation is 95%. No churn risk: a future expansion candidate to nurture rather than an active save today."
+  },
+  {
+    "id": "DOC-ACC-1024-US",
+    "account_id": "ACC-1024",
+    "source_type": "usage_summary",
+    "title": "Tideway Bank - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 257, 258, 259, 260, 260, 260, 260, 260. Seat utilisation is 95% (260 of 275 licensed seats). This usage pattern is consistent with no material risk event this quarter. Recommendation flag: Steady usage; strong NPS from economic buyer."
+  },
+  {
+    "id": "DOC-ACC-1024-SR",
+    "account_id": "ACC-1024",
+    "source_type": "survey_response",
+    "title": "Tideway Bank - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 5 of 5. Respondent: Tom Becker.\nVerbatim: 'Solid product and responsive team; we would happily be a reference.'\nThis reading is consistent with the account's positive sentiment."
+  },
+  {
+    "id": "DOC-ACC-1024-BL",
+    "account_id": "ACC-1024",
+    "source_type": "billing_events",
+    "title": "Tideway Bank - Billing and Invoice History",
+    "text": "Annual invoice for 383k issued and paid within terms; payment history is clean with no open billing dispute. The renewal invoice for the 2027-06-04 term has not yet been issued. Note for the motion: there is no payment friction, so the play should lead with nurture the relationship and line up a Q4 expansion conversation rather than a pricing concession."
+  },
+  {
+    "id": "DOC-ACC-1025-MN",
+    "account_id": "ACC-1025",
+    "source_type": "meeting_notes",
+    "title": "Evergreen Retail - Weekly CS Sync",
+    "text": "Attendees: Priya Nair (CSM); Maya Chen (customer).\nContext: Evergreen Retail is at 173k ARR across 81 licensed seats, renewing 2027-06-07. Seat utilisation is 89% (72 of 81).\nDiscussion: No material risk event this quarter. Root cause hypothesis: n/a, the account is healthy.\nAgreed next step: nurture the relationship and line up a Q4 expansion conversation. Owner: Priya Nair."
+  },
+  {
+    "id": "DOC-ACC-1025-CT",
+    "account_id": "ACC-1025",
+    "source_type": "call_transcript",
+    "title": "Evergreen Retail - Customer Call",
+    "text": "Customer (Maya Chen): Solid product and responsive team; we would happily be a reference.\nCSM (Priya Nair): Understood. That lines up with no material risk event this quarter. If we nurture the relationship and line up a Q4 expansion conversation, would that put us back on track?\nCustomer (Maya Chen): It would help. Let us see the plan and timeline.\nCSM (Priya Nair): I will send a written plan today and confirm the 2027-06-07 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1025-ST",
+    "account_id": "ACC-1025",
+    "source_type": "support_tickets",
+    "title": "Evergreen Retail - Open Support Tickets",
+    "text": "Ticket 1025-4639 (Priority: Low, Status: Open). Title: Minor enhancement request on reporting export. Description: Reported by Paul Adler; n/a, the account is healthy. Engineering and CS are coordinating on nurture the relationship and line up a Q4 expansion conversation."
+  },
+  {
+    "id": "DOC-ACC-1025-CRM",
+    "account_id": "ACC-1025",
+    "source_type": "crm_notes",
+    "title": "Evergreen Retail - CRM Account Notes",
+    "text": "Stage: established. Sentiment: positive.\nKey contacts: Maya Chen (primary), Paul Adler (day-to-day admin), Tom Becker (executive sponsor).\nARR 173k, 81 seats, renewal 2027-06-07, health 78.\nActive signals: none.\nOpen risk and motion: Healthy, steady account with a reference-willing promoter and one minor enhancement request. Utilisation is 89%. No churn risk: a future expansion candidate to nurture rather than an active save today."
+  },
+  {
+    "id": "DOC-ACC-1025-US",
+    "account_id": "ACC-1025",
+    "source_type": "usage_summary",
+    "title": "Evergreen Retail - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 69, 70, 71, 72, 72, 72, 72, 72. Seat utilisation is 89% (72 of 81 licensed seats). This usage pattern is consistent with no material risk event this quarter. Recommendation flag: Steady usage; strong NPS from economic buyer."
+  },
+  {
+    "id": "DOC-ACC-1026-MN",
+    "account_id": "ACC-1026",
+    "source_type": "meeting_notes",
+    "title": "Falcon Telematics - Weekly CS Sync",
+    "text": "Attendees: Marcus Lee (CSM); Felix Wagner (customer).\nContext: Falcon Telematics is at 67k ARR across 44 licensed seats, renewing 2027-04-04. Seat utilisation is 91% (40 of 44).\nDiscussion: No material risk event this quarter. Root cause hypothesis: n/a, the account is healthy.\nAgreed next step: nurture the relationship and line up a Q4 expansion conversation. Owner: Marcus Lee."
+  },
+  {
+    "id": "DOC-ACC-1026-CT",
+    "account_id": "ACC-1026",
+    "source_type": "call_transcript",
+    "title": "Falcon Telematics - Customer Call",
+    "text": "Customer (Felix Wagner): Solid product and responsive team; we would happily be a reference.\nCSM (Marcus Lee): Understood. That lines up with no material risk event this quarter. If we nurture the relationship and line up a Q4 expansion conversation, would that put us back on track?\nCustomer (Felix Wagner): It would help. Let us see the plan and timeline.\nCSM (Marcus Lee): I will send a written plan today and confirm the 2027-04-04 renewal path."
+  },
+  {
+    "id": "DOC-ACC-1026-ST",
+    "account_id": "ACC-1026",
+    "source_type": "support_tickets",
+    "title": "Falcon Telematics - Open Support Tickets",
+    "text": "Ticket 1026-4722 (Priority: Low, Status: Open). Title: Minor enhancement request on reporting export. Description: Reported by Nadia Petrosyan; n/a, the account is healthy. Engineering and CS are coordinating on nurture the relationship and line up a Q4 expansion conversation."
+  },
+  {
+    "id": "DOC-ACC-1026-CRM",
+    "account_id": "ACC-1026",
+    "source_type": "crm_notes",
+    "title": "Falcon Telematics - CRM Account Notes",
+    "text": "Stage: established. Sentiment: positive.\nKey contacts: Felix Wagner (primary), Nadia Petrosyan (day-to-day admin), Diego Castro (executive sponsor).\nARR 67k, 44 seats, renewal 2027-04-04, health 77.\nActive signals: none.\nOpen risk and motion: Healthy, steady account with a reference-willing promoter and one minor enhancement request. Utilisation is 91%. No churn risk: a future expansion candidate to nurture rather than an active save today."
+  },
+  {
+    "id": "DOC-ACC-1026-US",
+    "account_id": "ACC-1026",
+    "source_type": "usage_summary",
+    "title": "Falcon Telematics - Product Usage Summary (trailing 8 weeks)",
+    "text": "Weekly active users by week: 37, 38, 39, 40, 40, 40, 40, 40. Seat utilisation is 91% (40 of 44 licensed seats). This usage pattern is consistent with no material risk event this quarter. Recommendation flag: Steady usage; strong NPS from economic buyer."
+  },
+  {
+    "id": "DOC-ACC-1026-SR",
+    "account_id": "ACC-1026",
+    "source_type": "survey_response",
+    "title": "Falcon Telematics - CSAT Survey",
+    "text": "Survey type: Post-interaction CSAT. Score: 5 of 5. Respondent: Nadia Petrosyan.\nVerbatim: 'Solid product and responsive team; we would happily be a reference.'\nThis reading is consistent with the account's positive sentiment."
+  },
+  {
+    "id": "DOC-ACC-1026-BL",
+    "account_id": "ACC-1026",
+    "source_type": "billing_events",
+    "title": "Falcon Telematics - Billing and Invoice History",
+    "text": "Annual invoice for 67k issued and paid within terms; payment history is clean with no open billing dispute. The renewal invoice for the 2027-04-04 term has not yet been issued. Note for the motion: there is no payment friction, so the play should lead with nurture the relationship and line up a Q4 expansion conversation rather than a pricing concession."
+  },
+  {
+    "id": "DOC-ACC-1026-EML",
+    "account_id": "ACC-1026",
+    "source_type": "crm_notes",
+    "title": "Falcon Telematics - Stakeholder Email Recap",
+    "text": "From Marcus Lee to Diego Castro: Recapping our position on Falcon Telematics. No material risk event this quarter. We propose to nurture the relationship and line up a Q4 expansion conversation and will review progress at the next checkpoint ahead of the 2027-04-04 renewal."
   },
   {
     "id": "KB-001",
-    "account_id": null,
     "source_type": "kb_article",
-    "title": "Usage Health Scoring Methodology",
-    "text": "The account health score (0-100) blends four weighted signals. Adoption breadth (35%): share of licensed seats active in the trailing 28 days. Engagement depth (25%): frequency and recency of logins and core-feature usage. Relationship strength (20%): presence of an executive sponsor and an active champion. Support and reliability (20%): open high-severity tickets, recent incidents, and CSAT.\n\nA month-over-month decline in weekly active users greater than 20% is a leading churn indicator and should trigger a health-drop review. Loss of a champion with no identified replacement reduces relationship strength materially. Scores below 50 are high risk; below 40 are critical and warrant immediate intervention."
+    "title": "Health score model and risk thresholds",
+    "text": "The health score blends product usage (seat utilisation and weekly active users), relationship strength (mapped sponsor, NPS), and commercial signals (renewal window, billing disputes). A drop of 20% or more in weekly active users month over month crosses the high-risk threshold and triggers a save review. Critical risk is reserved for executive escalations and Sev-1 incidents."
   },
   {
     "id": "KB-002",
-    "account_id": null,
     "source_type": "kb_article",
-    "title": "Churn Save Playbook Overview",
-    "text": "A churn save begins with diagnosis: identify whether risk is driven by product value, relationship, reliability, or commercials, because the remedy differs for each. Value and adoption gaps call for re-onboarding and use-case expansion. Relationship gaps call for re-establishing an executive sponsor. Reliability incidents call for an escalation response with a written RCA. Commercial risk calls for ROI framing before any discount.\n\nAlways quantify what is at stake (ARR at risk, renewal date) and pair every save motion with a measurable success metric, for example restoring weekly active users to baseline within 30 days, or moving the health score above 50 before renewal."
+    "title": "Stakeholder mapping and champion continuity",
+    "text": "Every account should map at least three contacts: a day-to-day champion, an administrator, and an executive sponsor. When a champion departs, re-map within two weeks and run a value recap with the incoming owner. Relationship concentration on a single contact is a leading churn indicator."
   },
   {
     "id": "KB-003",
-    "account_id": null,
     "source_type": "kb_article",
-    "title": "Product-Qualified Lead (PQL) Expansion Criteria",
-    "text": "An account is a product-qualified expansion lead when it shows organic pull, not seller push. Core criteria: seat utilization at or above 90% of licensed seats; additional teams piloting or borrowing logins; a feature request that maps to a higher tier (for example SSO/SCIM or data residency); an economic buyer with NPS 8 or higher; and confirmed budget for the current fiscal year.\n\nWhen these signals co-occur, lead with a seat-expansion proposal that bundles the enterprise capability they requested and offer a volume-pricing tier. PQL expansions close faster and retain better than cold upsells because value is already proven."
-  },
-  {
-    "id": "PLAY-HEALTH-DROP",
-    "account_id": null,
-    "source_type": "playbook",
-    "title": "Health Drop Recovery Play",
-    "text": "Trigger: Weekly active users down more than 20% month over month, or health score falling below 50.\nGoal: Restore usage to baseline within 30 days and stabilize the relationship.\nSteps: 1) Diagnose the drop, separating product breakage from disengagement. 2) Fix any blocking integration or technical issue with an expedited engineering ticket. 3) Identify and secure a new executive sponsor if the champion has left. 4) Run a targeted re-activation: outreach to dormant users and a refresher on the broken workflow. 5) Set a 30-day usage recovery target and review weekly.\nSuccess metric: WAU back to within 10% of prior baseline and health score above 50 before renewal."
-  },
-  {
-    "id": "PLAY-RENEWAL",
-    "account_id": null,
-    "source_type": "playbook",
-    "title": "Renewal Risk Mitigation Play",
-    "text": "Trigger: Renewal within 90 days combined with a competitive evaluation, price pressure, or a weak executive relationship.\nGoal: Secure the renewal while protecting ARR.\nSteps: 1) Build an ROI summary quantifying delivered value (downtime reduced, throughput or revenue gained). 2) Re-establish the executive relationship with a business review before any pricing conversation. 3) Counter discount requests with a multi-year structure or value-add bundle rather than a flat cut. 4) Address the competitive threat with a differentiation one-pager. 5) Confirm the mutual close plan and signatures timeline.\nSuccess metric: Renewal signed at or above target ARR; discount, if any, exchanged for term length or expansion."
-  },
-  {
-    "id": "PLAY-ONBOARD",
-    "account_id": null,
-    "source_type": "playbook",
-    "title": "Onboarding Acceleration Play",
-    "text": "Trigger: Onboarding behind milestone plan (for example fewer than 5 of 7 milestones by day 45), low seat provisioning, or training no-shows.\nGoal: Reach first value fast and provision the purchased seats.\nSteps: 1) Assign a dedicated implementation specialist to take SSO setup and data import off the customer's plate. 2) Run a focused 2-week milestone sprint targeting the highest-value workflow first. 3) Offer asynchronous, recorded training to fit constrained schedules. 4) Secure a short sponsor checkpoint to confirm priorities and unblock access. 5) Track provisioned-seat count and milestone completion weekly.\nSuccess metric: First value delivered and at least 80% of seats provisioned within 30 days of the rescue."
-  },
-  {
-    "id": "PLAY-ESCALATION",
-    "account_id": null,
-    "source_type": "playbook",
-    "title": "Executive Escalation Response Play",
-    "text": "Trigger: Sev-1 incident, repeated outages, or a formal executive escalation, especially near a renewal.\nGoal: Contain trust damage and prevent churn.\nSteps: 1) Acknowledge same day with a senior leader (VP or above) reaching out directly. 2) Deliver a written root-cause analysis within 48 hours. 3) Provide a concrete remediation roadmap with owners and dates. 4) Proactively offer SLA credits before the customer has to ask. 5) Establish a weekly executive check-in until trust is demonstrably restored.\nSuccess metric: Escalation formally closed, CSAT recovered to 4+ of 5, and renewal retained."
-  },
-  {
-    "id": "PLAY-EXPANSION",
-    "account_id": null,
-    "source_type": "playbook",
-    "title": "Expansion and Upsell Qualification Play",
-    "text": "Trigger: Product-qualified expansion signals, seat utilization at or above 90%, additional teams piloting, a tier-mapped feature request, and approved budget.\nGoal: Convert organic demand into a clean seat and tier expansion.\nSteps: 1) Quantify the pull, naming the teams and the borrowed-login behavior. 2) Build a seat-expansion proposal bundling the requested enterprise capability (for example SSO/SCIM). 3) Offer a volume-pricing tier to reward the larger commitment. 4) Confirm the economic buyer and budget timeline. 5) Tie expansion to a value milestone and a reference or case-study ask.\nSuccess metric: Expansion closed within the current fiscal quarter at or above the proposed seat count."
+    "title": "Seat utilisation and expansion qualification",
+    "text": "Seat utilisation above 90% with active cross-team interest is a product-qualified expansion signal. Confirm an approved budget, then package an upsell aligned to demonstrated value, including SSO and SCIM for clean provisioning at scale."
   },
   {
     "id": "KB-004",
-    "account_id": null,
     "source_type": "kb_article",
-    "title": "Champion Departure and Sponsor Mapping",
-    "text": "Losing a champion is one of the strongest leading indicators of churn because it removes the internal force that drives adoption and defends the renewal. When a champion or executive sponsor leaves, relationship strength in the health score drops immediately and should trigger a sponsor-mapping motion within 14 days.\n\nSteps: 1) Confirm the departure and any interim owner. 2) Map remaining stakeholders by influence and disposition (advocate, neutral, blocker). 3) Identify the most likely new champion based on who derives daily value. 4) Run a value-recap session to convert that person, giving them an internal win to own. 5) Re-establish an executive sponsor before any renewal conversation. Never let an account with a vacant sponsor seat enter a renewal window without a named replacement."
+    "title": "Renewal motion and competitive defense",
+    "text": "Open the renewal motion 90 days out. When a new buyer runs a competitive evaluation, lead with an ROI business review grounded in realised value, then counter price pressure with a multi-year structure rather than a flat discount."
   },
   {
     "id": "KB-005",
-    "account_id": null,
     "source_type": "kb_article",
-    "title": "Reading Conflicting Signals and When to Hold",
-    "text": "Not every dip warrants intervention. Signals conflict when, for example, usage is healthy but an exec is skeptical (relationship risk), or sentiment is negative but tied to a single resolved incident. The planner should separate supporting from contradicting evidence and weigh recency and source reliability.\n\nPrefer a monitor-and-hold posture when: signals are weak or contradictory; a credible remediation is already in flight; or the cost and relationship risk of acting outweighs the expected benefit. When holding, set explicit re-evaluation thresholds (for example, escalate if WAU falls another 10% or if a second incident occurs within 30 days) so the watch list is actionable rather than passive. Holding is a legitimate next best action, not the absence of one."
+    "title": "Onboarding milestones and time to value",
+    "text": "Healthy onboarding hits 7 milestones by day 60. When milestones slip past plan, assign an implementation specialist, compress the work into a two-week sprint, and add async training so a single overloaded admin is not the bottleneck."
   },
   {
     "id": "KB-006",
-    "account_id": null,
     "source_type": "kb_article",
-    "title": "Concession and Discount Guardrails",
-    "text": "Concessions protect revenue only when they buy something durable. Never lead a renewal with a discount; lead with value and relationship. A retention concession is appropriate only after a value-realignment attempt and, for at-risk renewals, with leadership approval.\n\nGuardrails: exchange any discount for term length (multi-year), expansion commitment, or a reference, never a flat one-time cut. Cap standard CSM-approved concessions at a defined threshold; anything larger requires CS leadership and finance sign-off. Do not offer a concession to mask a reliability or product problem, fix the underlying issue first. Document the rationale and the quid pro quo so the concession is auditable and repeatable."
+    "title": "Incident response and executive escalation",
+    "text": "For a Sev-1 incident or an executive escalation, deliver a same-day apology from leadership, a root cause analysis within 48 hours, a remediation roadmap, a proactive SLA credit, and a weekly executive check-in until trust is restored."
+  },
+  {
+    "id": "PLAY-HEALTH-DROP",
+    "source_type": "playbook",
+    "title": "Reverse a usage decline",
+    "text": "1) Confirm the technical root cause and open an engineering ticket. 2) Restore the broken capability with a fix sprint. 3) Re-engage the executive sponsor. 4) Track weekly active users back to baseline before the renewal."
+  },
+  {
+    "id": "PLAY-RENEWAL",
+    "source_type": "playbook",
+    "title": "Defend an at-risk renewal",
+    "text": "1) Quantify realised value in an ROI business review. 2) Map and meet the new decision maker. 3) Counter discount pressure with a multi-year structure. 4) Confirm terms and close the renewal."
+  },
+  {
+    "id": "PLAY-ONBOARD",
+    "source_type": "playbook",
+    "title": "Rescue a stalled onboarding",
+    "text": "1) Assign an implementation specialist. 2) Compress milestones into a two-week sprint. 3) Provide async training for the admin. 4) Hold a sponsor checkpoint at go-live."
+  },
+  {
+    "id": "PLAY-ESCALATION",
+    "source_type": "playbook",
+    "title": "Run an executive escalation",
+    "text": "1) Same-day VP apology. 2) RCA within 48 hours. 3) Remediation roadmap and SLA credit. 4) Weekly executive check-in until health recovers."
+  },
+  {
+    "id": "PLAY-EXPANSION",
+    "source_type": "playbook",
+    "title": "Convert a product-qualified expansion",
+    "text": "1) Confirm seat saturation and approved budget. 2) Package a seat expansion with SSO/SCIM. 3) Propose volume pricing. 4) Capture a reference or case study."
   }
 ]

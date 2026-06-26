@@ -1,0 +1,347 @@
+[
+  {
+    "id": "DOC-OPP-3001-CRM",
+    "account_id": "OPP-3001",
+    "source_type": "crm_record",
+    "title": "Brightwave Media - Opportunity Record",
+    "text": "Opportunity Brightwave Media: $59,000 in Negotiation, target close 2026-11-26, owner Sofia Romero. Risk medium. Signals: stage_stall, no_recent_activity. Status: Stuck in Negotiation 27 days; no buyer reply in 12 days."
+  },
+  {
+    "id": "DOC-OPP-3001-NOTE",
+    "account_id": "OPP-3001",
+    "source_type": "crm_note",
+    "title": "Brightwave Media - Deal Notes",
+    "text": "Champion Sven Larsson; economic buyer Sara Lindqvist. Current blocker: the economic buyer has gone quiet pending an internal budget review. Plan: confirm the blocker with the champion and send a value recap."
+  },
+  {
+    "id": "DOC-OPP-3001-CALL",
+    "account_id": "OPP-3001",
+    "source_type": "call_transcript",
+    "title": "Brightwave Media - Discovery / Status Call",
+    "text": "Buyer (Sven Larsson): Here is where we stand internally.\nAE (Sofia Romero): Understood. To keep momentum on a $59,000 deal toward 2026-11-26, I will confirm the blocker with the champion and send a value recap.\nBuyer (Sven Larsson): That works; send it over and we will review."
+  },
+  {
+    "id": "DOC-OPP-3001-EML",
+    "account_id": "OPP-3001",
+    "source_type": "crm_note",
+    "title": "Brightwave Media - Buyer Email Thread",
+    "text": "From Sofia Romero to Sara Lindqvist: Recapping next steps on Brightwave Media ($59,000). Blocker noted: the economic buyer has gone quiet pending an internal budget review. Proposed action: confirm the blocker with the champion and send a value recap ahead of 2026-11-26."
+  },
+  {
+    "id": "DOC-OPP-3002-CRM",
+    "account_id": "OPP-3002",
+    "source_type": "crm_record",
+    "title": "Cobalt Robotics - Opportunity Record",
+    "text": "Opportunity Cobalt Robotics: $85,000 in Negotiation, target close 2026-08-01, owner James Okafor. Risk medium. Signals: stage_stall, no_recent_activity. Status: Stuck in Negotiation 19 days; no buyer reply in 11 days."
+  },
+  {
+    "id": "DOC-OPP-3002-NOTE",
+    "account_id": "OPP-3002",
+    "source_type": "crm_note",
+    "title": "Cobalt Robotics - Deal Notes",
+    "text": "Champion Diego Castro; economic buyer Felix Wagner. Current blocker: the economic buyer has gone quiet pending an internal budget review. Plan: confirm the blocker with the champion and send a value recap."
+  },
+  {
+    "id": "DOC-OPP-3002-CALL",
+    "account_id": "OPP-3002",
+    "source_type": "call_transcript",
+    "title": "Cobalt Robotics - Discovery / Status Call",
+    "text": "Buyer (Diego Castro): Here is where we stand internally.\nAE (James Okafor): Understood. To keep momentum on a $85,000 deal toward 2026-08-01, I will confirm the blocker with the champion and send a value recap.\nBuyer (Diego Castro): That works; send it over and we will review."
+  },
+  {
+    "id": "DOC-OPP-3002-EML",
+    "account_id": "OPP-3002",
+    "source_type": "crm_note",
+    "title": "Cobalt Robotics - Buyer Email Thread",
+    "text": "From James Okafor to Felix Wagner: Recapping next steps on Cobalt Robotics ($85,000). Blocker noted: the economic buyer has gone quiet pending an internal budget review. Proposed action: confirm the blocker with the champion and send a value recap ahead of 2026-08-01."
+  },
+  {
+    "id": "DOC-OPP-3003-CRM",
+    "account_id": "OPP-3003",
+    "source_type": "crm_record",
+    "title": "Northgate Retail - Opportunity Record",
+    "text": "Opportunity Northgate Retail: $18,000 in Negotiation, target close 2026-10-01, owner Elena Petrova. Risk medium. Signals: stage_stall, no_recent_activity. Status: Stuck in Negotiation 16 days; no buyer reply in 8 days."
+  },
+  {
+    "id": "DOC-OPP-3003-NOTE",
+    "account_id": "OPP-3003",
+    "source_type": "crm_note",
+    "title": "Northgate Retail - Deal Notes",
+    "text": "Champion Carlos Mendez; economic buyer Paul Adler. Current blocker: the economic buyer has gone quiet pending an internal budget review. Plan: confirm the blocker with the champion and send a value recap."
+  },
+  {
+    "id": "DOC-OPP-3003-CALL",
+    "account_id": "OPP-3003",
+    "source_type": "call_transcript",
+    "title": "Northgate Retail - Discovery / Status Call",
+    "text": "Buyer (Carlos Mendez): Here is where we stand internally.\nAE (Elena Petrova): Understood. To keep momentum on a $18,000 deal toward 2026-10-01, I will confirm the blocker with the champion and send a value recap.\nBuyer (Carlos Mendez): That works; send it over and we will review."
+  },
+  {
+    "id": "DOC-OPP-3003-EML",
+    "account_id": "OPP-3003",
+    "source_type": "crm_note",
+    "title": "Northgate Retail - Buyer Email Thread",
+    "text": "From Elena Petrova to Paul Adler: Recapping next steps on Northgate Retail ($18,000). Blocker noted: the economic buyer has gone quiet pending an internal budget review. Proposed action: confirm the blocker with the champion and send a value recap ahead of 2026-10-01."
+  },
+  {
+    "id": "DOC-OPP-3004-CRM",
+    "account_id": "OPP-3004",
+    "source_type": "crm_record",
+    "title": "Pinecone Health - Opportunity Record",
+    "text": "Opportunity Pinecone Health: $10,000 in Proposal, target close 2026-11-23, owner Tara Mensah. Risk low. Signals: buying_intent, stakeholder_alignment. Status: Champion requested final pricing; economic buyer engaged."
+  },
+  {
+    "id": "DOC-OPP-3004-NOTE",
+    "account_id": "OPP-3004",
+    "source_type": "crm_note",
+    "title": "Pinecone Health - Deal Notes",
+    "text": "Champion Diego Castro; economic buyer Ravi Menon. Current blocker: none material; the buyer is ready to move. Plan: send a closing proposal with pricing, terms, and a mutual close plan."
+  },
+  {
+    "id": "DOC-OPP-3004-CALL",
+    "account_id": "OPP-3004",
+    "source_type": "call_transcript",
+    "title": "Pinecone Health - Discovery / Status Call",
+    "text": "Buyer (Diego Castro): Here is where we stand internally.\nAE (Tara Mensah): Understood. To keep momentum on a $10,000 deal toward 2026-11-23, I will send a closing proposal with pricing, terms, and a mutual close plan.\nBuyer (Diego Castro): That works; send it over and we will review."
+  },
+  {
+    "id": "DOC-OPP-3004-EML",
+    "account_id": "OPP-3004",
+    "source_type": "crm_note",
+    "title": "Pinecone Health - Buyer Email Thread",
+    "text": "From Tara Mensah to Ravi Menon: Recapping next steps on Pinecone Health ($10,000). Blocker noted: none material; the buyer is ready to move. Proposed action: send a closing proposal with pricing, terms, and a mutual close plan ahead of 2026-11-23."
+  },
+  {
+    "id": "DOC-OPP-3004-MN",
+    "account_id": "OPP-3004",
+    "source_type": "meeting_notes",
+    "title": "Pinecone Health - Deal Review",
+    "text": "Deal review for Pinecone Health ($10,000, Proposal). A $10,000 opportunity in Proposal shows clear readiness to close: the champion asked for final pricing and the economic buyer is looped in. Send a closing proposal with terms and a mutual close plan toward 2026-11-23. Forecast category set accordingly; next checkpoint before 2026-11-23."
+  },
+  {
+    "id": "DOC-OPP-3005-CRM",
+    "account_id": "OPP-3005",
+    "source_type": "crm_record",
+    "title": "Vanta Logistics - Opportunity Record",
+    "text": "Opportunity Vanta Logistics: $120,000 in Proposal, target close 2026-11-07, owner Devon Pierce. Risk low. Signals: buying_intent, stakeholder_alignment. Status: Champion requested final pricing; economic buyer engaged."
+  },
+  {
+    "id": "DOC-OPP-3005-NOTE",
+    "account_id": "OPP-3005",
+    "source_type": "crm_note",
+    "title": "Vanta Logistics - Deal Notes",
+    "text": "Champion Karim Haddad; economic buyer Felix Wagner. Current blocker: none material; the buyer is ready to move. Plan: send a closing proposal with pricing, terms, and a mutual close plan."
+  },
+  {
+    "id": "DOC-OPP-3005-CALL",
+    "account_id": "OPP-3005",
+    "source_type": "call_transcript",
+    "title": "Vanta Logistics - Discovery / Status Call",
+    "text": "Buyer (Karim Haddad): Here is where we stand internally.\nAE (Devon Pierce): Understood. To keep momentum on a $120,000 deal toward 2026-11-07, I will send a closing proposal with pricing, terms, and a mutual close plan.\nBuyer (Karim Haddad): That works; send it over and we will review."
+  },
+  {
+    "id": "DOC-OPP-3005-EML",
+    "account_id": "OPP-3005",
+    "source_type": "crm_note",
+    "title": "Vanta Logistics - Buyer Email Thread",
+    "text": "From Devon Pierce to Felix Wagner: Recapping next steps on Vanta Logistics ($120,000). Blocker noted: none material; the buyer is ready to move. Proposed action: send a closing proposal with pricing, terms, and a mutual close plan ahead of 2026-11-07."
+  },
+  {
+    "id": "DOC-OPP-3005-MN",
+    "account_id": "OPP-3005",
+    "source_type": "meeting_notes",
+    "title": "Vanta Logistics - Deal Review",
+    "text": "Deal review for Vanta Logistics ($120,000, Proposal). A $120,000 opportunity in Proposal shows clear readiness to close: the champion asked for final pricing and the economic buyer is looped in. Send a closing proposal with terms and a mutual close plan toward 2026-11-07. Forecast category set accordingly; next checkpoint before 2026-11-07."
+  },
+  {
+    "id": "DOC-OPP-3006-CRM",
+    "account_id": "OPP-3006",
+    "source_type": "crm_record",
+    "title": "Solstice Energy - Opportunity Record",
+    "text": "Opportunity Solstice Energy: $71,000 in Proposal, target close 2026-08-27, owner Hana Kim. Risk low. Signals: buying_intent, stakeholder_alignment. Status: Champion requested final pricing; economic buyer engaged."
+  },
+  {
+    "id": "DOC-OPP-3006-NOTE",
+    "account_id": "OPP-3006",
+    "source_type": "crm_note",
+    "title": "Solstice Energy - Deal Notes",
+    "text": "Champion Paul Adler; economic buyer Nadia Petrosyan. Current blocker: none material; the buyer is ready to move. Plan: send a closing proposal with pricing, terms, and a mutual close plan."
+  },
+  {
+    "id": "DOC-OPP-3006-CALL",
+    "account_id": "OPP-3006",
+    "source_type": "call_transcript",
+    "title": "Solstice Energy - Discovery / Status Call",
+    "text": "Buyer (Paul Adler): Here is where we stand internally.\nAE (Hana Kim): Understood. To keep momentum on a $71,000 deal toward 2026-08-27, I will send a closing proposal with pricing, terms, and a mutual close plan.\nBuyer (Paul Adler): That works; send it over and we will review."
+  },
+  {
+    "id": "DOC-OPP-3006-EML",
+    "account_id": "OPP-3006",
+    "source_type": "crm_note",
+    "title": "Solstice Energy - Buyer Email Thread",
+    "text": "From Hana Kim to Nadia Petrosyan: Recapping next steps on Solstice Energy ($71,000). Blocker noted: none material; the buyer is ready to move. Proposed action: send a closing proposal with pricing, terms, and a mutual close plan ahead of 2026-08-27."
+  },
+  {
+    "id": "DOC-OPP-3006-MN",
+    "account_id": "OPP-3006",
+    "source_type": "meeting_notes",
+    "title": "Solstice Energy - Deal Review",
+    "text": "Deal review for Solstice Energy ($71,000, Proposal). A $71,000 opportunity in Proposal shows clear readiness to close: the champion asked for final pricing and the economic buyer is looped in. Send a closing proposal with terms and a mutual close plan toward 2026-08-27. Forecast category set accordingly; next checkpoint before 2026-08-27."
+  },
+  {
+    "id": "DOC-OPP-3007-CRM",
+    "account_id": "OPP-3007",
+    "source_type": "crm_record",
+    "title": "Mosaic Fintech - Opportunity Record",
+    "text": "Opportunity Mosaic Fintech: $30,000 in Discovery, target close 2026-10-10, owner Mateo Alvarez. Risk medium. Signals: no_recent_activity. Status: Discovery underway; awaiting stakeholder confirmation."
+  },
+  {
+    "id": "DOC-OPP-3007-NOTE",
+    "account_id": "OPP-3007",
+    "source_type": "crm_note",
+    "title": "Mosaic Fintech - Deal Notes",
+    "text": "Champion Felix Wagner; economic buyer Ravi Menon. Current blocker: the buying committee is not yet mapped. Plan: multi-thread into the buying committee and quantify the pain."
+  },
+  {
+    "id": "DOC-OPP-3007-CALL",
+    "account_id": "OPP-3007",
+    "source_type": "call_transcript",
+    "title": "Mosaic Fintech - Discovery / Status Call",
+    "text": "Buyer (Felix Wagner): Here is where we stand internally.\nAE (Mateo Alvarez): Understood. To keep momentum on a $30,000 deal toward 2026-10-10, I will multi-thread into the buying committee and quantify the pain.\nBuyer (Felix Wagner): That works; send it over and we will review."
+  },
+  {
+    "id": "DOC-OPP-3007-EML",
+    "account_id": "OPP-3007",
+    "source_type": "crm_note",
+    "title": "Mosaic Fintech - Buyer Email Thread",
+    "text": "From Mateo Alvarez to Ravi Menon: Recapping next steps on Mosaic Fintech ($30,000). Blocker noted: the buying committee is not yet mapped. Proposed action: multi-thread into the buying committee and quantify the pain ahead of 2026-10-10."
+  },
+  {
+    "id": "DOC-OPP-3008-CRM",
+    "account_id": "OPP-3008",
+    "source_type": "crm_record",
+    "title": "Driftwood Travel - Opportunity Record",
+    "text": "Opportunity Driftwood Travel: $20,000 in Discovery, target close 2026-09-05, owner Aisha Bello. Risk medium. Signals: no_recent_activity. Status: Discovery underway; awaiting stakeholder confirmation."
+  },
+  {
+    "id": "DOC-OPP-3008-NOTE",
+    "account_id": "OPP-3008",
+    "source_type": "crm_note",
+    "title": "Driftwood Travel - Deal Notes",
+    "text": "Champion Tom Becker; economic buyer Bianca Rossi. Current blocker: the buying committee is not yet mapped. Plan: multi-thread into the buying committee and quantify the pain."
+  },
+  {
+    "id": "DOC-OPP-3008-CALL",
+    "account_id": "OPP-3008",
+    "source_type": "call_transcript",
+    "title": "Driftwood Travel - Discovery / Status Call",
+    "text": "Buyer (Tom Becker): Here is where we stand internally.\nAE (Aisha Bello): Understood. To keep momentum on a $20,000 deal toward 2026-09-05, I will multi-thread into the buying committee and quantify the pain.\nBuyer (Tom Becker): That works; send it over and we will review."
+  },
+  {
+    "id": "DOC-OPP-3008-EML",
+    "account_id": "OPP-3008",
+    "source_type": "crm_note",
+    "title": "Driftwood Travel - Buyer Email Thread",
+    "text": "From Aisha Bello to Bianca Rossi: Recapping next steps on Driftwood Travel ($20,000). Blocker noted: the buying committee is not yet mapped. Proposed action: multi-thread into the buying committee and quantify the pain ahead of 2026-09-05."
+  },
+  {
+    "id": "DOC-OPP-3009-CRM",
+    "account_id": "OPP-3009",
+    "source_type": "crm_record",
+    "title": "Kestrel Security - Opportunity Record",
+    "text": "Opportunity Kestrel Security: $225,000 in Evaluation, target close 2026-11-07, owner Lukas Novak. Risk high. Signals: stage_stall, stakeholder_change. Status: Stalled in Evaluation; primary champion changed roles."
+  },
+  {
+    "id": "DOC-OPP-3009-NOTE",
+    "account_id": "OPP-3009",
+    "source_type": "crm_note",
+    "title": "Kestrel Security - Deal Notes",
+    "text": "Champion Sven Larsson; economic buyer Sara Lindqvist. Current blocker: the original champion left and no new sponsor is confirmed. Plan: identify and develop a new champion, then re-validate the business case."
+  },
+  {
+    "id": "DOC-OPP-3009-CALL",
+    "account_id": "OPP-3009",
+    "source_type": "call_transcript",
+    "title": "Kestrel Security - Discovery / Status Call",
+    "text": "Buyer (Sven Larsson): Here is where we stand internally.\nAE (Lukas Novak): Understood. To keep momentum on a $225,000 deal toward 2026-11-07, I will identify and develop a new champion, then re-validate the business case.\nBuyer (Sven Larsson): That works; send it over and we will review."
+  },
+  {
+    "id": "DOC-OPP-3009-EML",
+    "account_id": "OPP-3009",
+    "source_type": "crm_note",
+    "title": "Kestrel Security - Buyer Email Thread",
+    "text": "From Lukas Novak to Sara Lindqvist: Recapping next steps on Kestrel Security ($225,000). Blocker noted: the original champion left and no new sponsor is confirmed. Proposed action: identify and develop a new champion, then re-validate the business case ahead of 2026-11-07."
+  },
+  {
+    "id": "DOC-OPP-3009-MN",
+    "account_id": "OPP-3009",
+    "source_type": "meeting_notes",
+    "title": "Kestrel Security - Deal Review",
+    "text": "Deal review for Kestrel Security ($225,000, Evaluation). A $225,000 opportunity in Evaluation is at risk after the primary champion changed roles. Re-establish a new internal sponsor and re-validate the business case before the 2026-11-07 target slips. Forecast category set accordingly; next checkpoint before 2026-11-07."
+  },
+  {
+    "id": "DOC-OPP-3010-CRM",
+    "account_id": "OPP-3010",
+    "source_type": "crm_record",
+    "title": "Lattice Manufacturing - Opportunity Record",
+    "text": "Opportunity Lattice Manufacturing: $66,000 in Evaluation, target close 2026-11-19, owner Priya Nair. Risk high. Signals: stage_stall, stakeholder_change. Status: Stalled in Evaluation; primary champion changed roles."
+  },
+  {
+    "id": "DOC-OPP-3010-NOTE",
+    "account_id": "OPP-3010",
+    "source_type": "crm_note",
+    "title": "Lattice Manufacturing - Deal Notes",
+    "text": "Champion Sven Larsson; economic buyer Omar Khalil. Current blocker: the original champion left and no new sponsor is confirmed. Plan: identify and develop a new champion, then re-validate the business case."
+  },
+  {
+    "id": "DOC-OPP-3010-CALL",
+    "account_id": "OPP-3010",
+    "source_type": "call_transcript",
+    "title": "Lattice Manufacturing - Discovery / Status Call",
+    "text": "Buyer (Sven Larsson): Here is where we stand internally.\nAE (Priya Nair): Understood. To keep momentum on a $66,000 deal toward 2026-11-19, I will identify and develop a new champion, then re-validate the business case.\nBuyer (Sven Larsson): That works; send it over and we will review."
+  },
+  {
+    "id": "DOC-OPP-3010-EML",
+    "account_id": "OPP-3010",
+    "source_type": "crm_note",
+    "title": "Lattice Manufacturing - Buyer Email Thread",
+    "text": "From Priya Nair to Omar Khalil: Recapping next steps on Lattice Manufacturing ($66,000). Blocker noted: the original champion left and no new sponsor is confirmed. Proposed action: identify and develop a new champion, then re-validate the business case ahead of 2026-11-19."
+  },
+  {
+    "id": "DOC-OPP-3010-MN",
+    "account_id": "OPP-3010",
+    "source_type": "meeting_notes",
+    "title": "Lattice Manufacturing - Deal Review",
+    "text": "Deal review for Lattice Manufacturing ($66,000, Evaluation). A $66,000 opportunity in Evaluation is at risk after the primary champion changed roles. Re-establish a new internal sponsor and re-validate the business case before the 2026-11-19 target slips. Forecast category set accordingly; next checkpoint before 2026-11-19."
+  },
+  {
+    "id": "KB-SAAS-001",
+    "source_type": "kb_article",
+    "title": "Stage definitions and exit criteria",
+    "text": "Each pipeline stage has explicit exit criteria: Discovery requires a quantified problem and a mapped buying committee; Evaluation requires a validated business case; Proposal requires agreed scope and pricing; Negotiation requires a mutual close plan. Do not advance a stage until its exit criteria are met."
+  },
+  {
+    "id": "KB-SAAS-002",
+    "source_type": "kb_article",
+    "title": "Multi-threading and champion development",
+    "text": "Single-threaded deals are fragile. Develop at least one champion plus an economic buyer, and re-map quickly when a stakeholder changes roles. A deal that loses its only champion should drop in forecast confidence until a new sponsor is confirmed."
+  },
+  {
+    "id": "KB-SAAS-003",
+    "source_type": "kb_article",
+    "title": "Closing motion and mutual close plans",
+    "text": "When buying intent and budget are confirmed, send a closing proposal with clear pricing and a mutual close plan that lists the steps and dates to signature. This protects deal velocity and forecast accuracy."
+  },
+  {
+    "id": "PLAY-SAAS-UNSTICK",
+    "source_type": "playbook",
+    "title": "Unstick a stalled deal",
+    "text": "1) Confirm the blocker with the champion. 2) Send a tailored value recap. 3) Propose a concrete next step and date. 4) Multi-thread if the buyer stays quiet."
+  },
+  {
+    "id": "PLAY-SAAS-CLOSE",
+    "source_type": "playbook",
+    "title": "Run the closing motion",
+    "text": "1) Confirm intent and budget. 2) Send pricing and terms. 3) Agree a mutual close plan. 4) Drive to signature on the planned date."
+  }
+]

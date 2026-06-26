@@ -1,170 +1,332 @@
 [
   {
-    "id": "DOC-2001-INV",
+    "id": "DOC-AR-2001-INV",
     "account_id": "AR-2001",
     "source_type": "invoice_record",
-    "title": "Riverstone Builders - Open Invoice",
-    "text": "Invoice INV-RS-4410. Amount: 48,250.00 USD. Issued 2026-06-01, terms net-30, due 2026-07-01. Status: past due as of report date 2026-07-13 (12 days past due). Aging bucket: 1-30. No dispute flag. Proof of delivery on file (materials signed for 2026-05-29). Prior 6 invoices all paid within terms. This is the account's only open past-due item."
+    "title": "Riverstone Builders - Invoice INV-48037",
+    "text": "Invoice INV-48037 for $40,400 (net-60) is 23 days past due, aging bucket 1-30. Customer credit limit is $47,000. Status: Invoice 23 days past due; first reminder unanswered."
   },
   {
-    "id": "DOC-2001-COMM",
+    "id": "DOC-AR-2001-COMM",
     "account_id": "AR-2001",
     "source_type": "communication_log",
-    "title": "Riverstone Builders - Outreach Log",
-    "text": "2026-07-06: Automated courtesy reminder #1 emailed to accounts-payable@riverstone.example with invoice copy and pay link. Delivered, opened, no reply. 2026-07-13: Reminder #2 queued. No phone outreach yet. No out-of-office or dispute notice received. Account contact (AP clerk) historically pays after the second reminder; a brief confirmation call is likely sufficient."
+    "title": "Riverstone Builders - Collections Communication Log",
+    "text": "Collector Tara Mensah contacted Diego Castro regarding $40,400 outstanding. Outcome: no promise to pay on file yet. Agreed next step: send a second reminder, then place a courtesy call."
   },
   {
-    "id": "DOC-2001-PAY",
+    "id": "DOC-AR-2001-PAY",
     "account_id": "AR-2001",
     "source_type": "payment_record",
     "title": "Riverstone Builders - Payment History",
-    "text": "Trailing 12 months: 6 invoices, average days-to-pay 27 (inside net-30). No broken promises, no short-pays, no disputes. Payment method: ACH. Behavior pattern: reliably pays around the reminder, occasionally a few days late at month-end. Low collection risk; relationship is good."
+    "text": "Trailing payment history for Riverstone Builders: a mix of on-time and late settlements; current balance $40,400 at 23 days past due. This pattern is consistent with the early stage overdue scenario."
   },
   {
-    "id": "DOC-2002-INV",
+    "id": "DOC-AR-2001-CRM",
+    "account_id": "AR-2001",
+    "source_type": "credit_record",
+    "title": "Riverstone Builders - Credit and Account Notes",
+    "text": "Risk level low, recovery health 83. Credit limit $47,000, terms net-60. Active signals: invoice_past_due, no_remittance_response. Motion: A reliable payer with one invoice 23 days past due and no open dispute. Routine early dunning (reminder, then a call) should clear $40,400 without straining the relationship."
+  },
+  {
+    "id": "DOC-AR-2002-INV",
     "account_id": "AR-2002",
     "source_type": "invoice_record",
-    "title": "Lakeside Hospitality Group - Aged Invoice",
-    "text": "Invoice INV-LH-3187. Amount: 91,500.00 USD. Issued 2026-05-02, terms net-45, due 2026-06-16. Status: 68 days past due as of 2026-07-13. Aging bucket: 61-90. No dispute on file. Service delivered and accepted (event-services contract Q2). The balance has now slipped from 31-60 into the 61-90 bucket without payment."
+    "title": "Cardinal Freight Systems - Invoice INV-44751",
+    "text": "Invoice INV-44751 for $30,900 (net-30) is 17 days past due, aging bucket 1-30. Customer credit limit is $35,000. Status: Invoice 17 days past due; first reminder unanswered."
   },
   {
-    "id": "DOC-2002-COMM",
+    "id": "DOC-AR-2002-COMM",
     "account_id": "AR-2002",
     "source_type": "communication_log",
-    "title": "Lakeside Hospitality Group - Dunning History",
-    "text": "2026-06-20: Reminder #1 emailed, no reply. 2026-06-30: Reminder #2 emailed, no reply. 2026-07-08: Reminder #3 plus voicemail to AP manager, no callback. No dispute raised in any exchange. Pattern this year mirrors prior quarters: Lakeside tends to ignore email and only responds to a direct firm notice followed by a phone call. Recommend escalating treatment to a formal dunning notice and a scheduled collection call."
+    "title": "Cardinal Freight Systems - Collections Communication Log",
+    "text": "Collector Devon Pierce contacted Nadia Petrosyan regarding $30,900 outstanding. Outcome: no promise to pay on file yet. Agreed next step: send a second reminder, then place a courtesy call."
   },
   {
-    "id": "DOC-2002-PAY",
+    "id": "DOC-AR-2002-PAY",
     "account_id": "AR-2002",
     "source_type": "payment_record",
-    "title": "Lakeside Hospitality Group - Payment History",
-    "text": "Trailing 12 months: 5 invoices, average days-to-pay 71 against net-45 terms (chronic late). Two prior balances reached the 61-90 bucket before being cleared in full after a phone call. No write-offs to date. Cash flow appears seasonal (post-event-season lag). Repeat-late-payer flag is set. Installment plans have not been needed historically, but the account responds to a firm, personal collection touch."
+    "title": "Cardinal Freight Systems - Payment History",
+    "text": "Trailing payment history for Cardinal Freight Systems: a mix of on-time and late settlements; current balance $30,900 at 17 days past due. This pattern is consistent with the early stage overdue scenario."
   },
   {
-    "id": "DOC-2003-INV",
+    "id": "DOC-AR-2002-CRM",
+    "account_id": "AR-2002",
+    "source_type": "credit_record",
+    "title": "Cardinal Freight Systems - Credit and Account Notes",
+    "text": "Risk level low, recovery health 72. Credit limit $35,000, terms net-30. Active signals: invoice_past_due, no_remittance_response. Motion: A reliable payer with one invoice 17 days past due and no open dispute. Routine early dunning (reminder, then a call) should clear $30,900 without straining the relationship."
+  },
+  {
+    "id": "DOC-AR-2003-INV",
     "account_id": "AR-2003",
     "source_type": "invoice_record",
-    "title": "Pinnacle Medical Supplies - Short-Paid Invoice",
-    "text": "Invoice INV-PM-7705. Original amount: 132,000.00 USD. Issued 2026-06-15, terms net-30, due 2026-07-15. Payment received 2026-07-10: 118,800.00 USD (a 13,200.00 short-pay, exactly 10% of one line item). Remaining open: 13,200.00 USD, flagged disputed. Aging on the disputed remainder: 22 days from issue. The undisputed 118,800.00 was paid early and in good faith."
+    "title": "Harbor Point Foods - Invoice INV-40707",
+    "text": "Invoice INV-40707 for $158,300 (net-30) is 11 days past due, aging bucket 1-30. Customer credit limit is $277,000. Status: Invoice 11 days past due; first reminder unanswered."
   },
   {
-    "id": "DOC-2003-DISP",
+    "id": "DOC-AR-2003-COMM",
     "account_id": "AR-2003",
+    "source_type": "communication_log",
+    "title": "Harbor Point Foods - Collections Communication Log",
+    "text": "Collector Hana Kim contacted Lena Ortiz regarding $158,300 outstanding. Outcome: no promise to pay on file yet. Agreed next step: send a second reminder, then place a courtesy call."
+  },
+  {
+    "id": "DOC-AR-2003-PAY",
+    "account_id": "AR-2003",
+    "source_type": "payment_record",
+    "title": "Harbor Point Foods - Payment History",
+    "text": "Trailing payment history for Harbor Point Foods: a mix of on-time and late settlements; current balance $158,300 at 11 days past due. This pattern is consistent with the early stage overdue scenario."
+  },
+  {
+    "id": "DOC-AR-2003-CRM",
+    "account_id": "AR-2003",
+    "source_type": "credit_record",
+    "title": "Harbor Point Foods - Credit and Account Notes",
+    "text": "Risk level low, recovery health 77. Credit limit $277,000, terms net-30. Active signals: invoice_past_due, no_remittance_response. Motion: A reliable payer with one invoice 11 days past due and no open dispute. Routine early dunning (reminder, then a call) should clear $158,300 without straining the relationship."
+  },
+  {
+    "id": "DOC-AR-2004-INV",
+    "account_id": "AR-2004",
+    "source_type": "invoice_record",
+    "title": "Granite Peak Supply - Invoice INV-46562",
+    "text": "Invoice INV-46562 for $232,250 (net-60) is 52 days past due, aging bucket 31-60. Customer credit limit is $403,000. Status: $232,250 overdue; first promise to pay was missed."
+  },
+  {
+    "id": "DOC-AR-2004-COMM",
+    "account_id": "AR-2004",
+    "source_type": "communication_log",
+    "title": "Granite Peak Supply - Collections Communication Log",
+    "text": "Collector Mateo Alvarez contacted Wendy Zhao regarding $232,250 outstanding. Outcome: first promise to pay missed on the agreed date. Agreed next step: escalate to a structured payment plan and apply a credit hold."
+  },
+  {
+    "id": "DOC-AR-2004-PAY",
+    "account_id": "AR-2004",
+    "source_type": "payment_record",
+    "title": "Granite Peak Supply - Payment History",
+    "text": "Trailing payment history for Granite Peak Supply: a mix of on-time and late settlements; current balance $232,250 at 52 days past due. This pattern is consistent with the broken promise scenario."
+  },
+  {
+    "id": "DOC-AR-2004-CRM",
+    "account_id": "AR-2004",
+    "source_type": "credit_record",
+    "title": "Granite Peak Supply - Credit and Account Notes",
+    "text": "Risk level high, recovery health 27. Credit limit $403,000, terms net-60. Active signals: high_value_overdue, broken_promise_to_pay. Motion: A large balance of $232,250 is 52 days past due and the first promise to pay was missed. Escalate to a structured payment plan with management sign-off and a credit hold if the next commitment slips."
+  },
+  {
+    "id": "DOC-AR-2005-INV",
+    "account_id": "AR-2005",
+    "source_type": "invoice_record",
+    "title": "Lakeshore Apparel - Invoice INV-44586",
+    "text": "Invoice INV-44586 for $271,050 (net-30) is 55 days past due, aging bucket 31-60. Customer credit limit is $421,000. Status: $271,050 overdue; first promise to pay was missed."
+  },
+  {
+    "id": "DOC-AR-2005-COMM",
+    "account_id": "AR-2005",
+    "source_type": "communication_log",
+    "title": "Lakeshore Apparel - Collections Communication Log",
+    "text": "Collector Aisha Bello contacted Karim Haddad regarding $271,050 outstanding. Outcome: first promise to pay missed on the agreed date. Agreed next step: escalate to a structured payment plan and apply a credit hold."
+  },
+  {
+    "id": "DOC-AR-2005-PAY",
+    "account_id": "AR-2005",
+    "source_type": "payment_record",
+    "title": "Lakeshore Apparel - Payment History",
+    "text": "Trailing payment history for Lakeshore Apparel: a mix of on-time and late settlements; current balance $271,050 at 55 days past due. This pattern is consistent with the broken promise scenario."
+  },
+  {
+    "id": "DOC-AR-2005-CRM",
+    "account_id": "AR-2005",
+    "source_type": "credit_record",
+    "title": "Lakeshore Apparel - Credit and Account Notes",
+    "text": "Risk level high, recovery health 22. Credit limit $421,000, terms net-30. Active signals: high_value_overdue, broken_promise_to_pay. Motion: A large balance of $271,050 is 55 days past due and the first promise to pay was missed. Escalate to a structured payment plan with management sign-off and a credit hold if the next commitment slips."
+  },
+  {
+    "id": "DOC-AR-2006-INV",
+    "account_id": "AR-2006",
+    "source_type": "invoice_record",
+    "title": "Summit Auto Parts - Invoice INV-46332",
+    "text": "Invoice INV-46332 for $32,500 (net-45) is 54 days past due, aging bucket 31-60. Customer credit limit is $56,000. Status: Payment withheld pending an invoice dispute ($32,500)."
+  },
+  {
+    "id": "DOC-AR-2006-COMM",
+    "account_id": "AR-2006",
+    "source_type": "communication_log",
+    "title": "Summit Auto Parts - Collections Communication Log",
+    "text": "Collector Lukas Novak contacted Tom Becker regarding $32,500 outstanding. Outcome: payment withheld pending dispute resolution. Agreed next step: resolve the dispute with finance and reissue a corrected invoice."
+  },
+  {
+    "id": "DOC-AR-2006-PAY",
+    "account_id": "AR-2006",
+    "source_type": "payment_record",
+    "title": "Summit Auto Parts - Payment History",
+    "text": "Trailing payment history for Summit Auto Parts: a mix of on-time and late settlements; current balance $32,500 at 54 days past due. This pattern is consistent with the dispute block scenario."
+  },
+  {
+    "id": "DOC-AR-2006-CRM",
+    "account_id": "AR-2006",
+    "source_type": "credit_record",
+    "title": "Summit Auto Parts - Credit and Account Notes",
+    "text": "Risk level medium, recovery health 50. Credit limit $56,000, terms net-45. Active signals: invoice_disputed, short_payment. Motion: Payment of $32,500 is blocked by a billing dispute, not unwillingness to pay. Resolve the dispute (pricing or proof of delivery) with finance, issue any credit memo, then confirm the corrected due date."
+  },
+  {
+    "id": "DOC-AR-2006-DSP",
+    "account_id": "AR-2006",
     "source_type": "dispute_case",
-    "title": "Pinnacle Medical Supplies - Dispute Case",
-    "text": "Dispute DSP-0091 (Status: Open). Disputed amount: 13,200.00 USD. Reason: pricing discrepancy. Customer asserts a 10% contracted volume discount on SKU MED-5500 was not applied to this invoice, citing master agreement section 4.2. Backup requested: signed pricing schedule and the PO. AP contact is cooperative and has continued paying the undisputed balance. Owner to validate the contract rate; if the discount is valid, issue a credit memo for 13,200.00 and close. Policy: do not dun the disputed amount while this case is open."
+    "title": "Summit Auto Parts - Open Dispute Case",
+    "text": "Dispute opened by Tom Becker on invoice INV-46332 for $32,500. Reason: pricing and proof-of-delivery discrepancy. Resolution path: finance to validate and issue a credit memo, then reissue a corrected invoice and confirm the new due date."
   },
   {
-    "id": "DOC-2003-COMM",
-    "account_id": "AR-2003",
-    "source_type": "communication_log",
-    "title": "Pinnacle Medical Supplies - Outreach Log",
-    "text": "2026-07-09: AP emailed remittance advice noting the short-pay and the claimed volume discount; tone professional and cooperative. 2026-07-11: Collections acknowledged, opened dispute DSP-0091, requested the signed pricing schedule. No dunning sent. Next step: route to the contract owner for rate validation within the dispute-cycle SLA."
-  },
-  {
-    "id": "DOC-2004-INV",
-    "account_id": "AR-2004",
+    "id": "DOC-AR-2007-INV",
+    "account_id": "AR-2007",
     "source_type": "invoice_record",
-    "title": "Summit Industrial Parts - Open Invoices and Exposure",
-    "text": "Open invoices: INV-SU-2210 (38,400.00, 41 days past due, bucket 31-60) and INV-SU-2231 (26,400.00, 9 days past due, bucket 1-30). Total outstanding: 64,800.00 USD. Approved credit limit: 60,000.00 USD. Exposure exceeds the limit by 4,800.00, triggering a credit-limit-breach flag. No dispute on either invoice."
+    "title": "Beacon Hospitality Group - Invoice INV-48547",
+    "text": "Invoice INV-48547 for $219,950 (net-45) is 42 days past due, aging bucket 31-60. Customer credit limit is $385,000. Status: Payment withheld pending an invoice dispute ($219,950)."
   },
   {
-    "id": "DOC-2004-CR",
-    "account_id": "AR-2004",
-    "source_type": "credit_record",
-    "title": "Summit Industrial Parts - Credit File",
-    "text": "Approved credit limit: 60,000.00 USD, terms net-30. Third-party commercial risk score: dropped from 72 to 58 over the last quarter (high-risk threshold is 60), driven by slower trade payments reported by other suppliers. Current exposure 64,800.00 exceeds the limit. Recommendation per policy credit_hold_threshold: place a credit hold on new orders and adjust the limit or move to partial prepayment until the past-due balance clears. Notify the account owner same day."
+    "id": "DOC-AR-2007-COMM",
+    "account_id": "AR-2007",
+    "source_type": "communication_log",
+    "title": "Beacon Hospitality Group - Collections Communication Log",
+    "text": "Collector Priya Nair contacted Ravi Menon regarding $219,950 outstanding. Outcome: payment withheld pending dispute resolution. Agreed next step: resolve the dispute with finance and reissue a corrected invoice."
   },
   {
-    "id": "DOC-2004-PAY",
-    "account_id": "AR-2004",
+    "id": "DOC-AR-2007-PAY",
+    "account_id": "AR-2007",
     "source_type": "payment_record",
-    "title": "Summit Industrial Parts - Payment History",
-    "text": "Trailing 12 months: 9 invoices, average days-to-pay 39 against net-30 (consistently late). One prior balance reached 31-60 before clearing. Repeat-late-payer flag set. No write-offs yet, but the combination of late-payment pattern, limit breach, and a falling risk score is the classic precursor to delinquency. Containment now (hold plus terms adjustment) is cheaper than recovery later."
+    "title": "Beacon Hospitality Group - Payment History",
+    "text": "Trailing payment history for Beacon Hospitality Group: a mix of on-time and late settlements; current balance $219,950 at 42 days past due. This pattern is consistent with the dispute block scenario."
   },
   {
-    "id": "DOC-2005-INV",
-    "account_id": "AR-2005",
-    "source_type": "invoice_record",
-    "title": "Cardinal Freight Systems - Large Overdue Invoice",
-    "text": "Invoice INV-CF-9050. Amount: 287,400.00 USD. Issued 2026-05-19, terms net-45, due 2026-07-03. Status: 55 days past due (bucket 31-60, trending toward 61-90). No dispute. This single balance is material to the monthly cash forecast and is the largest open past-due item in the portfolio. Account is strategic (multi-year relationship, large annual spend)."
-  },
-  {
-    "id": "DOC-2005-PAY",
-    "account_id": "AR-2005",
-    "source_type": "payment_record",
-    "title": "Cardinal Freight Systems - Promise History",
-    "text": "2026-07-02: AP director made a verbal promise to pay the full 287,400.00 by 2026-07-09. 2026-07-09: promise broken, no payment, no proactive notice (broken-promise flag set). Trailing 12 months otherwise solid: large invoices typically paid within terms; this is the first broken promise on record, attributed by the customer to a temporary liquidity squeeze from a delayed customer settlement on their side. One broken promise on an otherwise good payer argues for a relationship-aware recovery, not immediate escalation."
-  },
-  {
-    "id": "DOC-2005-COMM",
-    "account_id": "AR-2005",
-    "source_type": "communication_log",
-    "title": "Cardinal Freight Systems - Collection Call Notes",
-    "text": "2026-07-10: AR manager called the AP director after the missed promise. Customer apologized, cited a delayed inbound settlement, and asked for a short installment structure: 100,000 within 7 days and the remaining 187,400 over the following 30 days. No dispute. Tone: stressed but engaged and willing. Recommended action: secure a written promise to pay for the first tranche and a signed installment plan for the balance; involve the account owner given the strategic relationship; escalate to settlement only with controller approval if the second commitment also slips."
-  },
-  {
-    "id": "DOC-2006-INV",
-    "account_id": "AR-2006",
-    "source_type": "invoice_record",
-    "title": "Harbor Point Foods - Severely Aged Invoice",
-    "text": "Invoice INV-HP-1180. Amount: 76,900.00 USD. Issued 2026-03-11, terms net-30, due 2026-04-10. Status: 124 days past due, aging bucket 90+. No dispute on file. Two prior promises to pay (2026-05-20 and 2026-06-18) were both broken. The balance has been fully reserved in the doubtful-accounts allowance pending a recovery or write-off decision."
-  },
-  {
-    "id": "DOC-2006-CR",
-    "account_id": "AR-2006",
+    "id": "DOC-AR-2007-CRM",
+    "account_id": "AR-2007",
     "source_type": "credit_record",
-    "title": "Harbor Point Foods - Insolvency Signals",
-    "text": "Third-party risk score collapsed from 61 to 19 over two quarters. A trade alert flags a possible Chapter 11 preparation and two supplier liens filed in the last 30 days. Credit hold already in place; no new orders since April. Bankruptcy-signal flag set. Given exhausted internal treatment and insolvency indicators, the realistic paths are a discounted lump-sum settlement to recover partial cash, referral to a collections agency or legal, or a write-off, each requiring Finance Controller approval per policy."
+    "title": "Beacon Hospitality Group - Credit and Account Notes",
+    "text": "Risk level medium, recovery health 53. Credit limit $385,000, terms net-45. Active signals: invoice_disputed, short_payment. Motion: Payment of $219,950 is blocked by a billing dispute, not unwillingness to pay. Resolve the dispute (pricing or proof of delivery) with finance, issue any credit memo, then confirm the corrected due date."
   },
   {
-    "id": "DOC-2006-COMM",
-    "account_id": "AR-2006",
+    "id": "DOC-AR-2007-DSP",
+    "account_id": "AR-2007",
+    "source_type": "dispute_case",
+    "title": "Beacon Hospitality Group - Open Dispute Case",
+    "text": "Dispute opened by Ravi Menon on invoice INV-48547 for $219,950. Reason: pricing and proof-of-delivery discrepancy. Resolution path: finance to validate and issue a credit memo, then reissue a corrected invoice and confirm the new due date."
+  },
+  {
+    "id": "DOC-AR-2008-INV",
+    "account_id": "AR-2008",
+    "source_type": "invoice_record",
+    "title": "Ironwood Furniture - Invoice INV-44951",
+    "text": "Invoice INV-44951 for $117,950 (net-30) is 104 days past due, aging bucket 90+. Customer credit limit is $212,000. Status: 104+ days past due; insolvency rumour and broken promises."
+  },
+  {
+    "id": "DOC-AR-2008-COMM",
+    "account_id": "AR-2008",
     "source_type": "communication_log",
-    "title": "Harbor Point Foods - Outreach and Promise History",
-    "text": "2026-05-12: Firm dunning notice sent. 2026-05-20: Promise to pay 76,900 made by the CFO, then broken. 2026-06-18: Second promise (a 40,000 partial) made and broken. 2026-06-25 onward: calls and emails unanswered (unresponsive). Internal dunning path is complete (reminder, firm notice, calls, two broken promises). Required wait period before agency referral has elapsed. Recommendation: attempt a controller-approved settlement at roughly 35-45 cents on the dollar; if declined or no response, refer to agency or recommend write-off with full documentation."
+    "title": "Ironwood Furniture - Collections Communication Log",
+    "text": "Collector Marcus Lee contacted Grace Owens regarding $117,950 outstanding. Outcome: multiple promises to pay broken. Agreed next step: issue a final demand and prepare an agency referral."
+  },
+  {
+    "id": "DOC-AR-2008-PAY",
+    "account_id": "AR-2008",
+    "source_type": "payment_record",
+    "title": "Ironwood Furniture - Payment History",
+    "text": "Trailing payment history for Ironwood Furniture: a mix of on-time and late settlements; current balance $117,950 at 104 days past due. This pattern is consistent with the pre writeoff scenario."
+  },
+  {
+    "id": "DOC-AR-2008-CRM",
+    "account_id": "AR-2008",
+    "source_type": "credit_record",
+    "title": "Ironwood Furniture - Credit and Account Notes",
+    "text": "Risk level high, recovery health 19. Credit limit $212,000, terms net-30. Active signals: bankruptcy_signal, broken_promise_to_pay. Motion: $117,950 is 104 days past due with an insolvency rumour and repeated broken promises. Move to a pre-write-off motion: final demand, settlement offer, and a referral to a third-party agency if unresolved."
+  },
+  {
+    "id": "DOC-AR-2009-INV",
+    "account_id": "AR-2009",
+    "source_type": "invoice_record",
+    "title": "Coastal Print Works - Invoice INV-48421",
+    "text": "Invoice INV-48421 for $253,800 (net-60) is 44 days past due, aging bucket 61-90. Customer credit limit is $417,000. Status: Partial payments only; $253,800 balance remains 44 days past due."
+  },
+  {
+    "id": "DOC-AR-2009-COMM",
+    "account_id": "AR-2009",
+    "source_type": "communication_log",
+    "title": "Coastal Print Works - Collections Communication Log",
+    "text": "Collector Dana Whitfield contacted Felix Wagner regarding $253,800 outstanding. Outcome: partial payments received against the balance. Agreed next step: agree a firm instalment schedule with auto-pay enrolment."
+  },
+  {
+    "id": "DOC-AR-2009-PAY",
+    "account_id": "AR-2009",
+    "source_type": "payment_record",
+    "title": "Coastal Print Works - Payment History",
+    "text": "Trailing payment history for Coastal Print Works: a mix of on-time and late settlements; current balance $253,800 at 44 days past due. This pattern is consistent with the partial payer scenario."
+  },
+  {
+    "id": "DOC-AR-2009-CRM",
+    "account_id": "AR-2009",
+    "source_type": "credit_record",
+    "title": "Coastal Print Works - Credit and Account Notes",
+    "text": "Risk level medium, recovery health 48. Credit limit $417,000, terms net-60. Active signals: partial_payment, slow_payer. Motion: The customer pays partially and slowly, leaving $253,800 outstanding at 44 days. Negotiate a firm instalment schedule with auto-pay and monitor adherence before extending further credit."
+  },
+  {
+    "id": "DOC-AR-2010-INV",
+    "account_id": "AR-2010",
+    "source_type": "invoice_record",
+    "title": "Highland Dairy Co - Invoice INV-41356",
+    "text": "Invoice INV-41356 for $69,650 (net-45) is 53 days past due, aging bucket 61-90. Customer credit limit is $77,000. Status: Partial payments only; $69,650 balance remains 53 days past due."
+  },
+  {
+    "id": "DOC-AR-2010-COMM",
+    "account_id": "AR-2010",
+    "source_type": "communication_log",
+    "title": "Highland Dairy Co - Collections Communication Log",
+    "text": "Collector Sofia Romero contacted Diego Castro regarding $69,650 outstanding. Outcome: partial payments received against the balance. Agreed next step: agree a firm instalment schedule with auto-pay enrolment."
+  },
+  {
+    "id": "DOC-AR-2010-PAY",
+    "account_id": "AR-2010",
+    "source_type": "payment_record",
+    "title": "Highland Dairy Co - Payment History",
+    "text": "Trailing payment history for Highland Dairy Co: a mix of on-time and late settlements; current balance $69,650 at 53 days past due. This pattern is consistent with the partial payer scenario."
+  },
+  {
+    "id": "DOC-AR-2010-CRM",
+    "account_id": "AR-2010",
+    "source_type": "credit_record",
+    "title": "Highland Dairy Co - Credit and Account Notes",
+    "text": "Risk level medium, recovery health 47. Credit limit $77,000, terms net-45. Active signals: partial_payment, slow_payer. Motion: The customer pays partially and slowly, leaving $69,650 outstanding at 53 days. Negotiate a firm instalment schedule with auto-pay and monitor adherence before extending further credit."
   },
   {
     "id": "KB-COL-001",
-    "account_id": null,
     "source_type": "policy",
-    "title": "Dunning Treatment Sequence and Wait Periods",
-    "text": "Standard treatment progresses in order: (1) courtesy reminder at 3-7 days past due, (2) firm dunning notice once the balance ages past the next bucket or reminders go unanswered, (3) collection call to secure a promise to pay or an installment plan, (4) agency or legal referral only after the internal path is exhausted. Required wait periods: at least 14 days between the firm notice and any agency referral, and at least two documented contact attempts at the call stage. Never skip directly to agency or legal. If a dispute is open, pause dunning on the disputed amount and continue collecting the undisputed remainder on original terms."
+    "title": "Aging buckets and escalation thresholds",
+    "text": "Invoices age through 1-30, 31-60, 61-90, and 90+ day buckets. Early buckets call for automated reminders and a courtesy call. By 60+ days, escalate to a structured payment plan; by 90+ days, move toward a final demand and possible agency referral."
   },
   {
     "id": "KB-COL-002",
-    "account_id": null,
     "source_type": "policy",
-    "title": "Approval Thresholds: Settlements, Write-offs, and Holds",
-    "text": "Settlements and write-downs: any discounted payoff or balance reduction requires Finance Controller approval before it is offered to the customer; document the rationale, the recovery percentage, and the alternative considered. Write-offs: permitted only for confirmed-uncollectible balances, with Controller approval and full documentation, after internal treatment and (where applicable) agency referral are exhausted. Credit holds: a specialist may place a hold when exposure exceeds the approved limit or a third-party risk score crosses the high-risk threshold; notify the account owner the same day and record the trigger. For strategic or high-value accounts, loop in the account owner before a hold or agency referral to protect the relationship."
+    "title": "Promise to pay and credit holds",
+    "text": "Record every promise to pay with a date and amount. A broken promise raises risk and justifies a credit hold to stop new orders shipping against unpaid balances. Two or more broken promises should trigger management review."
   },
   {
     "id": "KB-COL-003",
-    "account_id": null,
     "source_type": "policy",
-    "title": "Compliant Collections Communication",
-    "text": "All collections communication must stay professional and within applicable fair-debt and privacy rules. Do not threaten, harass, or contact the debtor outside permitted business windows, and never disclose the debt to third parties who are not party to the obligation. Record every contact attempt in the communication log with date, channel, and outcome. When a customer states they are represented by counsel or in formal insolvency, route to legal and cease direct collection outreach. Empathy and accuracy recover more cash than pressure: confirm the balance is valid and undisputed before escalating tone."
+    "title": "Dispute handling and short payments",
+    "text": "Treat a disputed or short-paid invoice as a process problem, not a refusal to pay. Route to finance for validation, issue a credit memo where warranted, and reissue a corrected invoice so the clock restarts on a clean balance."
   },
   {
     "id": "PLAY-COL-AGING",
-    "account_id": null,
     "source_type": "playbook",
-    "title": "Aging Bucket Recovery Play",
-    "text": "Trigger: a balance slips into an older aging bucket (31-60 or 61-90) after reminders go unanswered, typically on a repeat-late payer. Goal: recover the cash and reset the aging without breaking the relationship. Steps: 1) Review the aging history and prior outreach log. 2) Send a firm dunning notice stating the balance, due date, and next steps. 3) Place a collection call to find the blocker and seek a promise to pay. 4) If the customer cannot pay in full, propose a written installment plan. 5) Set a follow-up checkpoint and update the cash forecast. Success metric: balance cleared or a kept installment plan in place, and the account moved out of the 60+ bucket within 30 days."
+    "title": "Work an aging balance",
+    "text": "1) Send the reminder sequence. 2) Place a courtesy call. 3) Confirm a promise to pay. 4) Escalate to a payment plan if the promise slips."
   },
   {
     "id": "PLAY-COL-DISPUTE",
-    "account_id": null,
     "source_type": "playbook",
-    "title": "Dispute and Short-Pay Clearance Play",
-    "text": "Trigger: a short-pay or an opened dispute blocks payment of part of a balance. Goal: resolve the dispute quickly and collect the undisputed remainder on original terms. Steps: 1) Open a dispute case capturing the disputed amount and the stated reason. 2) Gather backup (PO, proof of delivery, contract pricing, prior credits). 3) Route to the owner who can approve a credit memo or correct the bill. 4) Confirm the undisputed remainder is paid on schedule. 5) Close the case and document the resolution and any credit issued. Success metric: dispute resolved within the cycle-time target (10 days) and the undisputed balance collected on time. Do not dun or escalate the disputed amount while the case is open."
+    "title": "Resolve a disputed invoice",
+    "text": "1) Log the dispute reason. 2) Validate with finance. 3) Issue any credit memo. 4) Reissue a corrected invoice and confirm the due date."
   },
   {
     "id": "PLAY-COL-PREWRITEOFF",
-    "account_id": null,
     "source_type": "playbook",
-    "title": "Pre-Write-off Recovery Play",
-    "text": "Trigger: a severely aged balance (90+ days) shows insolvency signals or has exhausted internal treatment through broken promises and unanswered outreach. Goal: recover the maximum collectible cash and govern the write-off decision. Steps: 1) Confirm insolvency or that internal treatment is exhausted and required wait periods have elapsed. 2) Attempt a discounted lump-sum settlement (with Controller approval) to recover partial cash. 3) If declined or unresponsive, refer to a collections agency or legal per policy. 4) If confirmed uncollectible, recommend write-off with Controller approval and full documentation. Success metric: partial cash recovered via settlement, or a clean, fully documented write-off that removes a dead balance from active collection."
+    "title": "Pre-write-off recovery",
+    "text": "1) Issue a final demand. 2) Offer a settlement. 3) Apply a credit hold. 4) Refer to a third-party agency if unresolved."
   }
 ]
