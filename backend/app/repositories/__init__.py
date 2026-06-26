@@ -16,14 +16,17 @@ import asyncpg
 from app.repositories.episodes import EpisodesRepository
 from app.repositories.recommendations import RecommendationsRepository
 from app.repositories.runs import RunsRepository
+from app.repositories.vectors import DocumentChunkRepository
 
 __all__ = [
     "RunsRepository",
     "RecommendationsRepository",
     "EpisodesRepository",
+    "DocumentChunkRepository",
     "get_runs_repository",
     "get_recommendations_repository",
     "get_episodes_repository",
+    "get_document_chunk_repository",
 ]
 
 
@@ -48,3 +51,8 @@ async def get_recommendations_repository() -> RecommendationsRepository:
 async def get_episodes_repository() -> EpisodesRepository:
     """Return an EpisodesRepository bound to the shared pool."""
     return EpisodesRepository(await _pool())
+
+
+async def get_document_chunk_repository() -> DocumentChunkRepository:
+    """Return a DocumentChunkRepository bound to the shared pool (pgvector)."""
+    return DocumentChunkRepository(await _pool())

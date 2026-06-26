@@ -13,9 +13,32 @@ models on load.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import asyncpg
+
+
+def _coerce_dt(value: Any) -> Optional[datetime]:
+    """Coerce an ISO timestamp string (or datetime) into a datetime.
+
+    asyncpg binds a ``timestamptz`` parameter to a real ``datetime`` and rejects
+    plain strings, so episode payloads (which carry ``created_at`` as an ISO
+    string) must be parsed before insertion. Returns None when absent or
+    unparseable, letting the SQL COALESCE fall back to now().
+    """
+    if value is None or isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        # datetime.fromisoformat handles the trailing 'Z' since Python 3.11.
+        try:
+            return datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None
 
 
 def _dumps(value: Any) -> Optional[str]:
@@ -33,6 +56,13 @@ def _loads(value: Any) -> Any:
         return json.loads(value)
     except (TypeError, ValueError):
         return value
+
+
+def _vector_literal(embedding: Optional[List[float]]) -> Optional[str]:
+    """Render an embedding as a pgvector text literal, or None when absent."""
+    if not embedding:
+        return None
+    return "[" + ",".join(f"{float(x):.7g}" for x in embedding) + "]"
 
 
 def _status_of(episode: Dict[str, Any]) -> str:
@@ -53,28 +83,36 @@ class EpisodesRepository:
         """True when a pool is available (durable learning memory)."""
         return self._pool is not None
 
-    async def save(self, episode: Dict[str, Any]) -> Optional[str]:
+    async def save(
+        self,
+        episode: Dict[str, Any],
+        embedding: Optional[List[float]] = None,
+    ) -> Optional[str]:
         """Upsert an episode (full ``Episode.model_dump()`` dict).
 
-        Returns the episode id, or None when persistence is disabled.
+        When ``embedding`` is provided it is stored in the ``episodes.embedding``
+        pgvector column for similarity recall. When it is ``None`` any existing
+        embedding is preserved (so outcome updates do not wipe it). Returns the
+        episode id, or None when persistence is disabled.
         """
         if self._pool is None:
             return None
         episode_id = episode.get("id")
         if not episode_id:
             return None
+        vec = _vector_literal(embedding)
         await self._pool.execute(
             """
             INSERT INTO episodes (
                 id, account_id, domain, situation, action_key,
                 recommendation, preferred_action_key, phase,
-                outcome, status, payload, created_at
+                outcome, status, payload, embedding, created_at
             )
             VALUES (
                 $1, $2, $3, $4, $5,
                 $6::jsonb, $7, $8,
-                $9::jsonb, $10, $11::jsonb,
-                COALESCE($12::timestamptz, now())
+                $9::jsonb, $10, $11::jsonb, $12::vector,
+                COALESCE($13::timestamptz, now())
             )
             ON CONFLICT (id) DO UPDATE SET
                 account_id = EXCLUDED.account_id,
@@ -87,6 +125,7 @@ class EpisodesRepository:
                 outcome = EXCLUDED.outcome,
                 status = EXCLUDED.status,
                 payload = EXCLUDED.payload,
+                embedding = COALESCE(EXCLUDED.embedding, episodes.embedding),
                 updated_at = now()
             """,
             episode_id,
@@ -100,9 +139,43 @@ class EpisodesRepository:
             _dumps(episode.get("outcome")),
             _status_of(episode),
             _dumps(episode),
-            episode.get("created_at"),
+            vec,
+            _coerce_dt(episode.get("created_at")),
         )
         return episode_id
+
+    async def search_similar(
+        self, embedding: List[float], k: int = 6
+    ) -> List[Dict[str, Any]]:
+        """Return up to ``k`` episode payloads nearest to ``embedding``.
+
+        Cosine distance via pgvector's ``<=>``. Each result is the round-tripped
+        episode payload augmented with a ``similarity`` in [0, 1]. Empty offline
+        or when no episode has an embedding yet.
+        """
+        if self._pool is None:
+            return []
+        vec = _vector_literal(embedding)
+        if vec is None:
+            return []
+        rows = await self._pool.fetch(
+            """
+            SELECT payload, 1 - (embedding <=> $1::vector) AS similarity
+            FROM episodes
+            WHERE embedding IS NOT NULL
+            ORDER BY embedding <=> $1::vector
+            LIMIT $2
+            """,
+            vec,
+            k,
+        )
+        results: List[Dict[str, Any]] = []
+        for row in rows:
+            payload = _loads(row["payload"])
+            if isinstance(payload, dict):
+                payload = {**payload, "similarity": float(row["similarity"])}
+                results.append(payload)
+        return results
 
     async def record_outcome(
         self, episode: Dict[str, Any], outcome: Optional[Dict[str, Any]] = None

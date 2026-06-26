@@ -60,6 +60,14 @@ export interface Confidence {
   label: string;
 }
 
+// A concrete fact the engine does NOT yet have, that would change or strengthen
+// the recommendation (workflow step three: name the missing information).
+export interface MissingInformation {
+  gap: string;
+  why_it_matters: string;
+  suggested_source: string;
+}
+
 export type RiskOpportunityType = "risk" | "opportunity";
 
 export interface RiskOpportunity {
@@ -96,6 +104,8 @@ export interface Recommendation {
   expected_impact: ExpectedImpact;
   // Optional extra field: top-3 ranked alternatives with why-not reasons.
   alternatives?: Alternative[];
+  // Optional extra field: concrete missing facts (what we still need to know).
+  missing_information?: MissingInformation[];
   // Optional policy gates evaluated against the chosen action (see PolicyGate).
   policy?: PolicyGate[];
   status: RecommendationStatus;
@@ -218,12 +228,18 @@ export interface BeforeAfter {
   before: number;
   after: number;
   note: string;
+  // True only once real outcomes carry a measured NRR. When false the loop is
+  // empty and before/after are zeros (honest empty state, not fabricated).
+  has_data?: boolean;
 }
 
 export interface Learning {
   episodes: LearningEpisode[];
   accepted_rate: number; // 0..1
   before_after: BeforeAfter;
+  // Counts of decided/accepted episodes from real outcomes (optional).
+  decided?: number;
+  accepted?: number;
 }
 
 // GET /eval
@@ -300,4 +316,27 @@ export interface PolicyGate {
   status: PolicyGateStatus;
   detail: string;
   requires_approval?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Chat (generic agent console).
+//
+// A minimal transcript shape for the chat surface where a user can ask the
+// platform to do anything and watch the tools it calls. ChatMessage is a single
+// persisted turn; ChatToolCall is one tool invocation surfaced inline in an
+// assistant turn's trace (tool name, the arguments it was called with, and a
+// short human-readable result summary).
+// ---------------------------------------------------------------------------
+
+export type ChatRole = "user" | "assistant";
+
+export interface ChatMessage {
+  role: ChatRole;
+  content: string;
+}
+
+export interface ChatToolCall {
+  tool: string;
+  args?: Record<string, unknown>;
+  summary?: string;
 }

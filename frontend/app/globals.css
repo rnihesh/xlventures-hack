@@ -4,83 +4,86 @@
 
 /*
   Aperture design system.
-  Clean, dense-but-legible, trustworthy. Neutral slate palette with a calm
-  indigo primary, soft borders, and a refined dark mode tuned for long demos.
+  Monochrome white-to-black on a warm stone neutral scale, with a single
+  Claude clay-orange accent used sparingly for primary actions, active nav,
+  key metrics, and chart strokes. No other hues anywhere.
 */
 
 @layer base {
   :root {
+    /* Typography: Geist Sans for UI, Geist Mono for numbers, ids, code. */
+    --font-sans: var(--font-geist-sans);
+    --font-mono: var(--font-geist-mono);
+
+    /* Warm neutral surfaces (stone scale). */
     --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    --foreground: 24 10% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 24 10% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 24 10% 10%;
 
-    --primary: 243 75% 59%;
+    /* Accent: Claude clay orange (#D97757). Used sparingly. */
+    --primary: 15 63% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 222 47% 14%;
+    --secondary: 60 5% 96%;
+    --secondary-foreground: 24 10% 10%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
+    --muted: 60 5% 96%;
+    --muted-foreground: 25 5% 45%;
 
-    --accent: 226 100% 97%;
-    --accent-foreground: 243 75% 45%;
+    /* Subtle warm orange wash used for hovers and tinted chips. */
+    --accent: 18 70% 95%;
+    --accent-foreground: 15 55% 40%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 152 60% 36%;
-    --warning: 35 92% 45%;
-    --info: 217 91% 55%;
-
-    --border: 220 13% 91%;
-    --input: 220 13% 88%;
-    --ring: 243 75% 59%;
+    --border: 20 6% 90%;
+    --input: 20 6% 90%;
+    --ring: 15 63% 60%;
 
     --radius: 0.7rem;
 
-    --sidebar: 220 20% 99%;
+    --sidebar: 60 9% 98%;
   }
 
   .dark {
-    --background: 224 36% 6%;
-    --foreground: 213 31% 94%;
+    --font-sans: var(--font-geist-sans);
+    --font-mono: var(--font-geist-mono);
 
-    --card: 224 33% 9%;
-    --card-foreground: 213 31% 94%;
+    --background: 20 14% 4%;
+    --foreground: 60 9% 98%;
 
-    --popover: 224 33% 9%;
-    --popover-foreground: 213 31% 94%;
+    --card: 24 10% 11%;
+    --card-foreground: 60 9% 98%;
 
-    --primary: 243 80% 67%;
-    --primary-foreground: 224 40% 8%;
+    --popover: 24 10% 11%;
+    --popover-foreground: 60 9% 98%;
 
-    --secondary: 222 24% 16%;
-    --secondary-foreground: 213 31% 94%;
+    --primary: 15 63% 60%;
+    --primary-foreground: 0 0% 100%;
 
-    --muted: 222 24% 15%;
-    --muted-foreground: 217 14% 62%;
+    --secondary: 12 6% 15%;
+    --secondary-foreground: 60 9% 98%;
 
-    --accent: 243 40% 20%;
-    --accent-foreground: 243 90% 85%;
+    --muted: 12 6% 15%;
+    --muted-foreground: 24 6% 64%;
+
+    --accent: 15 30% 16%;
+    --accent-foreground: 18 75% 72%;
 
     --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 152 55% 48%;
-    --warning: 35 92% 58%;
-    --info: 217 91% 65%;
+    --border: 12 6% 16%;
+    --input: 12 6% 18%;
+    --ring: 15 63% 60%;
 
-    --border: 220 18% 18%;
-    --input: 220 18% 20%;
-    --ring: 243 80% 67%;
-
-    --sidebar: 224 38% 7%;
+    --sidebar: 20 14% 5%;
   }
 }
 
@@ -91,6 +94,7 @@
 
   html {
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizelegibility;
   }
 
@@ -104,7 +108,13 @@
   h2,
   h3,
   h4 {
+    text-wrap: balance;
     letter-spacing: -0.02em;
+  }
+
+  /* Mono numerics read crisper with tabular alignment by default. */
+  .font-mono {
+    font-feature-settings: "tnum" 1, "zero" 1;
   }
 }
 
