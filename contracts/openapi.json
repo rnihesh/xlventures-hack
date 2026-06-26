@@ -1,0 +1,269 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Intelligent Next Best Action API",
+    "version": "1.0.0",
+    "description": "REST and SSE API for the agentic decision intelligence platform. Turns business signals into explainable, confidence-scored Next Best Actions gated by human-in-the-loop approval."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Local development server."
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Health check.",
+        "description": "Returns service liveness status.",
+        "responses": {
+          "200": {
+            "description": "Service is healthy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["status"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "ok"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs": {
+      "post": {
+        "operationId": "createRun",
+        "summary": "Start a decision run.",
+        "description": "Submits a signal for an account in a given domain and starts an agentic run that produces recommendations.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateRunRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Run accepted and started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["run_id"],
+                  "properties": {
+                    "run_id": {
+                      "type": "string",
+                      "description": "Identifier of the created run."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error in request body.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{run_id}/stream": {
+      "get": {
+        "operationId": "streamRun",
+        "summary": "Stream run events.",
+        "description": "Returns a Server-Sent Events stream of the event envelope. Each event is sent as 'data: <json>\\n\\n'. The stream ends with a run.finished event.",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "description": "Identifier of the run to stream.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE stream of run events.",
+            "content": {
+              "text/event-stream": {
+                "schema": { "$ref": "#/components/schemas/Event" }
+              }
+            }
+          },
+          "404": {
+            "description": "Run not found.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{run_id}/hitl": {
+      "post": {
+        "operationId": "submitHitlDecision",
+        "summary": "Submit a human-in-the-loop decision.",
+        "description": "Approves, rejects, or edits a recommendation, resuming the gated run.",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "description": "Identifier of the run awaiting a decision.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/HitlRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Decision accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["status"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "description": "Resulting status after applying the decision."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Run not found.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error in request body.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateRunRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["domain", "account_id", "signal"],
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "Domain pack key (for example customer_success)."
+          },
+          "account_id": {
+            "type": "string",
+            "description": "Identifier of the target account."
+          },
+          "signal": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "content"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Signal type key from the domain pack."
+              },
+              "content": {
+                "type": "string",
+                "description": "Raw signal content to reason over."
+              }
+            }
+          }
+        }
+      },
+      "HitlRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["decision"],
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": ["approve", "reject", "edit"],
+            "description": "The human decision to apply."
+          },
+          "edited_action": {
+            "type": ["object", "null"],
+            "description": "Replacement action payload when decision is edit; otherwise null.",
+            "additionalProperties": true
+          },
+          "reason": {
+            "type": ["string", "null"],
+            "description": "Optional free-text justification for the decision."
+          }
+        }
+      },
+      "Event": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "run_id", "seq", "type", "ts", "data"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "run_id": { "type": "string" },
+          "seq": { "type": "integer", "minimum": 0 },
+          "type": {
+            "type": "string",
+            "enum": [
+              "run.started",
+              "node.started",
+              "node.finished",
+              "token",
+              "recommendation",
+              "hitl.required",
+              "run.finished",
+              "error"
+            ]
+          },
+          "ts": { "type": "string", "format": "date-time" },
+          "data": { "type": "object", "additionalProperties": true }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "detail": {
+            "description": "Error detail message or structured validation errors."
+          }
+        }
+      }
+    }
+  }
+}

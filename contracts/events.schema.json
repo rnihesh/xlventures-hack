@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xlventures.dev/contracts/events.schema.json",
+  "title": "SSE Event Envelope",
+  "description": "Server-Sent Events envelope streamed by GET /runs/{run_id}/stream as text/event-stream. Each event is serialized as 'data: <json>\\n\\n'. The stream ends with a run.finished event.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "run_id", "seq", "type", "ts", "data"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this event (UUID)."
+    },
+    "run_id": {
+      "type": "string",
+      "description": "Identifier of the run this event belongs to."
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Monotonically increasing sequence number within the run, starting at 0."
+    },
+    "type": {
+      "type": "string",
+      "description": "The kind of event being emitted.",
+      "enum": [
+        "run.started",
+        "node.started",
+        "node.finished",
+        "token",
+        "recommendation",
+        "hitl.required",
+        "run.finished",
+        "error"
+      ]
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO8601 timestamp of when the event was produced."
+    },
+    "data": {
+      "type": "object",
+      "description": "Type-specific payload. Shape depends on the value of 'type'.",
+      "additionalProperties": true
+    }
+  }
+}

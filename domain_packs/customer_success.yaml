@@ -1,0 +1,264 @@
+# Customer Success / Churn domain pack.
+# Flagship domain for the Intelligent Next Best Action platform.
+# This file is data, not code. The engine loads it to specialize planning,
+# retrieval, decisioning, and explanation for the Customer Success domain.
+
+domain: customer_success
+display_name: "Customer Success and Churn Prevention"
+
+personas:
+  - key: csm
+    label: "Customer Success Manager"
+    description: "Owns account health, adoption, and renewal outcomes for a book of business."
+    goals:
+      - "Prevent churn and protect recurring revenue."
+      - "Drive adoption to demonstrated value."
+      - "Surface and qualify expansion opportunities."
+  - key: cs_leader
+    label: "Customer Success Leader"
+    description: "Manages the CS org, portfolio risk, and net revenue retention targets."
+    goals:
+      - "Hold NRR and GRR at or above plan."
+      - "Reduce gross churn across the portfolio."
+      - "Standardize playbooks and forecast renewal risk."
+  - key: onboarding_specialist
+    label: "Onboarding Specialist"
+    description: "Guides new accounts from kickoff to first value within the target window."
+    goals:
+      - "Shorten time to value."
+      - "Complete activation milestones on schedule."
+  - key: account_executive
+    label: "Account Executive"
+    description: "Partners with CS on renewals and expansion commercials."
+    goals:
+      - "Close renewals on time and at target price."
+      - "Convert qualified expansion signals into upsell."
+
+signals:
+  - key: usage_drop
+    label: "Sustained drop in product usage"
+    source_type: usage_metric
+  - key: login_decline
+    label: "Decline in active user logins"
+    source_type: usage_metric
+  - key: feature_abandonment
+    label: "Key feature adoption stalled or reversed"
+    source_type: usage_metric
+  - key: support_ticket_spike
+    label: "Spike in support tickets or escalations"
+    source_type: support_ticket
+  - key: negative_sentiment
+    label: "Negative sentiment in calls, emails, or notes"
+    source_type: crm_note
+  - key: nps_detractor
+    label: "Detractor score in NPS or CSAT survey"
+    source_type: survey_response
+  - key: champion_departure
+    label: "Champion or executive sponsor left the account"
+    source_type: crm_note
+  - key: invoice_dispute
+    label: "Billing dispute or late payment"
+    source_type: billing_event
+  - key: renewal_window_open
+    label: "Renewal date inside the action window"
+    source_type: crm_record
+  - key: qbr_missed
+    label: "Quarterly business review skipped or declined"
+    source_type: calendar_event
+  - key: expansion_intent
+    label: "Buying or expansion intent expressed"
+    source_type: crm_note
+  - key: seat_growth
+    label: "Seat utilization approaching license cap"
+    source_type: usage_metric
+  - key: onboarding_milestone_late
+    label: "Onboarding milestone past due"
+    source_type: project_record
+
+decision_points:
+  onboarding_stall:
+    label: "Onboarding stall"
+    description: "A new account has not completed activation milestones within the expected window."
+    trigger_signals: [onboarding_milestone_late, login_decline, qbr_missed]
+    primary_kpi: time_to_value
+    default_persona: onboarding_specialist
+  low_adoption:
+    label: "Low adoption"
+    description: "Activated account is using a narrow slice of value, putting renewal at risk."
+    trigger_signals: [usage_drop, feature_abandonment, login_decline]
+    primary_kpi: health_score
+    default_persona: csm
+  health_drop:
+    label: "Health score drop"
+    description: "Composite health score has declined materially over the trailing period."
+    trigger_signals: [usage_drop, negative_sentiment, support_ticket_spike, nps_detractor]
+    primary_kpi: health_score
+    default_persona: csm
+  renewal_risk:
+    label: "Renewal risk"
+    description: "Renewal is approaching with signals that predict non-renewal or downgrade."
+    trigger_signals: [renewal_window_open, usage_drop, champion_departure, nps_detractor, invoice_dispute]
+    primary_kpi: GRR
+    default_persona: cs_leader
+  expansion_signal:
+    label: "Expansion signal"
+    description: "A healthy account shows intent or capacity to grow spend."
+    trigger_signals: [expansion_intent, seat_growth]
+    primary_kpi: NRR
+    default_persona: account_executive
+  escalation:
+    label: "Escalation"
+    description: "An urgent issue threatens the relationship and needs immediate cross-functional response."
+    trigger_signals: [support_ticket_spike, negative_sentiment, champion_departure, invoice_dispute]
+    primary_kpi: churn_rate
+    default_persona: cs_leader
+
+actions:
+  - key: schedule_executive_business_review
+    title: "Schedule an executive business review"
+    description: "Book a strategic review with the buying committee to realign on outcomes and value."
+    eligibility: "Use when champion is engaged and renewal is more than 30 days out."
+  - key: launch_adoption_campaign
+    title: "Launch a targeted adoption campaign"
+    description: "Deliver in-app guidance and enablement on the underused high-value features."
+    eligibility: "Use when feature adoption is stalled but sentiment is neutral or positive."
+  - key: assign_onboarding_taskforce
+    title: "Assign an onboarding taskforce"
+    description: "Bring in an onboarding specialist and solutions engineer to unblock activation."
+    eligibility: "Use when onboarding milestones are past due within the first 90 days."
+  - key: open_executive_escalation
+    title: "Open an executive escalation"
+    description: "Engage CS leadership and product to triage and commit to a remediation plan."
+    eligibility: "Use when support spikes coincide with negative sentiment or sponsor loss."
+  - key: identify_new_champion
+    title: "Identify and develop a new champion"
+    description: "Map stakeholders and cultivate a replacement champion after a departure."
+    eligibility: "Use when the prior champion or sponsor has left the account."
+  - key: propose_expansion_offer
+    title: "Propose an expansion offer"
+    description: "Package an upsell or cross-sell aligned to demonstrated value and intent."
+    eligibility: "Use only when health is good and expansion intent or seat growth is present."
+  - key: initiate_renewal_motion
+    title: "Initiate the renewal motion early"
+    description: "Start the renewal conversation with a value recap and multi-year options."
+    eligibility: "Use when the renewal window is open and health is stable or improving."
+  - key: offer_save_concession
+    title: "Offer a retention concession"
+    description: "Present a scoped discount, credit, or flexible term to retain an at-risk account."
+    eligibility: "Use only for renewal risk after value realignment has been attempted."
+  - key: resolve_billing_dispute
+    title: "Resolve the billing dispute"
+    description: "Coordinate finance and CS to clear the dispute and confirm corrected terms."
+    eligibility: "Use when an invoice dispute or late payment is the primary blocker."
+  - key: monitor_no_action
+    title: "Monitor and hold"
+    description: "Keep the account on a watch list with thresholds for re-evaluation."
+    eligibility: "Use when signals are weak or contradicting and intervention risk is high."
+
+playbooks:
+  - key: save_at_risk_renewal
+    name: "Save an at-risk renewal"
+    decision_point: renewal_risk
+    steps:
+      - "Pull the trailing 90 day health, usage, and sentiment trend."
+      - "Confirm the economic buyer and current champion status."
+      - "Run a value realignment session against original success criteria."
+      - "If gaps remain, scope a retention concession with leadership approval."
+      - "Document commitments and set a renewal close plan with dates."
+  - key: reignite_adoption
+    name: "Reignite stalled adoption"
+    decision_point: low_adoption
+    steps:
+      - "Identify the high-value features with low or reversing adoption."
+      - "Segment the affected users and their blockers."
+      - "Launch an in-app and email enablement campaign."
+      - "Schedule a hands-on workshop with power users."
+      - "Re-measure adoption after two weeks and adjust."
+  - key: accelerate_onboarding
+    name: "Accelerate stalled onboarding"
+    decision_point: onboarding_stall
+    steps:
+      - "Review the activation plan and overdue milestones."
+      - "Assign an onboarding specialist and solutions engineer."
+      - "Remove the top technical or organizational blocker."
+      - "Reset milestone dates and confirm with the sponsor."
+  - key: qualify_expansion
+    name: "Qualify and propose expansion"
+    decision_point: expansion_signal
+    steps:
+      - "Validate health score and demonstrated value."
+      - "Confirm intent or capacity (seat growth, stated need)."
+      - "Loop in the account executive and size the opportunity."
+      - "Package and present the expansion offer."
+
+kpis:
+  - key: NRR
+    label: "Net Revenue Retention"
+    description: "Recurring revenue retained plus expansion, net of churn and contraction."
+    unit: percent
+    target: ">= 110"
+  - key: GRR
+    label: "Gross Revenue Retention"
+    description: "Recurring revenue retained excluding expansion."
+    unit: percent
+    target: ">= 90"
+  - key: churn_rate
+    label: "Churn Rate"
+    description: "Share of accounts or revenue lost in the period."
+    unit: percent
+    target: "<= 8"
+  - key: health_score
+    label: "Customer Health Score"
+    description: "Composite of usage, sentiment, support, and engagement signals."
+    unit: index_0_100
+    target: ">= 70"
+  - key: time_to_value
+    label: "Time to Value"
+    description: "Days from kickoff to first realized value milestone."
+    unit: days
+    target: "<= 30"
+
+retrieval_sources:
+  - key: crm_notes
+    label: "CRM account notes and call summaries"
+    source_type: crm_note
+  - key: support_tickets
+    label: "Support tickets and escalation threads"
+    source_type: support_ticket
+  - key: usage_metrics
+    label: "Product usage and adoption telemetry"
+    source_type: usage_metric
+  - key: survey_responses
+    label: "NPS and CSAT survey responses"
+    source_type: survey_response
+  - key: billing_events
+    label: "Billing and invoice events"
+    source_type: billing_event
+  - key: contracts
+    label: "Contract and renewal records"
+    source_type: crm_record
+  - key: playbook_library
+    label: "Internal Customer Success playbook library"
+    source_type: knowledge_base
+
+planner_prompt: |
+  You are a Customer Success decision planner. Your job is to turn account
+  signals into a single, explainable Next Best Action that protects recurring
+  revenue and drives demonstrated value.
+
+  Operating principles:
+  - Always classify the situation into one decision point: onboarding_stall,
+    low_adoption, health_drop, renewal_risk, expansion_signal, or escalation.
+  - Choose actions only from the domain action catalog and respect each
+    action eligibility note. Never propose an expansion offer for an at-risk
+    or declining account.
+  - Ground every claim in retrieved evidence (CRM notes, usage metrics,
+    support tickets, surveys, billing, contracts). Cite the source and snippet.
+  - Separate supporting from contradicting signals honestly. If signals are
+    weak or conflicting, prefer monitor_no_action and explain why.
+  - Tie the recommended action to the primary KPI for the decision point and
+    state the expected direction and a grounded estimate of impact.
+  - Provide a counterfactual: what likely happens to the account if no action
+    is taken.
+  - This is a human-in-the-loop system. Frame the recommendation as a proposal
+    for a Customer Success Manager or leader to approve, edit, or reject.

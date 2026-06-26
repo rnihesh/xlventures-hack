@@ -1,0 +1,94 @@
+# SaaS Sales domain pack (skeleton).
+# Demonstrates that the engine is domain-agnostic: same schema, fewer entries.
+# This file is data, not code.
+
+domain: saas_sales
+display_name: "SaaS Sales Pipeline"
+
+personas:
+  - key: ae
+    label: "Account Executive"
+    description: "Owns opportunities from qualification to close."
+    goals:
+      - "Advance qualified pipeline to closed won."
+      - "Protect deal velocity and forecast accuracy."
+  - key: sales_manager
+    label: "Sales Manager"
+    description: "Manages the team forecast and deal coaching."
+    goals:
+      - "Hit quota and improve win rate."
+
+signals:
+  - key: stage_stall
+    label: "Opportunity stuck in stage past expected duration"
+    source_type: crm_record
+  - key: no_recent_activity
+    label: "No buyer engagement in the trailing period"
+    source_type: crm_note
+  - key: buying_intent
+    label: "Buying intent or budget confirmed"
+    source_type: crm_note
+
+decision_points:
+  deal_stall:
+    label: "Deal stall"
+    description: "An open opportunity has stalled in its current stage."
+    trigger_signals: [stage_stall, no_recent_activity]
+    primary_kpi: win_rate
+    default_persona: ae
+  closing_signal:
+    label: "Closing signal"
+    description: "A qualified opportunity shows readiness to close."
+    trigger_signals: [buying_intent]
+    primary_kpi: pipeline_velocity
+    default_persona: ae
+
+actions:
+  - key: re_engage_buyer
+    title: "Re-engage the buyer"
+    description: "Send a value-based outreach to revive a stalled conversation."
+    eligibility: "Use when activity has lapsed but the deal is not lost."
+  - key: send_proposal
+    title: "Send a closing proposal"
+    description: "Package pricing and terms to move toward signature."
+    eligibility: "Use when buying intent and budget are confirmed."
+
+playbooks:
+  - key: unstick_deal
+    name: "Unstick a stalled deal"
+    decision_point: deal_stall
+    steps:
+      - "Confirm the current blocker with the champion."
+      - "Send a tailored value recap and propose a next step."
+
+kpis:
+  - key: win_rate
+    label: "Win Rate"
+    description: "Share of qualified opportunities that close won."
+    unit: percent
+    target: ">= 25"
+  - key: pipeline_velocity
+    label: "Pipeline Velocity"
+    description: "Rate at which qualified pipeline converts to revenue."
+    unit: currency_per_day
+    target: "trend up"
+
+retrieval_sources:
+  - key: crm_records
+    label: "CRM opportunity records"
+    source_type: crm_record
+  - key: crm_notes
+    label: "Call notes and email summaries"
+    source_type: crm_note
+
+planner_prompt: |
+  You are a SaaS Sales decision planner. Turn opportunity signals into a single,
+  explainable Next Best Action that advances qualified pipeline.
+
+  Operating principles:
+  - Classify into one decision point: deal_stall or closing_signal.
+  - Choose actions only from the catalog and respect each eligibility note.
+  - Ground claims in CRM records and notes, citing source and snippet.
+  - Tie the action to the primary KPI and state expected direction and impact.
+  - This is a human-in-the-loop system. Frame the action as a proposal for an
+    Account Executive to approve, edit, or reject.

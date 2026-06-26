@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xlventures.dev/contracts/recommendation.schema.json",
+  "title": "Explainable Recommendation Object",
+  "description": "A confidence-scored, explainable Next Best Action produced by the decision engine and gated by human-in-the-loop approval.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "run_id",
+    "account_id",
+    "domain",
+    "action",
+    "rationale",
+    "evidence",
+    "signals",
+    "confidence",
+    "risk_opportunity",
+    "counterfactual",
+    "expected_impact",
+    "status",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for this recommendation."
+    },
+    "run_id": {
+      "type": "string",
+      "description": "Identifier of the run that produced this recommendation."
+    },
+    "account_id": {
+      "type": "string",
+      "description": "Identifier of the account or entity the recommendation targets."
+    },
+    "domain": {
+      "type": "string",
+      "description": "Domain pack key this recommendation was generated under (for example customer_success)."
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "title", "description"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Stable action key from the domain pack action catalog."
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable action title."
+        },
+        "description": {
+          "type": "string",
+          "description": "What the action entails and how to execute it."
+        }
+      }
+    },
+    "rationale": {
+      "type": "string",
+      "description": "Natural language explanation of why this action is recommended."
+    },
+    "evidence": {
+      "type": "array",
+      "description": "Grounding evidence that supports the rationale.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim", "source_id", "source_type", "snippet", "span"],
+        "properties": {
+          "claim": {
+            "type": "string",
+            "description": "The specific claim this evidence supports."
+          },
+          "source_id": {
+            "type": "string",
+            "description": "Identifier of the source document or record."
+          },
+          "source_type": {
+            "type": "string",
+            "description": "Type of source (for example crm_note, support_ticket, usage_metric)."
+          },
+          "snippet": {
+            "type": "string",
+            "description": "Exact excerpt from the source backing the claim."
+          },
+          "span": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["start", "end"],
+            "properties": {
+              "start": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Start character offset of the snippet within the source."
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "End character offset of the snippet within the source."
+              }
+            }
+          }
+        }
+      }
+    },
+    "signals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["supporting", "contradicting"],
+      "properties": {
+        "supporting": {
+          "type": "array",
+          "description": "Signal keys that support the recommendation.",
+          "items": { "type": "string" }
+        },
+        "contradicting": {
+          "type": "array",
+          "description": "Signal keys that weigh against the recommendation.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "method", "label"],
+      "properties": {
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Calibrated confidence between 0 and 1."
+        },
+        "method": {
+          "type": "string",
+          "description": "How the score was computed (for example llm_self_consistency, ensemble_vote)."
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable confidence band (for example low, medium, high)."
+        }
+      }
+    },
+    "risk_opportunity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "summary"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["risk", "opportunity"],
+          "description": "Whether the recommendation addresses a risk or an opportunity."
+        },
+        "summary": {
+          "type": "string",
+          "description": "Short summary of the risk or opportunity."
+        }
+      }
+    },
+    "counterfactual": {
+      "type": "string",
+      "description": "What is likely to happen if no action is taken."
+    },
+    "expected_impact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kpi", "direction", "estimate"],
+      "properties": {
+        "kpi": {
+          "type": "string",
+          "description": "The KPI this action is expected to move (for example NRR, churn_rate)."
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["up", "down"],
+          "description": "Expected direction of movement for the KPI."
+        },
+        "estimate": {
+          "type": "string",
+          "description": "Estimated magnitude of impact (for example +3 points over 90 days)."
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "approved", "rejected", "edited"],
+      "description": "Lifecycle status of the recommendation after human review."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO8601 timestamp when the recommendation was created."
+    }
+  }
+}
