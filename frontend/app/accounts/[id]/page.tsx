@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/states";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { riskVariant, formatArr, healthTone } from "@/components/account-table";
+import { WhatIfPanel } from "@/components/whatif-panel";
 import { cn } from "@/lib/utils";
 import { getAccount } from "@/lib/api";
 import type { AccountDetail, AccountSignal, Recommendation } from "@/lib/types";
@@ -364,6 +365,14 @@ export default function AccountDetailPage() {
             </TabsContent>
           </Tabs>
         </section>
+      </div>
+
+      <div className="mt-6">
+        <WhatIfPanel
+          domain={p.domain ?? "customer_success"}
+          accountId={p.account_id}
+          baseline={detail.current}
+        />
       </div>
     </div>
   );

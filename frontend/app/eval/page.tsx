@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { FlaskConical } from "lucide-react";
 
-import { AppSidebar } from "@/components/app-sidebar";
 import { EvalPanel, type EvalData } from "@/components/eval-panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getEval } from "@/lib/api";
@@ -80,9 +79,7 @@ export default function EvalPage() {
   }, []);
 
   return (
-    <div className="flex min-h-screen">
-      <AppSidebar />
-      <main className="flex flex-1 flex-col">
+    <div className="flex flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-border px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
@@ -111,7 +108,6 @@ export default function EvalPage() {
             <EvalPanel data={data} />
           )}
         </div>
-      </main>
     </div>
   );
 }
