@@ -62,6 +62,62 @@ def _default_evidence(account_id: str) -> List[Dict[str, Any]]:
     ]
 
 
+def _alternatives_from_candidates(candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Derive ranked alternatives from raw candidate_actions as a fallback.
+
+    Used when the recommender did not attach a prebuilt ``alternatives`` list.
+    Keeps the same shape: {action, score, rationale, why_not}.
+    """
+
+    out: List[Dict[str, Any]] = []
+    for idx, c in enumerate(candidates[:3]):
+        is_chosen = bool(c.get("chosen")) or idx == 0
+        out.append(
+            {
+                "action": {
+                    "key": c.get("key", ""),
+                    "title": c.get("title", ""),
+                    "description": c.get("description", ""),
+                },
+                "score": float(c.get("score", 0.0)),
+                "rationale": (
+                    "Highest expected value given risk magnitude and learned preferences."
+                    if is_chosen
+                    else c.get("reason", "Eligible play with lower expected value.")
+                ),
+                "why_not": None if is_chosen else c.get("reason"),
+                "chosen": is_chosen,
+            }
+        )
+    return out
+
+
+def _build_alternatives(state: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Return the ranked alternatives, preferring the recommender's own list."""
+
+    prebuilt = state.get("alternatives")
+    if isinstance(prebuilt, list) and prebuilt:
+        normalized: List[Dict[str, Any]] = []
+        for idx, alt in enumerate(prebuilt[:3]):
+            action = alt.get("action") or {}
+            normalized.append(
+                {
+                    "action": {
+                        "key": action.get("key", ""),
+                        "title": action.get("title", ""),
+                        "description": action.get("description", ""),
+                    },
+                    "score": float(alt.get("score", 0.0)),
+                    "rationale": alt.get("rationale", ""),
+                    "why_not": alt.get("why_not"),
+                    "chosen": bool(alt.get("chosen")) or idx == 0,
+                }
+            )
+        return normalized
+
+    return _alternatives_from_candidates(state.get("candidate_actions") or [])
+
+
 def _chosen_action(state: Dict[str, Any]) -> Dict[str, Any]:
     """Return the chosen candidate action, or a safe default."""
 
@@ -180,6 +236,9 @@ def build_recommendation(state: Dict[str, Any], llm: Any) -> Dict[str, Any]:
 
     confidence = _calibrated_confidence(state, action)
 
+    # Top-3 ranked alternatives (chosen play plus runner-ups with why_not).
+    alternatives = _build_alternatives(state)
+
     # Counterfactual: contrast the recommended play with the runner-up.
     candidates = state.get("candidate_actions") or []
     runner_up = next((c for c in candidates if not c.get("chosen")), None)
@@ -215,6 +274,9 @@ def build_recommendation(state: Dict[str, Any], llm: Any) -> Dict[str, Any]:
             "direction": direction,
             "estimate": estimate,
         },
+        # Extra field: ranked candidates the engine weighed before choosing.
+        # Kept outside the schema-required set so the contract stays intact.
+        "alternatives": alternatives,
         "status": "proposed",
         "created_at": _now_iso(),
     }

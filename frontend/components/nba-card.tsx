@@ -25,12 +25,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Alternatives } from "@/components/alternatives";
 import { cn } from "@/lib/utils";
+import type { Alternative } from "@/lib/types";
 import type {
   HitlDecision,
   Recommendation,
   RecommendationAction,
 } from "@/lib/useAgentStream";
+
+// The streamed Recommendation may carry an optional `alternatives` array that
+// is not part of the frozen useAgentStream type. Read it safely without
+// loosening the contract elsewhere.
+function readAlternatives(rec: Recommendation): Alternative[] {
+  const alts = (rec as unknown as { alternatives?: Alternative[] }).alternatives;
+  return Array.isArray(alts) ? alts : [];
+}
 
 function ConfidenceDial({
   score,
@@ -182,6 +192,7 @@ export function NbaCard({
   const rec = recommendation;
   const decided = rec.status !== "proposed";
   const isOpportunity = rec.risk_opportunity?.type === "opportunity";
+  const alternatives = readAlternatives(rec);
 
   const beginEdit = () => {
     setEditTitle(rec.action.title);
@@ -347,6 +358,8 @@ export function NbaCard({
             </section>
           )}
         </div>
+
+        {alternatives.length > 0 && <Alternatives alternatives={alternatives} />}
 
         {editing && (
           <section className="space-y-2 rounded-lg border border-violet-500/30 bg-violet-500/5 p-3">

@@ -39,6 +39,16 @@ export interface Evidence {
   score?: number;
 }
 
+// A ranked candidate action the engine weighed before choosing. The chosen play
+// is included with why_not === null; runner-ups carry a "why not" explanation.
+export interface Alternative {
+  action: RecommendationAction;
+  score: number; // 0..1 expected value
+  rationale: string;
+  why_not: string | null;
+  chosen?: boolean;
+}
+
 export interface Signals {
   supporting: string[];
   contradicting: string[];
@@ -84,6 +94,8 @@ export interface Recommendation {
   risk_opportunity: RiskOpportunity;
   counterfactual: string;
   expected_impact: ExpectedImpact;
+  // Optional extra field: top-3 ranked alternatives with why-not reasons.
+  alternatives?: Alternative[];
   status: RecommendationStatus;
   created_at: string; // ISO8601
 }

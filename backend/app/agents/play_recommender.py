@@ -6,7 +6,10 @@ This is where the learning effect shows up: when a human has previously accepted
 or rejected a play on similar accounts, memory preferences shift the ranking.
 
 Produces ``candidate_actions`` ranked by expected value, each annotated with why
-it was chosen or why it was passed over (the "why not these" trail).
+it was chosen or why it was passed over (the "why not these" trail). The top
+candidates are also distilled into a compact ``alternatives`` list (chosen play
+plus up to two runner-ups), each carrying a score, a short rationale, and a
+``why_not`` string for the runner-ups so the UI can surface the trade-offs.
 """
 
 from __future__ import annotations
@@ -53,6 +56,9 @@ _BASE_VALUE = {
     "re_engage_buyer": 0.67,
     "send_proposal": 0.73,
 }
+
+# How many ranked candidates to expose as user-facing alternatives.
+_MAX_ALTERNATIVES = 3
 
 
 def _eligible_actions(pack: DomainPack, decision_point: str) -> List[Action]:
@@ -109,10 +115,77 @@ def _episode_boost(episodes: List[Dict[str, Any]], action_key: str) -> float:
     return boost
 
 
+def _runner_up_why_not(chosen: Dict[str, Any], alt: Dict[str, Any]) -> str:
+    """Explain, in one line, why this eligible play lost to the chosen one."""
+
+    delta = round(chosen["score"] - alt["score"], 3)
+    if alt.get("preference_boost", 0.0) < 0:
+        return "Down-weighted by prior human rejections on similar accounts."
+    if alt.get("episode_boost", 0.0) < 0:
+        return "Similar past plays on this account were not accepted by the team."
+    if alt["key"] == "monitor_no_action":
+        return "Too passive for the current risk magnitude."
+    if delta <= 0:
+        return "Effectively tied on value but less decisive than the chosen play."
+    return (
+        f"Lower expected value (-{delta}) than the chosen play given current risk "
+        "and learned preferences."
+    )
+
+
+def _candidate_rationale(candidate: Dict[str, Any]) -> str:
+    """Short positive rationale for why a candidate was even in contention."""
+
+    bits: List[str] = [f"Expected value {candidate['score']}"]
+    if candidate.get("preference_boost", 0.0) > 0:
+        bits.append("favored by learned preferences")
+    if candidate.get("episode_boost", 0.0) > 0:
+        bits.append("accepted on similar accounts before")
+    if candidate.get("risk_term", 0.0) > 0 and candidate["key"] != "monitor_no_action":
+        bits.append("scales with the current risk magnitude")
+    return "; ".join(bits) + "."
+
+
+def build_alternatives(candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Distill ranked candidates into user-facing alternatives.
+
+    Returns up to ``_MAX_ALTERNATIVES`` entries shaped as
+    ``{action: {key, title, description}, score, rationale, why_not}``. The
+    chosen play sits first with ``why_not = None``; runner-ups carry a concise
+    reason they were passed over.
+    """
+
+    if not candidates:
+        return []
+
+    chosen = candidates[0]
+    alternatives: List[Dict[str, Any]] = []
+    for idx, candidate in enumerate(candidates[:_MAX_ALTERNATIVES]):
+        is_chosen = idx == 0
+        alternatives.append(
+            {
+                "action": {
+                    "key": candidate["key"],
+                    "title": candidate["title"],
+                    "description": candidate["description"],
+                },
+                "score": candidate["score"],
+                "rationale": (
+                    "Highest expected value given risk magnitude and learned preferences."
+                    if is_chosen
+                    else _candidate_rationale(candidate)
+                ),
+                "why_not": None if is_chosen else _runner_up_why_not(chosen, candidate),
+                "chosen": is_chosen,
+            }
+        )
+    return alternatives
+
+
 @register_agent(
     capability="play_recommender",
     description="Ranks eligible plays using pack eligibility plus learned memory.",
-    output_keys=["candidate_actions", "preferences", "similar_episodes"],
+    output_keys=["candidate_actions", "alternatives", "preferences", "similar_episodes"],
     cost_tier="strong",
     tags=["decision"],
 )
@@ -164,25 +237,23 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
 
     candidates.sort(key=lambda c: c["score"], reverse=True)
 
-    # Annotate the runner-ups with a short "why not" reason.
+    # Annotate the runner-ups with a short "why not" reason on the full list.
     if candidates:
         chosen = candidates[0]
         chosen["chosen"] = True
         chosen["reason"] = "Highest expected value given risk magnitude and learned preferences."
         for alt in candidates[1:]:
             alt["chosen"] = False
-            delta = round(chosen["score"] - alt["score"], 3)
-            if alt["preference_boost"] < 0:
-                alt["reason"] = "Down-weighted by prior human rejections on similar accounts."
-            elif alt["key"] == "monitor_no_action":
-                alt["reason"] = "Too passive for the current risk magnitude."
-            else:
-                alt["reason"] = f"Lower expected value (-{delta}) than the chosen play."
+            alt["reason"] = _runner_up_why_not(chosen, alt)
+
+    # Compact, ranked alternatives for the recommendation object and UI.
+    alternatives = build_alternatives(candidates)
 
     learned = bool(preferences) or bool(episodes)
 
     return {
         "candidate_actions": candidates,
+        "alternatives": alternatives,
         "preferences": preferences,
         "similar_episodes": episodes,
         "messages": [
@@ -191,6 +262,11 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
                 "content": (
                     f"Ranked {len(candidates)} eligible plays"
                     + (" using learned memory." if learned else ".")
+                    + (
+                        f" Considered {len(alternatives)} top alternatives."
+                        if alternatives
+                        else ""
+                    )
                 ),
             }
         ],
@@ -203,6 +279,10 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
                     "candidates": [
                         {"key": c["key"], "score": c["score"], "chosen": c.get("chosen", False)}
                         for c in candidates
+                    ],
+                    "alternatives": [
+                        {"key": a["action"]["key"], "score": a["score"], "chosen": a["chosen"]}
+                        for a in alternatives
                     ],
                     "used_memory": learned,
                     "similar_episodes": len(episodes),
