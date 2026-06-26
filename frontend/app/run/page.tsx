@@ -2,14 +2,16 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Play, RotateCcw, Sparkles } from "lucide-react";
+import { ListTree, Play, RotateCcw, Sparkles, Wrench } from "lucide-react";
 
 import { NbaCard } from "@/components/nba-card";
 import { RunTrace } from "@/components/run-trace";
+import { ToolCallPanel } from "@/components/tool-call-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useAgentStream } from "@/lib/useAgentStream";
 
@@ -55,6 +57,10 @@ function RunWorkspace() {
   const [domain, setDomain] = useState("customer_success");
   const [accountId, setAccountId] = useState("acct_001");
   const [signalText, setSignalText] = useState(EXAMPLES[0]);
+  const [leftTab, setLeftTab] = useState("trace");
+
+  // Count tool calls so the tab label reflects live orchestration activity.
+  const toolCallCount = events.filter((e) => e.type === "node.started").length;
 
   // Prefill from inbox / account 360 deep links.
   useEffect(() => {
@@ -168,9 +174,31 @@ function RunWorkspace() {
         )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
         <div className="lg:sticky lg:top-6 lg:self-start">
-          <RunTrace events={events} />
+          <Tabs value={leftTab} onValueChange={setLeftTab}>
+            <TabsList className="w-full">
+              <TabsTrigger value="trace" className="flex-1 gap-1.5">
+                <ListTree className="h-3.5 w-3.5" />
+                Trace
+              </TabsTrigger>
+              <TabsTrigger value="tools" className="flex-1 gap-1.5">
+                <Wrench className="h-3.5 w-3.5" />
+                Tool calls
+                {toolCallCount > 0 && (
+                  <span className="ml-0.5 rounded-full bg-background/60 px-1.5 text-[10px] tabular">
+                    {toolCallCount}
+                  </span>
+                )}
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="trace">
+              <RunTrace events={events} />
+            </TabsContent>
+            <TabsContent value="tools">
+              <ToolCallPanel events={events} />
+            </TabsContent>
+          </Tabs>
         </div>
         <NbaCard
           recommendation={recommendation}
