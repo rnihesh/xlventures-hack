@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { ListTree, Play, RotateCcw, Sparkles, Wrench } from "lucide-react";
 
 import { NbaCard } from "@/components/nba-card";
+import { PolicyPanel } from "@/components/policy-panel";
+import { ExecutePanel } from "@/components/execute-panel";
 import { RunTrace } from "@/components/run-trace";
 import { ToolCallPanel } from "@/components/tool-call-panel";
 import { Button } from "@/components/ui/button";
@@ -14,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useAgentStream } from "@/lib/useAgentStream";
+import type { Recommendation as RecommendationContract } from "@/lib/types";
 
 const STATUS_LABEL: Record<string, string> = {
   idle: "Idle",
@@ -44,6 +47,7 @@ const EXAMPLES = [
 function RunWorkspace() {
   const searchParams = useSearchParams();
   const {
+    runId,
     status,
     events,
     recommendation,
@@ -73,6 +77,11 @@ function RunWorkspace() {
   }, [searchParams]);
 
   const busy = status === "starting" || status === "streaming";
+
+  // The streamed recommendation carries policy gates at runtime; expose it as
+  // the shared contract type so the policy and execute panels can read them.
+  const contractRecommendation =
+    (recommendation as RecommendationContract | null) ?? null;
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,11 +209,26 @@ function RunWorkspace() {
             </TabsContent>
           </Tabs>
         </div>
-        <NbaCard
-          recommendation={recommendation}
-          hitlRequired={hitlRequired}
-          onDecision={submitHitl}
-        />
+        <div className="space-y-6">
+          <NbaCard
+            recommendation={recommendation}
+            hitlRequired={hitlRequired}
+            onDecision={submitHitl}
+          />
+          {recommendation && (
+            <>
+              <PolicyPanel
+                gates={contractRecommendation?.policy ?? []}
+                domain={domain.trim()}
+              />
+              <ExecutePanel
+                recommendation={contractRecommendation}
+                runId={runId}
+                accountId={accountId.trim()}
+              />
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

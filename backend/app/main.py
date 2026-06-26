@@ -93,9 +93,9 @@ def create_app() -> FastAPI:
     app.include_router(domains.router)
     app.include_router(whatif.router)
 
-    # Learning and eval routers are owned by other slices. Include them when
-    # present so the app still boots if a slice has not landed yet.
-    for module_name in ("learning", "eval"):
+    # Learning, eval, execute, and policy routers are owned by other slices.
+    # Include them when present so the app still boots if a slice has not landed.
+    for module_name in ("learning", "eval", "execute", "policy"):
         try:
             module = __import__(f"app.api.{module_name}", fromlist=["router"])
             app.include_router(module.router)

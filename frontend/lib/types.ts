@@ -96,6 +96,8 @@ export interface Recommendation {
   expected_impact: ExpectedImpact;
   // Optional extra field: top-3 ranked alternatives with why-not reasons.
   alternatives?: Alternative[];
+  // Optional policy gates evaluated against the chosen action (see PolicyGate).
+  policy?: PolicyGate[];
   status: RecommendationStatus;
   created_at: string; // ISO8601
 }
@@ -243,4 +245,59 @@ export interface EvalOutcomes {
 export interface EvalReport {
   suites: EvalSuite[];
   outcomes: EvalOutcomes;
+}
+
+// ---------------------------------------------------------------------------
+// Action artifacts and policy gates.
+//
+// An Artifact is a concrete, editable output the agent drafts for a chosen
+// action: a customer email, a CRM follow-up task, or a Slack message. The
+// discriminated union below lets the UI render the right editor per kind while
+// keeping a stable `kind` field for switching.
+// ---------------------------------------------------------------------------
+
+export type ArtifactKind = "email" | "crm_task" | "slack";
+
+// Draft email to a stakeholder. `to` may carry one or multiple recipients.
+export interface EmailArtifact {
+  kind: "email";
+  to?: string;
+  cc?: string;
+  subject: string;
+  body: string;
+}
+
+export type CrmTaskPriority = "high" | "medium" | "low" | string;
+
+// Follow-up task to push into the CRM (e.g. Salesforce, HubSpot).
+export interface CrmTaskArtifact {
+  kind: "crm_task";
+  title: string;
+  description: string;
+  assignee?: string;
+  due_date?: string; // ISO8601 date
+  priority?: CrmTaskPriority;
+}
+
+// Message to post into a Slack channel or thread.
+export interface SlackArtifact {
+  kind: "slack";
+  channel?: string;
+  message: string;
+}
+
+// Discriminated union over the supported artifact shapes.
+export type Artifact = EmailArtifact | CrmTaskArtifact | SlackArtifact;
+
+// A single policy gate evaluated against a chosen action. `status` reports the
+// gate outcome; `requires_approval` flags gates that hold the action for a
+// human even when not strictly failing.
+export type PolicyGateStatus = "pass" | "fail" | "warn" | string;
+
+export interface PolicyGate {
+  rule_id: string;
+  description: string;
+  status: PolicyGateStatus;
+  detail: string;
+  requires_approval?: boolean;
 }
