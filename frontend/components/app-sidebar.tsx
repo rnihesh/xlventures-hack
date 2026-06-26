@@ -1,27 +1,50 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Aperture,
   LayoutDashboard,
   Inbox,
+  MessageSquare,
   Play,
   Building2,
+  Upload,
   GraduationCap,
   FlaskConical,
   Boxes,
+  Settings,
   Moon,
   Sun,
+  LogOut,
   type LucideIcon,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { Press } from "@/components/ui/press";
+import { useAuth } from "@/lib/auth-context";
 
 const THEME_KEY = "aperture-theme";
+const COLLAPSE_KEY = "aperture-sidebar-collapsed";
 
-function ThemeToggle() {
+// Pixel widths the <aside> and the page offset (app-shell) share via a CSS
+// variable, so the main content slides in step with the sidebar width.
+const WIDTH_EXPANDED = "16rem";
+const WIDTH_COLLAPSED = "4.5rem";
+
+/*
+  Scoped Claude-orange accent for the sidebar. Exposed as CSS variables on the
+  <aside> so the nav links, brand mark, focus rings, and status dot can all
+  reference one source of truth without leaking new hues elsewhere.
+*/
+const ACCENT_VARS = {
+  "--sb-accent": "#D97757",
+  "--sb-accent-hover": "#C2613F",
+  "--sb-accent-subtle": "rgba(217,119,87,0.12)",
+} as CSSProperties;
+
+function ThemeToggle({ collapsed }: { collapsed: boolean }) {
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [mounted, setMounted] = useState(false);
 
@@ -47,14 +70,17 @@ function ThemeToggle() {
   };
 
   const isDark = theme === "dark";
+  const label = isDark ? "Switch to light theme" : "Switch to dark theme";
 
   return (
-    <button
-      type="button"
+    <Press
       onClick={toggle}
-      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
-      title={isDark ? "Switch to light theme" : "Switch to dark theme"}
-      className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      aria-label={label}
+      title={label}
+      className={cn(
+        "flex w-full items-center rounded-lg border border-border bg-card text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground",
+        collapsed ? "justify-center px-0 py-2" : "justify-between px-3 py-2",
+      )}
     >
       <span className="flex items-center gap-2.5">
         {/* Avoid an icon flip before hydration knows the real theme. */}
@@ -63,12 +89,83 @@ function ThemeToggle() {
         ) : (
           <Moon className="h-4 w-4" aria-hidden />
         )}
-        {mounted ? (isDark ? "Dark" : "Light") : "Theme"}
+        {!collapsed && (mounted ? (isDark ? "Dark" : "Light") : "Theme")}
       </span>
-      <span className="text-[10px] uppercase tracking-[0.12em] opacity-70">
-        Theme
-      </span>
-    </button>
+      {!collapsed && (
+        <span className="text-[10px] uppercase tracking-[0.12em] opacity-70">
+          Theme
+        </span>
+      )}
+    </Press>
+  );
+}
+
+function initialFor(user: { name?: string | null; email: string }): string {
+  const source = (user.name?.trim() || user.email || "?").trim();
+  return source.charAt(0).toUpperCase();
+}
+
+function UserWidget({ collapsed }: { collapsed: boolean }) {
+  const { user, org, logout } = useAuth();
+  const router = useRouter();
+
+  if (!user) return null;
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace("/login");
+  };
+
+  const displayName = user.name?.trim() || user.email;
+
+  // Collapsed: the avatar doubles as the sign-out affordance to save width.
+  if (collapsed) {
+    return (
+      <Press
+        onClick={handleLogout}
+        aria-label={`Sign out ${displayName}`}
+        title={`${displayName} - sign out`}
+        className="group relative flex w-full items-center justify-center rounded-lg border border-border bg-card py-2.5 text-muted-foreground hover:text-foreground"
+      >
+        <span
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--sb-accent)] text-sm font-semibold text-white group-hover:opacity-0"
+          aria-hidden
+        >
+          {initialFor(user)}
+        </span>
+        <LogOut className="absolute h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
+      </Press>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2.5">
+      <div
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--sb-accent)] text-sm font-semibold text-white"
+        aria-hidden
+      >
+        {initialFor(user)}
+      </div>
+      <div className="min-w-0 flex-1 leading-tight">
+        <div className="truncate text-sm font-medium" title={displayName}>
+          {displayName}
+        </div>
+        <div
+          className="truncate text-[11px] text-muted-foreground"
+          title={org?.name}
+        >
+          {org?.name ?? "Workspace"}
+        </div>
+      </div>
+      <Press
+        onClick={handleLogout}
+        aria-label="Sign out"
+        title="Sign out"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
+      >
+        <LogOut className="h-4 w-4" />
+      </Press>
+    </div>
   );
 }
 
@@ -82,15 +179,21 @@ interface NavItem {
 const PRIMARY: NavItem[] = [
   {
     label: "Overview",
-    href: "/",
+    href: "/dashboard",
     icon: LayoutDashboard,
-    match: (p) => p === "/",
+    match: (p) => p === "/dashboard",
   },
   {
     label: "Inbox",
     href: "/inbox",
     icon: Inbox,
     match: (p) => p.startsWith("/inbox"),
+  },
+  {
+    label: "Chat",
+    href: "/chat",
+    icon: MessageSquare,
+    match: (p) => p.startsWith("/chat"),
   },
   {
     label: "Run",
@@ -103,6 +206,12 @@ const PRIMARY: NavItem[] = [
     href: "/accounts",
     icon: Building2,
     match: (p) => p.startsWith("/accounts"),
+  },
+  {
+    label: "Ingest",
+    href: "/ingest",
+    icon: Upload,
+    match: (p) => p.startsWith("/ingest"),
   },
 ];
 
@@ -125,91 +234,164 @@ const INTELLIGENCE: NavItem[] = [
     icon: Boxes,
     match: (p) => p.startsWith("/domains"),
   },
+  {
+    label: "Settings",
+    href: "/settings",
+    icon: Settings,
+    match: (p) => p.startsWith("/settings"),
+  },
 ];
 
-function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+function NavLink({
+  item,
+  active,
+  collapsed,
+}: {
+  item: NavItem;
+  active: boolean;
+  collapsed: boolean;
+}) {
   const Icon = item.icon;
   return (
-    <Link
-      href={item.href}
-      aria-current={active ? "page" : undefined}
-      className={cn(
-        "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-        active
-          ? "bg-accent text-accent-foreground"
-          : "text-muted-foreground hover:bg-secondary hover:text-foreground",
-      )}
-    >
-      <span
+    <Press asChild>
+      <Link
+        href={item.href}
+        aria-current={active ? "page" : undefined}
+        // When collapsed the icon is the only affordance, so the native title
+        // tooltip names the destination on hover.
+        title={collapsed ? item.label : undefined}
         className={cn(
-          "absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-primary transition-opacity",
-          active ? "opacity-100" : "opacity-0",
-        )}
-        aria-hidden
-      />
-      <Icon
-        className={cn(
-          "h-4 w-4 shrink-0 transition-colors",
+          "group relative flex items-center rounded-lg py-2 text-sm font-medium",
+          collapsed ? "justify-center px-0" : "gap-3 px-3",
           active
-            ? "text-primary"
-            : "text-muted-foreground group-hover:text-foreground",
+            ? // Active route: subtle Claude-orange wash + accent text.
+              "bg-[var(--sb-accent-subtle)] text-[var(--sb-accent)]"
+            : // Idle: muted, with a faint neutral wash and a gentle lift on hover.
+              "text-muted-foreground hover:-translate-y-px hover:bg-secondary hover:text-foreground",
         )}
-      />
-      {item.label}
-    </Link>
+      >
+        <span
+          className={cn(
+            "absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--sb-accent)] transition-opacity",
+            active ? "opacity-100" : "opacity-0",
+          )}
+          aria-hidden
+        />
+        <Icon
+          className={cn(
+            "h-4 w-4 shrink-0 transition-colors",
+            active
+              ? "text-[var(--sb-accent)]"
+              : "text-muted-foreground group-hover:text-foreground",
+          )}
+        />
+        {!collapsed && item.label}
+      </Link>
+    </Press>
   );
 }
 
 export function AppSidebar() {
   const pathname = usePathname() || "/";
+  // Start expanded; the stored preference is restored on mount.
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Restore the persisted collapse state once on mount.
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1");
+    } catch {
+      /* storage unavailable; default expanded */
+    }
+  }, []);
+
+  // Drive the page offset (in app-shell) from a single CSS variable.
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--sidebar-w",
+      collapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED,
+    );
+  }, [collapsed]);
+
+  const toggle = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(COLLAPSE_KEY, next ? "1" : "0");
+      } catch {
+        /* storage unavailable; toggle still applies for the session */
+      }
+      return next;
+    });
+  };
 
   const renderSection = (items: NavItem[]) =>
     items.map((item) => {
       const active = item.match
         ? item.match(pathname)
         : pathname.startsWith(item.href);
-      return <NavLink key={item.href} item={item} active={active} />;
+      return (
+        <NavLink
+          key={item.href}
+          item={item}
+          active={active}
+          collapsed={collapsed}
+        />
+      );
     });
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border bg-[hsl(var(--sidebar))] md:flex">
-      <div className="flex h-16 items-center gap-2.5 border-b border-border px-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+    <aside
+      style={{
+        ...ACCENT_VARS,
+        width: collapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED,
+      }}
+      className="fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-border bg-[hsl(var(--sidebar))] transition-[width] duration-300 ease-out md:flex"
+    >
+      <div
+        className={cn(
+          "flex h-20 items-center border-b border-border",
+          collapsed ? "justify-center px-0" : "gap-2.5 px-5",
+        )}
+      >
+        {/* The brand mark doubles as the collapse toggle. */}
+        <Press
+          onClick={toggle}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-pressed={collapsed}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--sb-accent)] text-white shadow-sm transition-transform hover:scale-105 active:scale-95"
+        >
           <Aperture className="h-[18px] w-[18px]" />
-        </div>
-        <div className="leading-tight">
-          <div className="text-sm font-semibold tracking-tight">Aperture</div>
-          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-            Decision Engine
+        </Press>
+        {!collapsed && (
+          <div className="leading-tight">
+            <div className="text-sm font-semibold tracking-tight">Aperture</div>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              Decision Engine
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <nav className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 py-5 scroll-thin">
         <div className="flex flex-col gap-1">
-          <div className="px-3 pb-1 text-eyebrow">Workspace</div>
+          {!collapsed && (
+            <div className="px-3 pb-1 text-eyebrow">Workspace</div>
+          )}
           {renderSection(PRIMARY)}
         </div>
         <div className="flex flex-col gap-1">
-          <div className="px-3 pb-1 text-eyebrow">Intelligence</div>
+          {!collapsed && (
+            <div className="px-3 pb-1 text-eyebrow">Intelligence</div>
+          )}
           {renderSection(INTELLIGENCE)}
         </div>
       </nav>
 
       <div className="space-y-3 border-t border-border p-3">
-        <ThemeToggle />
-        <div className="rounded-lg border border-border bg-card px-3 py-2.5">
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-            </span>
-            <span className="text-xs font-medium">Agent runtime online</span>
-          </div>
-          <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-            Hybrid retrieval, memory, and human-gated approval are active.
-          </p>
-        </div>
+        <ThemeToggle collapsed={collapsed} />
+        <UserWidget collapsed={collapsed} />
       </div>
     </aside>
   );

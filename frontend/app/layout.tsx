@@ -1,14 +1,10 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
-import { AppSidebar } from "@/components/app-sidebar";
+import { AppShell } from "@/components/app-shell";
+import { AuthProvider } from "@/lib/auth-context";
 import { Toaster } from "@/components/ui/toast";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  display: "swap",
-});
 
 // Set the theme class before first paint so there is no flash. Stored
 // preference wins; otherwise we respect the OS setting (default dark brand).
@@ -28,19 +24,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`dark ${inter.variable}`}
+      className={`dark ${GeistSans.variable} ${GeistMono.variable}`}
       suppressHydrationWarning
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
-        <div className="flex min-h-screen">
-          <AppSidebar />
-          <div className="flex min-h-screen flex-1 flex-col md:pl-64">
-            <main className="flex-1">{children}</main>
-          </div>
-        </div>
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
         <Toaster />
       </body>
     </html>
