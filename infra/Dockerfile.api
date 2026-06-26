@@ -6,20 +6,21 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Install system build dependencies
+# Install system build dependencies (psycopg/asyncpg builds, healthcheck curl).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv
-RUN pip install --no-cache-dir uv
-
-# Copy backend source (build context is ./backend)
+# Copy backend source (build context is ./backend).
 COPY . /app
 
-# Sync dependencies into the project environment
-RUN uv sync --frozen || uv sync
+# Install the project and its dependencies via pip. The pyproject uses the
+# hatchling build backend, so an editable install resolves everything declared
+# under [project].dependencies (fastapi, uvicorn, alembic, ...).
+RUN pip install --upgrade pip \
+    && pip install -e .
 
 EXPOSE 8000
 
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the FastAPI app directly with uvicorn (deps are on the system interpreter).
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,26 @@
+# Python virtualenvs and caches (never copy into the image build context)
+.venv/
+venv/
+.uv/
+uv.lock
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# Runtime artifacts
+backend/app/eval/_last_run.json
+app/eval/_last_run.json
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.log

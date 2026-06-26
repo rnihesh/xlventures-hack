@@ -18,13 +18,19 @@ services:
 
   api:
     build:
-      context: ./backend
+      # Paths are relative to this compose file (infra/). The backend lives at
+      # the repo root, so context is ../backend and the Dockerfile resolves to
+      # ../backend/../infra/Dockerfile.api == infra/Dockerfile.api.
+      context: ../backend
       dockerfile: ../infra/Dockerfile.api
     depends_on:
       db:
         condition: service_healthy
+    # .env lives at the repo root (next to .env.example); optional so the stack
+    # still comes up with deterministic offline defaults when it is absent.
     env_file:
-      - .env
+      - path: ../.env
+        required: false
     environment:
       DATABASE_URL: postgresql://nba:nba@db:5432/nba
     ports:
@@ -32,8 +38,11 @@ services:
 
   web:
     build:
-      context: ./frontend
+      context: ../frontend
       dockerfile: ../infra/Dockerfile.web
+      args:
+        # NEXT_PUBLIC_* values are inlined at build time, so pass it as a build arg.
+        NEXT_PUBLIC_API_URL: http://localhost:8000
     depends_on:
       - api
     environment:
