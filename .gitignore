@@ -37,3 +37,6 @@ docs/
 .idea/
 .vscode/
 *.log
+
+# Next.js generated
+next-env.d.ts
