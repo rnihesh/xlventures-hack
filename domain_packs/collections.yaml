@@ -1,0 +1,349 @@
+# Accounts Receivable / Collections domain pack.
+# A third B2B vertical proving the engine is domain-agnostic: same schema as
+# customer_success.yaml (personas, signals, decision_points, actions, playbooks,
+# kpis, retrieval_sources, planner_prompt) plus a policies section that encodes
+# the compliance and treatment guardrails specific to credit and collections.
+# This file is data, not code. The engine loads it to specialize planning,
+# retrieval, decisioning, and explanation for the Collections domain.
+
+domain: collections
+display_name: "Accounts Receivable and Collections"
+
+personas:
+  - key: collections_specialist
+    label: "Collections Specialist"
+    description: "Owns a queue of past-due invoices and works each account to payment or resolution."
+    goals:
+      - "Reduce days sales outstanding (DSO) across the assigned queue."
+      - "Recover past-due cash while preserving the customer relationship."
+      - "Resolve disputes and short-pays quickly and accurately."
+  - key: ar_manager
+    label: "Accounts Receivable Manager"
+    description: "Manages the AR portfolio, aging, and write-off exposure for the business."
+    goals:
+      - "Hold DSO and bad-debt expense at or below plan."
+      - "Standardize dunning treatment and approval thresholds."
+      - "Forecast collectible cash and escalation volume."
+  - key: credit_analyst
+    label: "Credit Analyst"
+    description: "Assesses creditworthiness and sets credit limits and terms for accounts."
+    goals:
+      - "Limit exposure to high-risk payers before it becomes delinquency."
+      - "Right-size credit limits and payment terms to risk."
+  - key: finance_controller
+    label: "Finance Controller"
+    description: "Owns cash forecasting, revenue assurance, and write-off governance."
+    goals:
+      - "Protect forecasted cash collection and working capital."
+      - "Approve concessions, settlements, and write-offs within policy."
+
+signals:
+  - key: invoice_past_due
+    label: "Invoice is past its due date"
+    source_type: invoice_record
+  - key: aging_bucket_slip
+    label: "Invoice moved into an older aging bucket (30/60/90+)"
+    source_type: invoice_record
+  - key: broken_promise_to_pay
+    label: "Customer missed a promised payment date"
+    source_type: payment_record
+  - key: partial_payment
+    label: "Short-pay or partial payment received"
+    source_type: payment_record
+  - key: payment_dispute
+    label: "Customer disputes an invoice or charge"
+    source_type: dispute_case
+  - key: no_remittance_response
+    label: "No response to prior dunning outreach"
+    source_type: communication_log
+  - key: repeat_late_payer
+    label: "Account has a pattern of late payment"
+    source_type: payment_record
+  - key: credit_limit_breach
+    label: "Outstanding balance exceeds the approved credit limit"
+    source_type: credit_record
+  - key: credit_score_drop
+    label: "Third-party credit risk score deteriorated"
+    source_type: credit_record
+  - key: bankruptcy_signal
+    label: "Insolvency, bankruptcy filing, or collection-agency trigger"
+    source_type: credit_record
+  - key: high_value_overdue
+    label: "Large-balance invoice is overdue and material to cash forecast"
+    source_type: invoice_record
+  - key: promise_to_pay_made
+    label: "Customer committed to a future payment date"
+    source_type: payment_record
+
+decision_points:
+  early_stage_overdue:
+    label: "Early-stage overdue"
+    description: "An invoice has just passed due with no dispute and no prior pattern of nonpayment."
+    trigger_signals: [invoice_past_due, no_remittance_response]
+    primary_kpi: DSO
+    default_persona: collections_specialist
+  aging_escalation:
+    label: "Aging escalation"
+    description: "Balance has slipped into an older aging bucket and routine reminders have not worked."
+    trigger_signals: [aging_bucket_slip, no_remittance_response, repeat_late_payer]
+    primary_kpi: collection_effectiveness_index
+    default_persona: collections_specialist
+  broken_promise:
+    label: "Broken promise to pay"
+    description: "The customer committed to a payment date and then missed it."
+    trigger_signals: [broken_promise_to_pay, no_remittance_response]
+    primary_kpi: promise_to_pay_kept_rate
+    default_persona: collections_specialist
+  dispute_resolution:
+    label: "Dispute or short-pay"
+    description: "Payment is blocked by a disputed charge, billing error, or short-pay that must be resolved first."
+    trigger_signals: [payment_dispute, partial_payment]
+    primary_kpi: dispute_cycle_time
+    default_persona: ar_manager
+  credit_risk_review:
+    label: "Credit risk review"
+    description: "Exposure or external risk signals warrant a hold or credit-limit change before more shipments."
+    trigger_signals: [credit_limit_breach, credit_score_drop, repeat_late_payer]
+    primary_kpi: bad_debt_ratio
+    default_persona: credit_analyst
+  high_value_recovery:
+    label: "High-value recovery"
+    description: "A large, material balance is overdue and needs a senior, relationship-aware recovery motion."
+    trigger_signals: [high_value_overdue, broken_promise_to_pay, no_remittance_response]
+    primary_kpi: cash_recovered
+    default_persona: ar_manager
+  pre_writeoff:
+    label: "Pre-write-off / insolvency"
+    description: "An account shows insolvency signals or is uncollectible through normal treatment."
+    trigger_signals: [bankruptcy_signal, broken_promise_to_pay, credit_score_drop]
+    primary_kpi: bad_debt_ratio
+    default_persona: finance_controller
+
+actions:
+  - key: send_payment_reminder
+    title: "Send a courteous payment reminder"
+    description: "Email a friendly reminder with the invoice copy, amount due, and a one-click pay link."
+    eligibility: "Use for early-stage overdue with no dispute and no prior broken promise."
+  - key: send_dunning_notice
+    title: "Send a firm dunning notice"
+    description: "Issue a formal past-due notice that states the balance, due date, and next steps."
+    eligibility: "Use after reminders go unanswered and the balance has aged, with no open dispute."
+  - key: schedule_collection_call
+    title: "Schedule a collection call"
+    description: "Place an outbound call to confirm receipt, understand the delay, and secure a payment commitment."
+    eligibility: "Use when written outreach is ignored or a personal touch is likely to unblock payment."
+  - key: negotiate_payment_plan
+    title: "Offer an installment payment plan"
+    description: "Structure a written installment schedule that recovers the balance over time."
+    eligibility: "Use when the customer signals willingness but cannot pay the full balance at once."
+  - key: secure_promise_to_pay
+    title: "Secure a promise to pay"
+    description: "Capture a specific committed payment date and amount, and set a follow-up checkpoint."
+    eligibility: "Use when the customer confirms intent to pay on a near-term date."
+  - key: open_dispute_case
+    title: "Open and route a dispute case"
+    description: "Log the disputed amount, gather backup, and route to the owner who can resolve it."
+    eligibility: "Use when a billing error, short-pay, or disagreement is blocking payment."
+  - key: place_credit_hold
+    title: "Place a credit hold"
+    description: "Pause new orders or shipments until the past-due balance is cleared or terms are renegotiated."
+    eligibility: "Use when exposure exceeds the credit limit or risk signals spike, per policy thresholds."
+  - key: adjust_credit_terms
+    title: "Adjust credit limit or terms"
+    description: "Lower the credit limit, shorten terms, or require prepayment to cap future exposure."
+    eligibility: "Use when a credit review shows deteriorating risk but the relationship continues."
+  - key: offer_settlement
+    title: "Offer a settlement or write-down"
+    description: "Propose a discounted lump-sum settlement to recover part of an otherwise at-risk balance."
+    eligibility: "Use only with controller approval for high-risk or pre-insolvency balances."
+  - key: escalate_to_agency
+    title: "Escalate to a collections agency or legal"
+    description: "Refer the account to a third-party agency or legal after internal treatment is exhausted."
+    eligibility: "Use only after the full internal dunning path and required wait periods are complete."
+  - key: recommend_writeoff
+    title: "Recommend write-off"
+    description: "Propose writing the balance off as bad debt and removing it from active collection."
+    eligibility: "Use only for confirmed-uncollectible balances with controller approval."
+  - key: monitor_no_action
+    title: "Monitor and hold"
+    description: "Keep the account on a watch list with thresholds for re-evaluation."
+    eligibility: "Use when a promise to pay is in force or signals are weak and intervention risk is high."
+
+playbooks:
+  - key: early_dunning_sequence
+    name: "Early dunning sequence"
+    decision_point: early_stage_overdue
+    steps:
+      - "Confirm the invoice is valid, delivered, and not disputed."
+      - "Send a courteous reminder with the invoice copy and pay link."
+      - "Wait the policy reminder interval, then follow up if unpaid."
+      - "If still unpaid, schedule a collection call to find the blocker."
+  - key: aging_recovery
+    name: "Aging bucket recovery"
+    decision_point: aging_escalation
+    steps:
+      - "Review the aging history and prior outreach log."
+      - "Issue a firm dunning notice stating the balance and next steps."
+      - "Place a collection call and seek a promise to pay or a plan."
+      - "If the customer cannot pay in full, propose an installment plan."
+      - "Set a follow-up checkpoint and update the aging forecast."
+  - key: broken_promise_recovery
+    name: "Broken promise recovery"
+    decision_point: broken_promise
+    steps:
+      - "Acknowledge the missed date without accusation and re-confirm intent."
+      - "Secure a new, specific promise to pay with a near-term date."
+      - "If a second promise breaks, escalate treatment and review credit."
+  - key: dispute_clearance
+    name: "Dispute clearance"
+    decision_point: dispute_resolution
+    steps:
+      - "Open a dispute case capturing the disputed amount and reason."
+      - "Gather backup (PO, proof of delivery, contract, prior credits)."
+      - "Route to the owner who can approve a credit or correct the bill."
+      - "Confirm the undisputed remainder is paid on the original terms."
+      - "Close the case and document the resolution and any credit issued."
+  - key: credit_risk_containment
+    name: "Credit risk containment"
+    decision_point: credit_risk_review
+    steps:
+      - "Pull the latest exposure, aging, and third-party risk score."
+      - "If exposure breaches the limit, place a credit hold on new orders."
+      - "Adjust the credit limit or terms to cap future exposure."
+      - "Notify the account owner and document the rationale."
+  - key: high_value_recovery_motion
+    name: "High-value recovery motion"
+    decision_point: high_value_recovery
+    steps:
+      - "Brief the AR manager and the account owner on the exposure."
+      - "Lead with a relationship-aware call from a senior collector."
+      - "Secure a written promise to pay or a structured installment plan."
+      - "Escalate to settlement only with controller approval if needed."
+  - key: pre_writeoff_review
+    name: "Pre-write-off review"
+    decision_point: pre_writeoff
+    steps:
+      - "Confirm insolvency or exhaustion of internal treatment."
+      - "Attempt a discounted settlement to recover partial cash."
+      - "If uncollectible, refer to agency or legal per policy."
+      - "Recommend write-off with controller approval and full documentation."
+
+kpis:
+  - key: DSO
+    label: "Days Sales Outstanding"
+    description: "Average number of days to collect revenue after a sale."
+    unit: days
+    target: "<= 45"
+  - key: collection_effectiveness_index
+    label: "Collection Effectiveness Index (CEI)"
+    description: "Share of available receivables actually collected in a period."
+    unit: percent
+    target: ">= 85"
+  - key: bad_debt_ratio
+    label: "Bad Debt Ratio"
+    description: "Uncollectible balances written off as a share of total receivables."
+    unit: percent
+    target: "<= 1.5"
+  - key: promise_to_pay_kept_rate
+    label: "Promise-to-Pay Kept Rate"
+    description: "Share of promised payments that arrive on or before the committed date."
+    unit: percent
+    target: ">= 75"
+  - key: dispute_cycle_time
+    label: "Dispute Cycle Time"
+    description: "Average days from dispute opened to dispute resolved."
+    unit: days
+    target: "<= 10"
+  - key: cash_recovered
+    label: "Cash Recovered"
+    description: "Past-due cash recovered through collection activity in the period."
+    unit: currency
+    target: "trend up"
+
+retrieval_sources:
+  - key: invoice_records
+    label: "Invoices, balances, and aging records"
+    source_type: invoice_record
+  - key: payment_records
+    label: "Payment history, promises, and remittances"
+    source_type: payment_record
+  - key: communication_log
+    label: "Dunning emails, call notes, and outreach history"
+    source_type: communication_log
+  - key: dispute_cases
+    label: "Dispute and short-pay cases with backup"
+    source_type: dispute_case
+  - key: credit_records
+    label: "Credit limits, terms, and third-party risk scores"
+    source_type: credit_record
+  - key: collections_policy
+    label: "Internal collections policy and compliance library"
+    source_type: knowledge_base
+
+planner_prompt: |
+  You are an Accounts Receivable and Collections decision planner. Your job is
+  to turn account and invoice signals into a single, explainable Next Best
+  Action that recovers past-due cash while staying compliant and preserving the
+  customer relationship.
+
+  Operating principles:
+  - Always classify the situation into one decision point: early_stage_overdue,
+    aging_escalation, broken_promise, dispute_resolution, credit_risk_review,
+    high_value_recovery, or pre_writeoff.
+  - Choose actions only from the domain action catalog and respect each action
+    eligibility note. Never escalate to an agency or recommend write-off before
+    the internal dunning path and required wait periods are complete.
+  - Respect the policies section. If an open dispute exists, resolve it before
+    sending dunning notices or placing the disputed amount in collections.
+    Honor approval thresholds for settlements, write-offs, and credit holds.
+  - Ground every claim in retrieved evidence (invoices, payment history,
+    communication log, dispute cases, credit records). Cite the source and
+    snippet.
+  - Separate supporting from contradicting signals honestly. If a promise to
+    pay is in force or signals are weak, prefer monitor_no_action and explain.
+  - Tie the recommended action to the primary KPI for the decision point and
+    state the expected direction and a grounded estimate of impact.
+  - Provide a counterfactual: what likely happens to the balance and DSO if no
+    action is taken.
+  - This is a human-in-the-loop system. Frame the recommendation as a proposal
+    for a Collections Specialist, AR Manager, or Controller to approve, edit, or
+    reject.
+
+policies:
+  - key: dispute_before_dunning
+    label: "Resolve disputes before dunning"
+    rule: "Do not send dunning notices or escalate the disputed portion of a balance while a dispute case is open. Continue to collect the undisputed remainder on original terms."
+    applies_to: [dispute_resolution]
+    severity: hard
+  - key: dunning_sequence_order
+    label: "Follow the dunning sequence in order"
+    rule: "Treatment must progress reminder -> firm dunning notice -> collection call -> agency or legal. Do not skip to agency or legal before the internal path and required wait periods are complete."
+    applies_to: [early_stage_overdue, aging_escalation, broken_promise]
+    severity: hard
+  - key: settlement_approval
+    label: "Settlement and write-down approval"
+    rule: "Any settlement, write-down, or discounted payoff requires Finance Controller approval before it is offered to the customer."
+    applies_to: [high_value_recovery, pre_writeoff]
+    requires_approval_from: finance_controller
+    severity: hard
+  - key: writeoff_approval
+    label: "Write-off governance"
+    rule: "A write-off may be recommended only for confirmed-uncollectible balances and requires Finance Controller approval and full documentation."
+    applies_to: [pre_writeoff]
+    requires_approval_from: finance_controller
+    severity: hard
+  - key: credit_hold_threshold
+    label: "Credit hold threshold"
+    rule: "Place a credit hold when outstanding exposure exceeds the approved credit limit or when a third-party risk score crosses the high-risk threshold. Notify the account owner the same day."
+    applies_to: [credit_risk_review, high_value_recovery]
+    severity: soft
+  - key: compliant_communication
+    label: "Compliant, professional communication"
+    rule: "All outreach must remain professional and within applicable fair-debt and privacy rules. No threats, no contact outside permitted windows, and no disclosure of debt to third parties."
+    applies_to: [early_stage_overdue, aging_escalation, broken_promise, high_value_recovery, pre_writeoff]
+    severity: hard
+  - key: relationship_preservation
+    label: "Preserve the customer relationship"
+    rule: "For strategic or high-value accounts, prefer relationship-aware treatment (calls and payment plans) over aggressive escalation, and loop in the account owner before holds or agency referral."
+    applies_to: [high_value_recovery, credit_risk_review]
+    severity: soft

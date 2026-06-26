@@ -28,6 +28,27 @@
     "text": "Stage: At-risk. Sentiment: Negative and trending down.\nKey contacts: Karim Haddad (Ops Director, CHAMPION - departed 2026-06-05); Lena Ortiz (Junior Ops Analyst, day-to-day admin, low authority); VP Operations seat currently vacant per LinkedIn.\nARR 180k, 120 seats, renewal 2026-10-15.\nLatest health drivers: login frequency -38% MoM, broken TMS integration, champion loss, no executive sponsor.\nOpen risk: If integration is not restored and a new sponsor secured within 30 days, forecast a downgrade or non-renewal. Save motion required."
   },
   {
+    "id": "DOC-1001-UN",
+    "account_id": "ACC-1001",
+    "source_type": "usage_notes",
+    "title": "Northwind Logistics - Product Usage Telemetry (trailing 8 weeks)",
+    "text": "Weekly active users (WAU) by week: 96, 94, 91, 88, 71, 64, 59, 57. The break point is week 5, which aligns with the carrier API change on May 28. Logins from the dispatch team dropped from a daily average of 41 to 12. Core feature usage: shipment-tracking views down 61%, ETA dashboard opens down 74%, automated-status webhooks firing at 8% of prior volume because the sync jobs are erroring. Seat utilization fell from 80% (96 of 120) to 48% (57 of 120). Two power users (both dispatchers) have not logged in for 21 days. No usage decline in the finance module, which does not depend on the carrier integration, confirming the issue is integration-specific rather than a broad disengagement. Recommendation flag raised automatically: WAU down 38% MoM crosses the 20% health-drop threshold."
+  },
+  {
+    "id": "DOC-1001-SR",
+    "account_id": "ACC-1001",
+    "source_type": "survey_response",
+    "title": "Northwind Logistics - CSAT Survey (2026-06-13)",
+    "text": "Survey type: Post-support-interaction CSAT. Score: 2 of 5. Respondent: Lena Ortiz (Junior Ops Analyst).\nVerbatim comment: 'The tool stopped showing live shipment status two weeks ago and we lost a lot of time before anyone explained why. When our director left there was no one to chase it. I need this fixed before peak season or my team will go back to spreadsheets.'\nDriver tags: reliability, integration, sponsor-loss. This is the lowest CSAT recorded for the account since onboarding."
+  },
+  {
+    "id": "DOC-1001-BL",
+    "account_id": "ACC-1001",
+    "source_type": "billing_events",
+    "title": "Northwind Logistics - Billing and Invoice History",
+    "text": "Invoice INV-NW-0426 (annual, 180,000) issued 2026-04-15, status PAID on 2026-04-22, no disputes. Payment history is clean: all prior invoices paid within terms. No billing dispute is open. Renewal invoice for the 2026-10-15 term has not yet been issued. Note for the renewal motion: there is no commercial or payment friction here, the risk is product reliability and relationship, so a save should lead with the integration fix and sponsor re-engagement rather than any pricing concession."
+  },
+  {
     "id": "DOC-1002-MN",
     "account_id": "ACC-1002",
     "source_type": "meeting_notes",
@@ -54,6 +75,20 @@
     "source_type": "crm_notes",
     "title": "Helios Analytics - CRM Account Notes",
     "text": "Stage: Expansion. Sentiment: Very positive.\nKey contacts: VP Data (economic buyer, NPS 9, advocate); two team leads (power users).\nARR 240k, 90 seats, 95% utilization, renewal 2027-02-01.\nExpansion drivers: seat saturation (86/90 active), 3 teams piloting, SSO/SCIM requested, volume pricing inquiry, FY budget approved.\nOpportunity: 60-seat upsell on enterprise tier, est. +150k ARR. PQL criteria met. Also a strong reference/case-study candidate."
+  },
+  {
+    "id": "DOC-1002-UN",
+    "account_id": "ACC-1002",
+    "source_type": "usage_notes",
+    "title": "Helios Analytics - Product Usage Telemetry (trailing 8 weeks)",
+    "text": "Weekly active users (WAU) by week: 78, 80, 82, 83, 85, 85, 86, 86. Seat utilization is at 95% (86 of 90 licensed seats active weekly) and rising. Borrowed-login activity detected: 14 distinct device fingerprints map to shared service accounts across Marketing Ops, Finance, and the new EU data team, a strong signal of unsanctioned expansion. Power-user cohort (top 10%) runs an average of 47 sessions per week and frequently hits the concurrent-query cap. Two legacy BI integrations were disconnected this quarter, consistent with the customer's claim that they retired two competing tools. Adoption breadth score is 96 of 100. This is textbook product-qualified expansion: organic pull, seat saturation, and a tier-mapped need for SSO/SCIM."
+  },
+  {
+    "id": "DOC-1002-SR",
+    "account_id": "ACC-1002",
+    "source_type": "survey_response",
+    "title": "Helios Analytics - NPS Survey (2026-06-08)",
+    "text": "Survey type: Relationship NPS. Score: 9 (Promoter). Respondent: VP Data (economic buyer).\nVerbatim comment: 'This is now our standard analytics tooling. The team would revolt if we took it away. We just need enterprise SSO and a clean way to add the other departments asking for seats.'\nDriver tags: value-realized, advocacy, expansion-intent. Respondent opted in as a reference and to a case study on dashboard-build-time reduction."
   },
   {
     "id": "DOC-1003-MN",
@@ -84,6 +119,13 @@
     "text": "Stage: Onboarding (stalled). Sentiment: Neutral, cooperative but capacity-constrained.\nKey contacts: Director of Digital Learning (sponsor, low availability); IT admin (willing but overloaded).\nARR 96k, 60 seats (18 provisioned), renewal 2026-12-01.\nStall drivers: 2 of 7 milestones at day 45, SSO unconfigured, data import pending, training no-shows, sponsor distracted by semester start.\nPlan: Onboarding acceleration play. Assign implementation specialist, 2-week milestone sprint, async training, sponsor checkpoint."
   },
   {
+    "id": "DOC-1003-UN",
+    "account_id": "ACC-1003",
+    "source_type": "usage_notes",
+    "title": "Brightpath Education - Onboarding Telemetry Day 45",
+    "text": "Provisioned seats: 18 of 60 (30%). Weekly active users: 11, concentrated in a single pilot department. Milestones complete: 2 of 7 (account created, first course imported). Outstanding milestones: SSO configuration, bulk seat provisioning, historical data import, admin training certification, first live student cohort. Training attendance: 2 scheduled sessions, both no-shows. Login recency: the executive sponsor (Director of Digital Learning) has logged in once in 45 days. Time-to-value model projects first realized value at day 78 on the current trajectory, which is past the back-to-school window and 48 days beyond the 30-day target. This is a clear onboarding-stall pattern driven by customer-side capacity, not product fit."
+  },
+  {
     "id": "DOC-1004-MN",
     "account_id": "ACC-1004",
     "source_type": "meeting_notes",
@@ -110,6 +152,20 @@
     "source_type": "crm_notes",
     "title": "Atlas Manufacturing - CRM Account Notes",
     "text": "Stage: Renewal at risk. Sentiment: Mixed; users happy, new exec skeptical.\nKey contacts: VP Operations (new, evaluating Forgeline, no relationship yet); procurement lead (pushing 12% discount); plant managers (active power users).\nARR 320k, 200 seats (180 active), renewal 2026-08-30 (65 days).\nRisk drivers: competitive eval, price pressure, two missed QBRs, weak executive relationship despite strong usage.\nPlan: Renewal risk mitigation. ROI business review with new VP, then multi-year proposal instead of flat discount."
+  },
+  {
+    "id": "DOC-1004-UN",
+    "account_id": "ACC-1004",
+    "source_type": "usage_notes",
+    "title": "Atlas Manufacturing - Product Usage Telemetry (trailing 8 weeks)",
+    "text": "Weekly active users are stable and strong: 178 to 182 across the period, 180 of 200 seats active weekly (90% utilization). Shop-floor adoption is deep: throughput dashboard opened daily by 38 plant managers, downtime-logging workflow used across all 4 plants. No usage decline anywhere in the product. The data clearly shows the renewal risk is NOT a value or adoption problem: usage and breadth scores are healthy (88 of 100). The risk is relationship and commercial, driven by a new VP with no relationship and a procurement-led competitive evaluation. Any save motion should foreground the realized ROI (downtime reduced, throughput gained) rather than re-onboarding."
+  },
+  {
+    "id": "DOC-1004-BL",
+    "account_id": "ACC-1004",
+    "source_type": "billing_events",
+    "title": "Atlas Manufacturing - Billing and ROI Summary",
+    "text": "Invoice INV-AT-0331 (annual, 320,000) issued 2026-03-01, PAID 2026-03-18, terms net-30, no disputes. Payment history is clean across 3 prior terms. Quantified value delivered this contract year (from product telemetry and customer-confirmed figures): unplanned downtime reduced 22% (approx 140 machine-hours per plant per quarter), throughput up 9%. Procurement is requesting a 12% discount to renew. Recommended commercial posture: counter the flat discount with a 2-year term at a smaller blended concession, anchored on the ROI summary above. No billing dispute exists; the negotiation is purely competitive and relationship-driven."
   },
   {
     "id": "DOC-1005-MN",
@@ -140,6 +196,20 @@
     "text": "Stage: Escalation / churn risk. Sentiment: Strongly negative.\nKey contacts: CTO (escalation owner, threatening non-renewal); Head of Ops (impacted); economic buyer aligned with CTO.\nARR 410k, 150 seats, renewal 2026-09-20 (critical, 92 days). Health 38.\nEscalation drivers: Sev-1 6-hour outage during quarter close, failed regional failover, CSAT 2/5, SLA credit and RCA demands, explicit churn language.\nPlan: Executive escalation play. VP apology same day, RCA in 48h, remediation roadmap, proactive SLA credits, weekly exec check-in."
   },
   {
+    "id": "DOC-1005-SR",
+    "account_id": "ACC-1005",
+    "source_type": "survey_response",
+    "title": "Vertex Financial - Post-Incident CSAT (2026-06-19)",
+    "text": "Survey type: Post-incident CSAT. Score: 2 of 5. Respondent: Vertex Head of Ops.\nVerbatim comment: 'A six-hour outage during quarter-end close is the single worst time this could happen. We delayed our close and I had to explain it upward. I need a real root-cause analysis and a credible reliability plan, or we will look elsewhere at renewal in September.'\nDriver tags: reliability, trust, churn-risk. This score is down from a 4 of 5 on the prior quarter's relationship survey, a sharp reversal tied entirely to the Sev-1 incident."
+  },
+  {
+    "id": "DOC-1005-BL",
+    "account_id": "ACC-1005",
+    "source_type": "billing_events",
+    "title": "Vertex Financial - Billing and SLA Credit Status",
+    "text": "Invoice INV-VX-0220 (annual, 410,000) issued 2026-02-20, PAID 2026-03-05, net-15 terms, historically prompt. Open item: SLA credit request tied to ticket VX-9002. The 2026-06-19 outage (5 hours 55 minutes of downtime) breaches the contractual 99.9% monthly uptime SLA; finance has modeled a service credit of approximately 8,500 (one month at the tiered breach rate). Recommendation: proactively offer the SLA credit before the customer escalates the demand, as a good-faith gesture inside the escalation play. No payment dispute exists; this is a contractual credit, not a collections matter."
+  },
+  {
     "id": "DOC-1006-MN",
     "account_id": "ACC-1006",
     "source_type": "meeting_notes",
@@ -152,6 +222,13 @@
     "source_type": "crm_notes",
     "title": "Cobalt Retail Group - CRM Account Notes",
     "text": "Stage: Healthy / nurture. Sentiment: Positive.\nKey contacts: Economic buyer (advocate, NPS 9, reference-willing).\nARR 145k, 75 seats, renewal 2027-01-10, health 79.\nDrivers: steady usage, strong satisfaction, one minor feature request logged, reference and case-study opportunity. No churn risk. Future expansion possible as new store regions launch."
+  },
+  {
+    "id": "DOC-1006-UN",
+    "account_id": "ACC-1006",
+    "source_type": "usage_notes",
+    "title": "Cobalt Retail Group - Product Usage Telemetry (trailing 8 weeks)",
+    "text": "Weekly active users are flat and healthy: 70 to 73 across the period, 73 of 75 seats active weekly (97% utilization). Core feature adoption is broad and even across stores, with no concentration risk. One enhancement request logged (configurable store-comparison view), no errors or reliability issues. Health score 79, stable. Expansion watch: the customer mentioned three new store regions launching in Q4; if seat demand follows, this becomes a future product-qualified expansion candidate. For now the correct posture is nurture and reference cultivation, not an active save or upsell motion."
   },
   {
     "id": "KB-001",
@@ -208,5 +285,26 @@
     "source_type": "playbook",
     "title": "Expansion and Upsell Qualification Play",
     "text": "Trigger: Product-qualified expansion signals, seat utilization at or above 90%, additional teams piloting, a tier-mapped feature request, and approved budget.\nGoal: Convert organic demand into a clean seat and tier expansion.\nSteps: 1) Quantify the pull, naming the teams and the borrowed-login behavior. 2) Build a seat-expansion proposal bundling the requested enterprise capability (for example SSO/SCIM). 3) Offer a volume-pricing tier to reward the larger commitment. 4) Confirm the economic buyer and budget timeline. 5) Tie expansion to a value milestone and a reference or case-study ask.\nSuccess metric: Expansion closed within the current fiscal quarter at or above the proposed seat count."
+  },
+  {
+    "id": "KB-004",
+    "account_id": null,
+    "source_type": "kb_article",
+    "title": "Champion Departure and Sponsor Mapping",
+    "text": "Losing a champion is one of the strongest leading indicators of churn because it removes the internal force that drives adoption and defends the renewal. When a champion or executive sponsor leaves, relationship strength in the health score drops immediately and should trigger a sponsor-mapping motion within 14 days.\n\nSteps: 1) Confirm the departure and any interim owner. 2) Map remaining stakeholders by influence and disposition (advocate, neutral, blocker). 3) Identify the most likely new champion based on who derives daily value. 4) Run a value-recap session to convert that person, giving them an internal win to own. 5) Re-establish an executive sponsor before any renewal conversation. Never let an account with a vacant sponsor seat enter a renewal window without a named replacement."
+  },
+  {
+    "id": "KB-005",
+    "account_id": null,
+    "source_type": "kb_article",
+    "title": "Reading Conflicting Signals and When to Hold",
+    "text": "Not every dip warrants intervention. Signals conflict when, for example, usage is healthy but an exec is skeptical (relationship risk), or sentiment is negative but tied to a single resolved incident. The planner should separate supporting from contradicting evidence and weigh recency and source reliability.\n\nPrefer a monitor-and-hold posture when: signals are weak or contradictory; a credible remediation is already in flight; or the cost and relationship risk of acting outweighs the expected benefit. When holding, set explicit re-evaluation thresholds (for example, escalate if WAU falls another 10% or if a second incident occurs within 30 days) so the watch list is actionable rather than passive. Holding is a legitimate next best action, not the absence of one."
+  },
+  {
+    "id": "KB-006",
+    "account_id": null,
+    "source_type": "kb_article",
+    "title": "Concession and Discount Guardrails",
+    "text": "Concessions protect revenue only when they buy something durable. Never lead a renewal with a discount; lead with value and relationship. A retention concession is appropriate only after a value-realignment attempt and, for at-risk renewals, with leadership approval.\n\nGuardrails: exchange any discount for term length (multi-year), expansion commitment, or a reference, never a flat one-time cut. Cap standard CSM-approved concessions at a defined threshold; anything larger requires CS leadership and finance sign-off. Do not offer a concession to mask a reliability or product problem, fix the underlying issue first. Document the rationale and the quid pro quo so the concession is auditable and repeatable."
   }
 ]

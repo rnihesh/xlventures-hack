@@ -7,7 +7,7 @@ down:
 	docker compose -f infra/docker-compose.yml down
 
 seed:
-	@echo "seed: placeholder, wire up data seeding here"
+	cd backend && python -m app.seed
 
 eval:
 	cd backend && python -m app.eval.runner
