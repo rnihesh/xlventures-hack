@@ -7,7 +7,13 @@ the app via ``from app.config import settings``.
 
 from __future__ import annotations
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Dev fallback for the session signing secret. Used when JWT_SECRET is unset or
+# explicitly blank (e.g. the empty value shipped in .env.example) so the app
+# never tries to sign tokens with an empty HMAC key, which PyJWT rejects.
+_DEFAULT_JWT_SECRET = "dev-insecure-jwt-secret-change-me"
 
 
 class Settings(BaseSettings):
@@ -37,6 +43,26 @@ class Settings(BaseSettings):
     # When unset the app runs in DB-less mode (in-memory checkpointer, no pool).
     database_url: str | None = None
 
+    # --- Auth / JWT ----------------------------------------------------------
+    # HS256 secret for the nba_session cookie. A dev default keeps the app
+    # bootable offline; override via JWT_SECRET in any real deployment.
+    jwt_secret: str = _DEFAULT_JWT_SECRET
+    # Public base URL of the frontend, used to build email verification links.
+    app_base_url: str = "http://localhost:3000"
+
+    # --- AWS / SES (email, all optional) ------------------------------------
+    aws_region: str = "us-east-1"
+    ses_sender_email: str | None = None
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: str | None = None
+
+    # --- Google OAuth (Gmail send, all optional) ----------------------------
+    # Used by the integrations Google connector. All blank offline so the
+    # consent flow degrades to a graceful "not configured" status.
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+    google_redirect_uri: str = "http://localhost:3000/api/auth/callback/google"
+
     # --- LangSmith / tracing (all optional) ----------------------------------
     langsmith_api_key: str | None = None
     langsmith_project: str | None = None
@@ -46,6 +72,19 @@ class Settings(BaseSettings):
     # --- CORS ----------------------------------------------------------------
     # Comma-separated list in env (e.g. "http://localhost:3000,http://localhost:3001").
     cors_origins: str = "http://localhost:3000"
+
+    @field_validator("jwt_secret", mode="before")
+    @classmethod
+    def _default_blank_jwt_secret(cls, value: object) -> object:
+        """Coerce an unset or blank JWT secret to the dev fallback.
+
+        PyJWT raises on an empty HMAC key, so a blank ``JWT_SECRET`` (as shipped
+        in .env.example) would otherwise 500 on login. Falling back keeps the
+        app bootable offline while still letting a real secret override it.
+        """
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return _DEFAULT_JWT_SECRET
+        return value
 
     @property
     def cors_origins_list(self) -> list[str]:

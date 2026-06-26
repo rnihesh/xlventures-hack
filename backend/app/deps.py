@@ -150,9 +150,12 @@ def get_llm(model: str | None = None, **kwargs: Any) -> Any:
         logger.info("DEMO_MODE active: using deterministic offline chat model.")
         return get_demo_llm(model=model or settings.openai_model, **kwargs)
 
+    # A request timeout plus bounded retries keep live runs from hanging: without
+    # them a slow or stuck OpenAI call would block the planner's first node for
+    # minutes. Caller kwargs win, so an explicit timeout/max_retries is preserved.
     return ChatOpenAI(
         model=model or settings.openai_model,
         api_key=settings.openai_api_key or "sk-placeholder",
         base_url=settings.openai_base_url,
-        **kwargs,
+        **{"timeout": 30.0, "max_retries": 2, **kwargs},
     )

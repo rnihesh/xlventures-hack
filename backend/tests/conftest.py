@@ -35,13 +35,21 @@ def app():
 
 @pytest.fixture()
 def client(app):
-    """A FastAPI TestClient that runs the app's full lifespan offline.
+    """A FastAPI TestClient, logged in as the Demo user, running offline.
 
     Using the client as a context manager triggers startup and shutdown so the
     in-memory checkpointer and (absent) DB pool are wired exactly as at runtime.
+    User-facing endpoints are org-scoped, so the fixture logs in as the seeded
+    Demo user (which owns all seed data); the session cookie persists on the
+    client for every subsequent request.
     """
 
     from fastapi.testclient import TestClient
 
     with TestClient(app) as test_client:
+        resp = test_client.post(
+            "/auth/login",
+            json={"email": "demo@niheshr.com", "password": "demo1234"},
+        )
+        assert resp.status_code == 200, f"demo login failed: {resp.text}"
         yield test_client

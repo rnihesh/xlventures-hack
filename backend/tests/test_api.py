@@ -32,9 +32,9 @@ def test_accounts_inbox(client) -> None:
         for field in ("account_id", "name", "domain", "health_score", "risk_level"):
             assert field in account
 
-    # Sorted with high risk ahead of low risk (risk ordering is part of the API).
-    order = {"high": 0, "medium": 1, "low": 2}
-    ranks = [order.get(a["risk_level"], 3) for a in accounts]
+    # Sorted with highest risk ahead of lowest (risk ordering is part of the API).
+    order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    ranks = [order.get(a["risk_level"], 4) for a in accounts]
     assert ranks == sorted(ranks)
 
     # A known seeded account is reachable on the 360 endpoint.
@@ -80,6 +80,36 @@ def test_learning_surface(client) -> None:
     before_after = body["before_after"]
     for field in ("kpi", "before", "after", "note"):
         assert field in before_after
+
+
+def test_gen_runs_populates_real_learning_metrics(client) -> None:
+    """gen_runs drives real graph runs so /learning reflects real outcomes.
+
+    Asserts the acceptance trend, counts, and projected before/after are all
+    computed from the episodes the planner genuinely produced (not fixtures).
+    """
+
+    import asyncio
+
+    from app.gen_runs import generate
+
+    summary = asyncio.run(generate(6, force=True))
+    assert summary["skipped"] is False
+    assert summary["decided"] == summary["runs"] >= 1
+
+    body = client.get("/learning").json()
+    assert body["has_data"] is True
+    assert body["decided"] >= summary["decided"]
+    # Acceptance rate is approved-or-edited over decided, in [0, 1].
+    assert 0.0 <= body["accepted_rate"] <= 1.0
+    # The trend is a real cumulative-acceptance series, one point per decision.
+    trend = body["trend"]
+    assert isinstance(trend, list) and len(trend) == body["decided"]
+    assert all(0.0 <= p["rate"] <= 1.0 for p in trend)
+    assert [p["index"] for p in trend] == list(range(1, len(trend) + 1))
+    # Projected before/after is labeled a projection and carries real data.
+    assert body["before_after"]["projected"] is True
+    assert body["before_after"]["has_data"] is True
 
 
 def test_eval_suites_and_outcomes(client) -> None:
