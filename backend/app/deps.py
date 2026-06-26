@@ -11,12 +11,15 @@ and no real OpenAI key. They degrade gracefully:
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import asyncpg
 from langchain_openai import ChatOpenAI
 
 from app.config import settings
+
+logger = logging.getLogger("app.deps")
 
 # ---------------------------------------------------------------------------
 # Database pool (lazily created singleton)
@@ -80,16 +83,29 @@ async def get_checkpointer() -> Any:
         return _checkpointer
 
     if settings.database_url:
-        # Import lazily so the dependency is only required when a DB is used.
-        from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+        try:
+            # Import lazily so the dependency is only required when a DB is used.
+            from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-        # from_conn_string returns an async context manager; we enter it
-        # manually and keep the reference so it stays open for the app's life.
-        _checkpointer_cm = AsyncPostgresSaver.from_conn_string(settings.database_url)
-        _checkpointer = await _checkpointer_cm.__aenter__()
-        # Create the checkpointer tables if they do not exist yet.
-        await _checkpointer.setup()
-        return _checkpointer
+            # from_conn_string returns an async context manager; we enter it
+            # manually and keep the reference so it stays open for the app's life.
+            _checkpointer_cm = AsyncPostgresSaver.from_conn_string(
+                settings.database_url
+            )
+            _checkpointer = await _checkpointer_cm.__aenter__()
+            # Create the checkpointer tables if they do not exist yet.
+            await _checkpointer.setup()
+            return _checkpointer
+        except Exception as exc:  # noqa: BLE001 - degrade to in-memory saver
+            # Either the Postgres saver package is not installed or the database
+            # is unreachable. Fall back so the graph still runs (state is then
+            # process-local and lost on restart).
+            logger.warning(
+                "AsyncPostgresSaver unavailable (%s); using in-memory checkpointer.",
+                exc,
+            )
+            _checkpointer_cm = None
+            _checkpointer = None
 
     # DB-less fallback: in-memory checkpointer (state lost on restart).
     from langgraph.checkpoint.memory import MemorySaver

@@ -1,19 +1,25 @@
-"""The Memory store: in-memory episode + outcome storage with similarity recall.
+"""The Memory store: episode + outcome storage with similarity recall.
 
-The default ``Memory`` is fully in-memory and seeded at construction with
-day-zero episodes (see ``seed_episodes``). It runs distillation once on
-startup so preferences exist immediately. It requires no database and no
-network: recall uses a lightweight lexical similarity (token Jaccard blended
-with a sequence ratio) so the demo boots offline.
+The default ``Memory`` is seeded at construction with day-zero episodes (see
+``seed_episodes``) and runs distillation once so preferences exist immediately.
+It requires no database and no network: recall uses a lightweight lexical
+similarity (token Jaccard blended with a sequence ratio) so the demo boots
+offline.
 
-When ``DATABASE_URL`` is set the same in-memory store is used; a Postgres
-write-through layer can be added later behind this identical interface without
-touching callers.
+When ``DATABASE_URL`` is set the in-memory store becomes a write-through cache
+over Postgres: persisted episodes (and their outcomes) are lazily loaded on the
+first async access and every ``write_episode`` / ``record_outcome`` is mirrored
+to the ``episodes`` table via the episodes repository, so learning survives
+restarts. With no database the same code path is a graceful no-op and behavior
+is identical to the pure in-memory store. The frozen Memory interface
+(recall_similar, write_episode, record_outcome, get_preferences) is unchanged.
 """
 
 from __future__ import annotations
 
+import asyncio
 import difflib
+import logging
 import re
 import uuid
 from typing import Any, Dict, List, Optional
@@ -21,6 +27,8 @@ from typing import Any, Dict, List, Optional
 from app.memory.distill import run_distillation
 from app.memory.seed_episodes import load_seed_episodes
 from app.memory.types import Episode, Outcome, normalize_decision
+
+logger = logging.getLogger("app.memory.store")
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
 
@@ -58,6 +66,12 @@ class Memory:
         self._pref_version: int = 0
         self._distilled: bool = False
 
+        # Postgres write-through (lazy). ``_repo`` stays None offline; the load
+        # guard makes the one-time DB hydration idempotent and concurrency-safe.
+        self._repo: Any | None = None
+        self._db_loaded: bool = False
+        self._db_lock = asyncio.Lock()
+
         if seed:
             for ep in load_seed_episodes():
                 self._episodes[ep.id] = ep
@@ -74,6 +88,75 @@ class Memory:
         if not self._distilled:
             run_distillation(self)
 
+    # -- persistence (Postgres write-through, no-op offline) -----------------
+
+    async def _ensure_db(self) -> None:
+        """Lazily bind the episodes repository and hydrate persisted episodes.
+
+        Runs at most once. When no pool is available (offline) this leaves the
+        store as a pure in-memory + seeded instance. Any failure degrades to
+        in-memory only so the app keeps serving.
+        """
+
+        if self._db_loaded:
+            return
+        async with self._db_lock:
+            if self._db_loaded:
+                return
+            try:
+                from app.deps import get_pool
+                from app.repositories.episodes import EpisodesRepository
+
+                pool = await get_pool()
+                repo = EpisodesRepository(pool)
+                if repo.enabled:
+                    self._repo = repo
+                    await self._load_persisted(repo)
+            except Exception as exc:  # noqa: BLE001 - persistence is best-effort
+                logger.warning("Memory persistence unavailable: %s", exc)
+                self._repo = None
+            finally:
+                self._db_loaded = True
+
+    async def _load_persisted(self, repo: Any) -> None:
+        """Merge DB-persisted episodes over the seeds, or seed an empty DB."""
+
+        rows = await repo.list_all()
+        if not rows:
+            # First boot against an empty database: persist the seeded day-zero
+            # episodes so the before/after learning story survives restarts.
+            for ep in list(self._episodes.values()):
+                try:
+                    await repo.save(ep.model_dump())
+                except Exception:  # noqa: BLE001
+                    pass
+            return
+
+        changed = False
+        for payload in rows:
+            try:
+                ep = Episode(**payload)
+            except Exception:  # noqa: BLE001 - skip any malformed row
+                continue
+            self._episodes[ep.id] = ep
+            changed = True
+        if changed:
+            # Re-distill so preferences reflect the persisted outcomes.
+            run_distillation(self)
+
+    async def _persist_episode(self, episode_id: str) -> None:
+        """Mirror a single episode to Postgres when persistence is enabled."""
+
+        if self._repo is None:
+            return
+        episode = self._episodes.get(episode_id)
+        if episode is None:
+            return
+        try:
+            await self._repo.save(episode.model_dump())
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to persist episode %s: %s", episode_id, exc)
+
     # -- frozen interface ----------------------------------------------------
 
     async def recall_similar(
@@ -86,6 +169,9 @@ class Memory:
         eligible. Each result includes a ``what_changed`` note when it is a
         prior decision on the same account.
         """
+
+        # Hydrate persisted episodes (no-op offline) so recall spans history.
+        await self._ensure_db()
 
         scored: List[tuple[float, Episode]] = []
         for ep in self._episodes.values():
@@ -144,6 +230,8 @@ class Memory:
     ) -> str:
         """Persist a new episode and return its id."""
 
+        await self._ensure_db()
+
         episode_id = f"ep-{uuid.uuid4().hex[:12]}"
         self._episodes[episode_id] = Episode(
             id=episode_id,
@@ -155,6 +243,8 @@ class Memory:
             phase="live",
             outcome=Outcome(decision="pending"),
         )
+        # Mirror to Postgres when enabled (no-op offline).
+        await self._persist_episode(episode_id)
         return episode_id
 
     async def record_outcome(
@@ -166,6 +256,8 @@ class Memory:
     ) -> None:
         """Attach a human decision (and optional measured metrics) to an episode
         and re-distill so the next recommendation reflects the new signal."""
+
+        await self._ensure_db()
 
         episode = self._episodes.get(episode_id)
         if episode is None:
@@ -179,6 +271,18 @@ class Memory:
         # Learning is incremental: every outcome updates preferences.
         run_distillation(self)
 
+        # Mirror the updated outcome to Postgres (no-op offline) and append an
+        # audit row so the learning history is durable.
+        if self._repo is not None:
+            try:
+                await self._repo.record_outcome(
+                    episode.model_dump(), episode.outcome.model_dump()
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Failed to persist outcome for %s: %s", episode_id, exc
+                )
+
     async def get_preferences(self, domain: str) -> Dict[str, Any]:
         """Return the distilled preference bundle for ``domain``.
 
@@ -187,6 +291,7 @@ class Memory:
         returned for unknown domains so callers never need to special-case.
         """
 
+        await self._ensure_db()
         self._ensure_distilled()
         bundle = self._preferences.get(domain)
         if bundle is None:
