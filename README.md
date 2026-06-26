@@ -191,6 +191,23 @@ The eval harness scores components and outcomes against `backend/app/eval/golden
 
 The full contract lives in `contracts/openapi.json`, with recommendation and event shapes in `contracts/recommendation.schema.json` and `contracts/events.schema.json`.
 
+## Demo walkthrough
+
+A tight 5-minute story, fully offline and deterministic. One command boots the API with `DEMO_MODE=1`:
+
+```bash
+make demo      # backend on http://localhost:8000 (deterministic, no API keys)
+```
+
+Then in another terminal start the UI (`cd frontend && npm install && npm run dev`, http://localhost:3000). Every API call below also lives as a ready-to-run example in `scripts/requests.http` (VS Code REST Client, JetBrains, or curl).
+
+1. **Open the inbox.** The accounts list surfaces an at-risk account: Northwind Logistics (`ACC-1001`), health 42, usage down 38 percent after an integration broke and the champion left.
+2. **Run the engine.** Kick off a run on that account and watch the trace stream: the planner picks specialists, risk analysis scores the threat, the drafter proposes an action, retrieval cites a similar past account.
+3. **Read the explainable NBA.** The Next Best Action lands with a confidence dial, a plain-language rationale, cited evidence, ranked alternatives, and the policy gates that must clear before it can ship.
+4. **Approve and execute.** Clear the human-in-the-loop interrupt with one click, preview the drafted artifact (email, CRM task, or Slack), and execute.
+5. **Show the learning improvement.** Record the outcome and distill it into a lesson, then refresh `/eval` to see the score move.
+6. **Swap the domain pack.** Switch to SaaS Sales or Collections to prove the same engine retargets with zero code changes.
+
 ## Five-minute demo script
 
 1. **Setup (30s).** `cp .env.example .env`, then `make seed`. Start the backend (`uvicorn app.main:app --port 8000`) and frontend (`npm run dev`). Open http://localhost:3000. No API keys needed.

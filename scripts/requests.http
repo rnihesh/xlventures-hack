@@ -1,0 +1,224 @@
+# Intelligent Next Best Action: raw HTTP examples
+#
+# Works with the VS Code "REST Client" extension, JetBrains HTTP client, or as a
+# reference for hand-written curl. Boot the API first with deterministic offline
+# fallbacks:
+#
+#     make demo            # backend on http://localhost:8000 with DEMO_MODE=1
+#
+# Seeded account ids come from backend/seeds/customer_success/accounts.json.
+# The default story uses ACC-1001 (Northwind Logistics), a high-risk account
+# whose usage collapsed after an integration break.
+#
+# If APP_TOKEN is set in the environment, add this header to the run endpoints:
+#     Authorization: Bearer {{appToken}}
+
+@baseUrl = http://localhost:8000
+@domain = customer_success
+@accountId = ACC-1001
+@appToken =
+
+###############################################################################
+# 1. Liveness
+###############################################################################
+
+### Health check
+GET {{baseUrl}}/health
+
+
+###############################################################################
+# 2. Domain packs (swap the engine to another vertical, data not code)
+###############################################################################
+
+### List installed domain packs
+GET {{baseUrl}}/domains
+
+### One domain pack in detail
+GET {{baseUrl}}/domains/{{domain}}
+
+
+###############################################################################
+# 3. Accounts (the "inbox": pick an at-risk account)
+###############################################################################
+
+### List accounts
+GET {{baseUrl}}/accounts
+
+### Account detail with signals and history
+GET {{baseUrl}}/accounts/{{accountId}}
+
+
+###############################################################################
+# 4. Runs (plan + dispatch specialist agents for one account)
+###############################################################################
+
+### Start a decision run. Capture the run_id from the response for the calls below.
+# @name createRun
+POST {{baseUrl}}/runs
+Content-Type: application/json
+
+{
+  "domain": "{{domain}}",
+  "account_id": "{{accountId}}",
+  "signal": {
+    "type": "usage_drop",
+    "content": "Weekly active users down 38% month over month after the TMS integration broke on May 28; the champion departed June 5."
+  }
+}
+
+### Reuse the run_id from the create response above.
+@runId = {{createRun.response.body.run_id}}
+
+### Stream planner + agent steps and the final recommendation (SSE).
+# Watch node.started / node.finished / recommendation / hitl.required / run.finished.
+# With curl, stream live:  curl -N {{baseUrl}}/runs/{{runId}}/stream
+GET {{baseUrl}}/runs/{{runId}}/stream
+Accept: text/event-stream
+
+
+###############################################################################
+# 5. Human-in-the-loop (approve, reject, or edit at the interrupt)
+###############################################################################
+
+### Approve the recommended action
+POST {{baseUrl}}/runs/{{runId}}/hitl
+Content-Type: application/json
+
+{
+  "decision": "approve",
+  "reason": "Rationale and cited precedent are sound; proceed before the October renewal."
+}
+
+### Reject (records the no so the learning loop adapts)
+# POST {{baseUrl}}/runs/{{runId}}/hitl
+# Content-Type: application/json
+#
+# {
+#   "decision": "reject",
+#   "reason": "Too aggressive for this stakeholder right now."
+# }
+
+### Edit the action before approving (only key/title/description may change)
+# POST {{baseUrl}}/runs/{{runId}}/hitl
+# Content-Type: application/json
+#
+# {
+#   "decision": "edit",
+#   "edited_action": {
+#     "title": "Run an integration recovery sprint, then book an executive review"
+#   },
+#   "reason": "Lead with the reliability fix, then re-engage leadership."
+# }
+
+
+###############################################################################
+# 6. What-if (counterfactual re-scoring)
+###############################################################################
+
+### Nudge signals and re-score the recommendation instantly
+POST {{baseUrl}}/whatif
+Content-Type: application/json
+
+{
+  "domain": "{{domain}}",
+  "account_id": "{{accountId}}",
+  "overrides": {
+    "usage_trend": -38,
+    "nps": 3,
+    "arr": 180000
+  }
+}
+
+
+###############################################################################
+# 7. Policy / guardrails
+###############################################################################
+
+### Read the policy and guardrails for a domain
+GET {{baseUrl}}/policy/{{domain}}
+
+### Evaluate a candidate action against policy before it is shown
+POST {{baseUrl}}/policy/evaluate
+Content-Type: application/json
+
+{
+  "domain": "{{domain}}",
+  "account_id": "{{accountId}}",
+  "recommendation": {
+    "account_id": "{{accountId}}",
+    "domain": "{{domain}}",
+    "action": {
+      "key": "schedule_executive_business_review",
+      "title": "Schedule an executive business review",
+      "description": "Book a strategic review with the buying committee to realign on outcomes and value."
+    }
+  }
+}
+
+
+###############################################################################
+# 8. Execute (one-click: render the approved artifact)
+###############################################################################
+
+### Execute by run_id (uses the recommendation stored on the run)
+# POST {{baseUrl}}/execute
+# Content-Type: application/json
+#
+# {
+#   "run_id": "{{runId}}",
+#   "artifact_type": "email"
+# }
+
+### Execute by passing the recommendation explicitly. artifact_type: email | crm_task | slack
+POST {{baseUrl}}/execute
+Content-Type: application/json
+
+{
+  "account_id": "{{accountId}}",
+  "artifact_type": "email",
+  "recommendation": {
+    "account_id": "{{accountId}}",
+    "domain": "{{domain}}",
+    "action": {
+      "key": "schedule_executive_business_review",
+      "title": "Schedule an executive business review",
+      "description": "Book a strategic review with the buying committee to realign on outcomes and value."
+    }
+  }
+}
+
+### Execution status and artifacts for a run
+GET {{baseUrl}}/execute/{{runId}}
+
+
+###############################################################################
+# 9. Eval (golden-scenario quality, before/after learning)
+###############################################################################
+
+### Latest cached eval summary (suites + headline outcome)
+GET {{baseUrl}}/eval
+
+### Force a fresh recompute
+GET {{baseUrl}}/eval?refresh=true
+
+
+###############################################################################
+# 10. Learning loop (optional: close the loop and watch it improve)
+###############################################################################
+
+### Distilled lessons and learning state
+GET {{baseUrl}}/learning
+
+### Record a downstream outcome against an episode
+# POST {{baseUrl}}/learning/outcome
+# Content-Type: application/json
+#
+# {
+#   "episode_id": "EPISODE-ID-FROM-/learning",
+#   "decision": "approve",
+#   "reason": "Executive review booked; usage recovered after the integration fix.",
+#   "metrics": { "nrr": 1.04 }
+# }
+
+### Distill recent feedback into reusable lessons
+# POST {{baseUrl}}/learning/distill
