@@ -3,6 +3,9 @@
 // Every read endpoint falls back to deterministic seed data when the backend
 // is unreachable, so the UI boots and demos cleanly offline. Mutations
 // (createRun, hitl) surface real errors because they require the live agent.
+// The what-if endpoint computes a counterfactual; it degrades to a local,
+// deterministic approximation when the backend is unreachable so the demo
+// never blanks out.
 
 import type {
   Account,
@@ -135,6 +138,169 @@ export function hitl(
 
 export function streamUrl(runId: string): string {
   return `${API_BASE}/runs/${encodeURIComponent(runId)}/stream`;
+}
+
+// ---------------------------------------------------------------------------
+// Counterfactual "what-if" (POST /whatif)
+// ---------------------------------------------------------------------------
+
+// The signals a user may nudge. All optional; omitted ones keep the baseline.
+export interface WhatIfOverrides {
+  usage_trend?: number; // QoQ usage change, percent
+  nps?: number; // 0..10
+  arr?: number; // annual recurring revenue / contract size
+  [key: string]: number | undefined;
+}
+
+export interface WhatIfRequest {
+  domain: string;
+  account_id: string;
+  overrides: WhatIfOverrides;
+}
+
+export interface WhatIfBaseline {
+  action: RecommendationAction;
+  confidence: number; // 0..1
+  risk_score: number; // 0..1
+}
+
+export interface WhatIfPressures {
+  usage_pressure: number;
+  nps_pressure: number;
+  mean_pressure: number;
+  conflict: number;
+}
+
+export interface WhatIfResponse {
+  recommendation: Recommendation;
+  baseline: WhatIfBaseline;
+  confidence_delta: number; // whatif - baseline, in 0..1 points
+  risk_score: { baseline: number; whatif: number };
+  pressures: WhatIfPressures;
+  applied_overrides: { usage_trend: number; nps: number; arr: number };
+  action_changed: boolean;
+}
+
+/**
+ * Re-run the decision pipeline with a couple of overridden input signals and
+ * report how the recommendation and confidence shift versus the baseline.
+ *
+ * Surfaces the live backend result when reachable; otherwise returns a local,
+ * deterministic approximation (mirrors the backend counterfactual math) so the
+ * panel still demonstrates the effect offline.
+ */
+export async function whatIf(payload: WhatIfRequest): Promise<WhatIfResponse> {
+  try {
+    return await postJson<WhatIfResponse>("/whatif", payload);
+  } catch {
+    return localWhatIf(payload);
+  }
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+function round3(v: number): number {
+  return Math.round(v * 1000) / 1000;
+}
+
+function signPct(v: number): string {
+  return `${v >= 0 ? "+" : ""}${v.toFixed(0)}%`;
+}
+
+function formatUsd(v: number): string {
+  return `$${Math.round(v).toLocaleString("en-US")}`;
+}
+
+function seedArr(accountId: string): number {
+  return SEED_ACCOUNTS.find((a) => a.account_id === accountId)?.arr ?? 120000;
+}
+
+// Offline approximation of the backend's counterfactual layer. Deterministic
+// so the demo is stable when the agent is unreachable.
+function localWhatIf(payload: WhatIfRequest): WhatIfResponse {
+  const seed = seedRecommendation(payload.account_id);
+  const baseRisk = 0.62;
+  const baseConf = seed.confidence.score;
+
+  const usageTrend = payload.overrides.usage_trend ?? -10;
+  const nps = payload.overrides.nps ?? 7;
+  const arr = payload.overrides.arr ?? seedArr(payload.account_id);
+
+  const usagePressure = clamp(-usageTrend / 40, -1, 1);
+  const npsPressure = clamp((7 - nps) / 7, -1, 1);
+  const meanPressure = clamp(0.6 * usagePressure + 0.4 * npsPressure, -1, 1);
+  const conflict = Math.abs(usagePressure - npsPressure) / 2;
+
+  const newRisk = clamp(round3(baseRisk + 0.3 * meanPressure), 0.05, 0.95);
+  const direction = seed.risk_opportunity.type === "risk" ? 1 : -1;
+  const alignment = direction * meanPressure;
+  const newConf = clamp(round3(baseConf + 0.22 * alignment - 0.16 * conflict), 0.05, 0.97);
+
+  // Flip to a more decisive play when risk runs high, a lighter one when low.
+  const escalated: RecommendationAction = {
+    key: "open_executive_escalation",
+    title: "Open an executive escalation with the buying committee",
+    description:
+      "Pull in your VP of CS and the customer's economic buyer to arrest the decline before renewal.",
+  };
+  const lightTouch: RecommendationAction = {
+    key: "launch_adoption_campaign",
+    title: "Launch a targeted adoption campaign",
+    description:
+      "Drive feature adoption with a guided enablement path rather than a senior intervention.",
+  };
+  let action = seed.action;
+  if (newRisk >= 0.7) action = escalated;
+  else if (newRisk <= 0.45) action = lightTouch;
+  const actionChanged = action.key !== seed.action.key;
+
+  const riskPhrase =
+    newRisk > baseRisk + 0.02
+      ? "elevated"
+      : newRisk < baseRisk - 0.02
+        ? "reduced"
+        : "roughly unchanged";
+
+  const recommendation: Recommendation = {
+    ...seed,
+    id: `whatif_${payload.account_id}_${Date.now()}`,
+    account_id: payload.account_id,
+    domain: payload.domain,
+    action,
+    status: "proposed",
+    confidence: {
+      score: newConf,
+      method: "counterfactual_whatif",
+      label: newConf >= 0.75 ? "high" : newConf >= 0.5 ? "medium" : "low",
+    },
+    counterfactual:
+      `With usage trend ${signPct(usageTrend)} QoQ, NPS ${nps.toFixed(0)}/10, and ARR ` +
+      `${formatUsd(arr)}, churn risk is ${riskPhrase} (${baseRisk.toFixed(2)} -> ${newRisk.toFixed(2)}). ` +
+      (actionChanged
+        ? `The engine now favors '${action.title}'.`
+        : "The recommended play holds, with recalibrated confidence."),
+  };
+
+  return {
+    recommendation,
+    baseline: {
+      action: seed.action,
+      confidence: round3(baseConf),
+      risk_score: round3(baseRisk),
+    },
+    confidence_delta: round3(newConf - baseConf),
+    risk_score: { baseline: round3(baseRisk), whatif: newRisk },
+    pressures: {
+      usage_pressure: round3(usagePressure),
+      nps_pressure: round3(npsPressure),
+      mean_pressure: round3(meanPressure),
+      conflict: round3(conflict),
+    },
+    applied_overrides: { usage_trend: usageTrend, nps, arr },
+    action_changed: actionChanged,
+  };
 }
 
 // ---------------------------------------------------------------------------

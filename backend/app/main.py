@@ -85,12 +85,13 @@ def create_app() -> FastAPI:
     )
 
     # Import routers lazily here to avoid import cycles with app.deps/app.config.
-    from app.api import accounts, domains, health, runs
+    from app.api import accounts, domains, health, runs, whatif
 
     app.include_router(health.router)
     app.include_router(runs.router)
     app.include_router(accounts.router)
     app.include_router(domains.router)
+    app.include_router(whatif.router)
 
     # Learning and eval routers are owned by other slices. Include them when
     # present so the app still boots if a slice has not landed yet.
