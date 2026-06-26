@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowUpDown, ChevronRight } from "lucide-react";
+import { ArrowUpDown, ChevronRight, Download, Loader2, Plus } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Account, RiskLevel } from "@/lib/types";
 
@@ -22,16 +23,36 @@ export function riskVariant(
     case "medium":
       return "warning";
     case "low":
-      return "success";
+      return "muted";
     default:
       return "muted";
   }
 }
 
 export function healthTone(score: number): string {
-  if (score >= 70) return "bg-emerald-500";
-  if (score >= 45) return "bg-amber-500";
-  return "bg-rose-500";
+  if (score >= 45) return "bg-primary";
+  return "bg-destructive";
+}
+
+// Plain-language label so a non-expert can read a health number at a glance.
+export function healthLabel(score: number): string {
+  if (score >= 70) return "Healthy";
+  if (score >= 45) return "Needs attention";
+  return "At risk";
+}
+
+// A friendly one-liner describing what a risk level means for the account.
+export function riskMeaning(risk: RiskLevel): string {
+  switch (String(risk).toLowerCase()) {
+    case "high":
+      return "Likely to churn or cut back without action soon.";
+    case "medium":
+      return "Some warning signs worth a proactive check-in.";
+    case "low":
+      return "Stable relationship with no pressing concerns.";
+    default:
+      return "Risk level not yet assessed.";
+  }
 }
 
 export function formatArr(arr: number): string {
@@ -43,15 +64,20 @@ export function formatArr(arr: number): string {
 function HealthBar({ score }: { score: number }) {
   const pct = Math.max(0, Math.min(100, score));
   return (
-    <div className="flex items-center gap-2">
-      <div className="h-1.5 w-20 overflow-hidden rounded-full bg-muted">
-        <div
-          className={cn("h-full rounded-full transition-all", healthTone(pct))}
-          style={{ width: `${pct}%` }}
-        />
+    <div className="min-w-[8.5rem]">
+      <div className="flex items-center gap-2">
+        <div className="h-1.5 w-20 overflow-hidden rounded-full bg-muted">
+          <div
+            className={cn("h-full rounded-full transition-all", healthTone(pct))}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span className="w-7 text-right text-xs tabular text-muted-foreground">
+          {Math.round(pct)}
+        </span>
       </div>
-      <span className="w-7 text-right text-xs tabular text-muted-foreground">
-        {Math.round(pct)}
+      <span className="mt-1 block text-[11px] text-muted-foreground">
+        {healthLabel(pct)}
       </span>
     </div>
   );
@@ -66,17 +92,28 @@ interface ColumnDef {
 
 const COLUMNS: ColumnDef[] = [
   { key: "name", label: "Account" },
-  { key: "health_score", label: "Health" },
-  { key: "risk_level", label: "Risk" },
-  { key: "arr", label: "ARR", align: "right" },
+  { key: "health_score", label: "Health score" },
+  { key: "risk_level", label: "Churn risk" },
+  { key: "arr", label: "Revenue (ARR)", align: "right" },
 ];
 
 export interface AccountTableProps {
   accounts: Account[];
   className?: string;
+  // Optional empty-state actions. When the list is empty and these are
+  // provided, the table offers a clear way to populate the portfolio.
+  onAddAccount?: () => void;
+  onImportDemo?: () => void;
+  importing?: boolean;
 }
 
-export function AccountTable({ accounts, className }: AccountTableProps) {
+export function AccountTable({
+  accounts,
+  className,
+  onAddAccount,
+  onImportDemo,
+  importing,
+}: AccountTableProps) {
   const [sortKey, setSortKey] = React.useState<SortKey>("risk_level");
   const [sortDir, setSortDir] = React.useState<SortDir>("desc");
 
@@ -165,6 +202,9 @@ export function AccountTable({ accounts, className }: AccountTableProps) {
                     {account.name}
                   </div>
                   <div className="mt-0.5 line-clamp-1 max-w-md text-xs text-muted-foreground">
+                    <span className="text-muted-foreground/70">
+                      Latest signal:{" "}
+                    </span>
                     {account.last_signal}
                   </div>
                 </Link>
@@ -193,11 +233,40 @@ export function AccountTable({ accounts, className }: AccountTableProps) {
           ))}
           {sorted.length === 0 && (
             <tr>
-              <td
-                colSpan={5}
-                className="px-4 py-10 text-center text-sm text-muted-foreground"
-              >
-                No accounts to show.
+              <td colSpan={5} className="px-4 py-12 text-center">
+                <p className="text-sm font-medium text-foreground">
+                  No accounts yet
+                </p>
+                <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+                  {onAddAccount || onImportDemo
+                    ? "Add your first account or import the demo set to get started."
+                    : "No accounts to show."}
+                </p>
+                {(onAddAccount || onImportDemo) && (
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                    {onAddAccount && (
+                      <Button type="button" onClick={onAddAccount}>
+                        <Plus className="h-4 w-4" />
+                        Add account
+                      </Button>
+                    )}
+                    {onImportDemo && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={onImportDemo}
+                        disabled={importing}
+                      >
+                        {importing ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4" />
+                        )}
+                        Import demo accounts
+                      </Button>
+                    )}
+                  </div>
+                )}
               </td>
             </tr>
           )}

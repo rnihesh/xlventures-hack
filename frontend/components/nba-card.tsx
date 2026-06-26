@@ -5,6 +5,7 @@ import {
   Check,
   FileText,
   GitBranch,
+  HelpCircle,
   Pencil,
   Quote,
   TrendingDown,
@@ -26,9 +27,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alternatives } from "@/components/alternatives";
+import { InfoHint } from "@/components/ui/tooltip";
 import { toast } from "@/components/ui/toast";
+import { explainSignal, SIGNAL_GROUP_HELP } from "@/lib/signal-glossary";
 import { cn } from "@/lib/utils";
-import type { Alternative } from "@/lib/types";
+import type { Alternative, MissingInformation } from "@/lib/types";
 import type {
   HitlDecision,
   Recommendation,
@@ -41,6 +44,14 @@ import type {
 function readAlternatives(rec: Recommendation): Alternative[] {
   const alts = (rec as unknown as { alternatives?: Alternative[] }).alternatives;
   return Array.isArray(alts) ? alts : [];
+}
+
+// The streamed Recommendation may also carry the engine's `missing_information`
+// (what we still need to know). Read it safely without loosening the contract.
+function readMissingInformation(rec: Recommendation): MissingInformation[] {
+  const gaps = (rec as unknown as { missing_information?: MissingInformation[] })
+    .missing_information;
+  return Array.isArray(gaps) ? gaps : [];
 }
 
 function ConfidenceDial({
@@ -57,12 +68,8 @@ function ConfidenceDial({
   const radius = 26;
   const circumference = 2 * Math.PI * radius;
   const dash = circumference * clamped;
-  const tone =
-    clamped >= 0.75
-      ? "text-emerald-500"
-      : clamped >= 0.5
-        ? "text-amber-500"
-        : "text-rose-500";
+  // One accent for every confidence level: Claude orange arc on a border track.
+  const tone = "text-primary";
 
   return (
     <div className="flex items-center gap-3">
@@ -74,7 +81,7 @@ function ConfidenceDial({
             r={radius}
             fill="none"
             strokeWidth="6"
-            className="stroke-muted"
+            className="stroke-border"
           />
           <circle
             cx="32"
@@ -88,7 +95,7 @@ function ConfidenceDial({
             stroke="currentColor"
           />
         </svg>
-        <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold tabular">
+        <span className="absolute inset-0 flex items-center justify-center font-mono text-sm font-semibold tabular">
           {pct}
           <span className="text-[10px] text-muted-foreground">%</span>
         </span>
@@ -133,10 +140,14 @@ function SignalChips({
   if (!items || items.length === 0) return null;
   return (
     <div>
-      <h4 className="mb-1.5 text-eyebrow">{title}</h4>
+      <h4 className="mb-1.5 flex items-center gap-1 text-eyebrow">
+        {title}
+        <InfoHint text={SIGNAL_GROUP_HELP[tone]} align="start" />
+      </h4>
       <ul className="flex flex-wrap gap-1.5">
         {items.map((s, i) => (
-          <li key={`${tone}-${i}`}>
+          // Native title gives a quick plain-language read of each cryptic chip.
+          <li key={`${tone}-${i}`} title={explainSignal(s)}>
             <Badge variant={tone === "supporting" ? "success" : "danger"}>
               {s}
             </Badge>
@@ -194,6 +205,7 @@ export function NbaCard({
   const decided = rec.status !== "proposed";
   const isOpportunity = rec.risk_opportunity?.type === "opportunity";
   const alternatives = readAlternatives(rec);
+  const missingInformation = readMissingInformation(rec);
 
   const beginEdit = () => {
     setEditTitle(rec.action.title);
@@ -244,12 +256,12 @@ export function NbaCard({
           : "muted";
 
   return (
-    <Card className={cn("flex h-full animate-rise flex-col", className)}>
+    <Card className={cn("flex animate-rise flex-col", className)}>
       <CardHeader className="gap-3 pb-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="mb-1.5 flex items-center gap-2">
-              <Badge variant={isOpportunity ? "success" : "warning"}>
+              <Badge variant={isOpportunity ? "success" : "danger"}>
                 {rec.risk_opportunity?.type ?? "action"}
               </Badge>
               <Badge variant={statusVariant}>{rec.status}</Badge>
@@ -269,12 +281,12 @@ export function NbaCard({
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 space-y-5 overflow-y-auto scroll-thin">
+      <CardContent className="space-y-5">
         {rec.risk_opportunity?.summary && (
           <div
             className={cn(
               "rounded-lg border-l-2 bg-muted/40 px-3 py-2 text-sm",
-              isOpportunity ? "border-l-emerald-500" : "border-l-amber-500",
+              isOpportunity ? "border-l-primary" : "border-l-destructive",
             )}
           >
             {rec.risk_opportunity.summary}
@@ -382,9 +394,46 @@ export function NbaCard({
 
         {alternatives.length > 0 && <Alternatives alternatives={alternatives} />}
 
+        {missingInformation.length > 0 && (
+          <section>
+            <SectionLabel icon={HelpCircle}>
+              What we still need to know
+            </SectionLabel>
+            <ul className="space-y-2">
+              {missingInformation.map((gap, i) => (
+                <li
+                  key={`gap-${i}`}
+                  className="flex gap-2.5 rounded-lg border border-dashed bg-muted/30 px-3 py-2"
+                >
+                  <span
+                    aria-hidden
+                    className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground/90">
+                      {gap.gap}
+                    </p>
+                    {gap.why_it_matters && (
+                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                        {gap.why_it_matters}
+                      </p>
+                    )}
+                    {gap.suggested_source && (
+                      <p className="mt-1 text-[10px] text-muted-foreground/70">
+                        <span className="text-primary/80">Source:</span>{" "}
+                        {gap.suggested_source}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {editing && (
-          <section className="space-y-2 rounded-lg border border-violet-500/30 bg-violet-500/5 p-3">
-            <h4 className="text-eyebrow text-violet-600">Edit action</h4>
+          <section className="space-y-2 rounded-lg border border-primary/30 bg-primary/[0.05] p-3">
+            <h4 className="text-eyebrow text-primary">Edit action</h4>
             <Input
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}

@@ -135,25 +135,23 @@ const STATUS_STYLES: Record<
   { dot: string; badge: string; text: string }
 > = {
   running: {
-    dot: "bg-amber-400 ring-amber-400/30 animate-pulse",
-    badge:
-      "bg-amber-500/12 text-amber-600 dark:text-amber-400 ring-amber-500/20",
+    dot: "bg-primary ring-primary/30 animate-pulse",
+    badge: "bg-primary/12 text-primary ring-primary/20",
     text: "Running",
   },
   done: {
-    dot: "bg-emerald-500 ring-emerald-500/30",
-    badge:
-      "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
+    dot: "bg-foreground/70 ring-border",
+    badge: "bg-muted text-muted-foreground ring-border",
     text: "Done",
   },
   info: {
-    dot: "bg-sky-500 ring-sky-500/30",
-    badge: "bg-sky-500/12 text-sky-600 dark:text-sky-400 ring-sky-500/20",
+    dot: "bg-muted-foreground/50 ring-border",
+    badge: "bg-muted text-muted-foreground ring-border",
     text: "Info",
   },
   error: {
-    dot: "bg-rose-500 ring-rose-500/30",
-    badge: "bg-rose-500/12 text-rose-600 dark:text-rose-400 ring-rose-500/20",
+    dot: "bg-destructive ring-destructive/30",
+    badge: "bg-destructive/12 text-destructive ring-destructive/20",
     text: "Error",
   },
 };
@@ -185,7 +183,7 @@ export function RunTrace({ events, className }: RunTraceProps) {
             <span
               className={cn(
                 "h-2 w-2 rounded-full",
-                active ? "animate-pulse bg-amber-400" : "bg-muted-foreground/40",
+                active ? "animate-pulse bg-primary" : "bg-muted-foreground/40",
               )}
             />
             Planner trace

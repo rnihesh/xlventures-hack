@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
@@ -18,12 +18,19 @@ import { RunTrace } from "@/components/run-trace";
 import { ToolCallPanel } from "@/components/tool-call-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useAgentStream } from "@/lib/useAgentStream";
-import type { Recommendation as RecommendationContract } from "@/lib/types";
+import { getAccounts, getDomains } from "@/lib/api";
+import { getActiveDomain } from "@/lib/active-domain";
+import type {
+  Account,
+  DomainSummary,
+  Recommendation as RecommendationContract,
+} from "@/lib/types";
 
 const STATUS_LABEL: Record<string, string> = {
   idle: "Idle",
@@ -36,13 +43,12 @@ const STATUS_LABEL: Record<string, string> = {
 
 const STATUS_TONE: Record<string, string> = {
   idle: "bg-muted text-muted-foreground",
-  starting: "bg-sky-500/12 text-sky-600 ring-1 ring-inset ring-sky-500/20",
-  streaming:
-    "bg-amber-500/12 text-amber-600 ring-1 ring-inset ring-amber-500/20",
-  hitl: "bg-violet-500/12 text-violet-600 ring-1 ring-inset ring-violet-500/20",
-  finished:
-    "bg-emerald-500/12 text-emerald-600 ring-1 ring-inset ring-emerald-500/20",
-  error: "bg-rose-500/12 text-rose-600 ring-1 ring-inset ring-rose-500/20",
+  starting: "bg-muted text-muted-foreground ring-1 ring-inset ring-border",
+  streaming: "bg-primary/12 text-primary ring-1 ring-inset ring-primary/20",
+  hitl: "bg-primary/12 text-primary ring-1 ring-inset ring-primary/25",
+  finished: "bg-primary/12 text-primary ring-1 ring-inset ring-primary/20",
+  error:
+    "bg-destructive/10 text-destructive ring-1 ring-inset ring-destructive/20",
 };
 
 const EXAMPLES = [
@@ -50,6 +56,30 @@ const EXAMPLES = [
   "Weekly active users down 18% over the past 30 days.",
   "Champion asked about SSO and 25 more seats for next quarter.",
 ];
+
+const DEFAULT_DOMAIN = "customer_success";
+
+// Highest risk first so the default account is the one that most needs a play.
+const RISK_RANK: Record<string, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+
+function riskRank(level: string): number {
+  return RISK_RANK[level?.toLowerCase()] ?? 2;
+}
+
+function sortByRisk(accounts: Account[]): Account[] {
+  return [...accounts].sort(
+    (a, b) => riskRank(a.risk_level) - riskRank(b.risk_level),
+  );
+}
+
+function accountLabel(account: Account): string {
+  return `${account.name} (${account.account_id}, ${account.risk_level})`;
+}
 
 function RunWorkspace() {
   const searchParams = useSearchParams();
@@ -65,23 +95,91 @@ function RunWorkspace() {
     reset,
   } = useAgentStream();
 
-  const [domain, setDomain] = useState("customer_success");
-  const [accountId, setAccountId] = useState("acct_001");
+  const [domain, setDomain] = useState(DEFAULT_DOMAIN);
+  const [accountId, setAccountId] = useState("");
   const [signalText, setSignalText] = useState(EXAMPLES[0]);
   const [leftTab, setLeftTab] = useState("trace");
 
+  const [domains, setDomains] = useState<DomainSummary[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  // When the accounts endpoint cannot be reached we fall back to a free-text
+  // account input so the form still works offline.
+  const [accountsFailed, setAccountsFailed] = useState(false);
+  // Honor a deep-linked account_id before account-driven defaults kick in.
+  const [pinnedAccountId, setPinnedAccountId] = useState<string | null>(null);
+  // A deep-linked signal wins over the first account's last_signal prefill.
+  const deepSignalRef = useRef(false);
+
   // Count tool calls so the tab label reflects live orchestration activity.
   const toolCallCount = events.filter((e) => e.type === "node.started").length;
+
+  // Load the domain list once for the domain dropdown.
+  useEffect(() => {
+    const controller = new AbortController();
+    getDomains(controller.signal)
+      .then(setDomains)
+      .catch(() => setDomains([]));
+    return () => controller.abort();
+  }, []);
+
+  // Load accounts whenever the domain changes, then default to the highest-risk
+  // account in that domain (unless a deep link pinned a specific account).
+  useEffect(() => {
+    const controller = new AbortController();
+    setAccountsFailed(false);
+    getAccounts(controller.signal)
+      .then((all) => {
+        const scoped = sortByRisk(all.filter((a) => a.domain === domain));
+        setAccounts(scoped);
+        setAccountId((current) => {
+          if (pinnedAccountId && scoped.some((a) => a.account_id === pinnedAccountId)) {
+            return pinnedAccountId;
+          }
+          if (current && scoped.some((a) => a.account_id === current)) {
+            return current;
+          }
+          return scoped[0]?.account_id ?? "";
+        });
+      })
+      .catch(() => {
+        setAccounts([]);
+        setAccountsFailed(true);
+      });
+    return () => controller.abort();
+  }, [domain, pinnedAccountId]);
+
+  // Default to the active domain pack chosen on the Domains page, unless a deep
+  // link explicitly names a domain (that takes precedence).
+  useEffect(() => {
+    if (searchParams.get("domain")) return;
+    setDomain(getActiveDomain());
+  }, [searchParams]);
 
   // Prefill from inbox / account 360 deep links.
   useEffect(() => {
     const a = searchParams.get("account_id");
     const d = searchParams.get("domain");
     const s = searchParams.get("signal");
-    if (a) setAccountId(a);
+    if (a) setPinnedAccountId(a);
     if (d) setDomain(d);
-    if (s) setSignalText(s);
+    if (s) {
+      deepSignalRef.current = true;
+      setSignalText(s);
+    }
   }, [searchParams]);
+
+  // When the selected account changes, prefill the signal with its last signal.
+  // A deep-linked signal takes precedence for the initial selection only.
+  const selectedAccount = accounts.find((a) => a.account_id === accountId) ?? null;
+  useEffect(() => {
+    if (!selectedAccount?.last_signal) return;
+    if (deepSignalRef.current) {
+      deepSignalRef.current = false;
+      return;
+    }
+    setSignalText(selectedAccount.last_signal);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccount?.account_id]);
 
   const busy = status === "starting" || status === "streaming";
   const idle = status === "idle" && events.length === 0 && !recommendation;
@@ -93,7 +191,7 @@ function RunWorkspace() {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (busy || !signalText.trim()) return;
+    if (busy || !signalText.trim() || !accountId.trim()) return;
     void start({
       domain: domain.trim(),
       account_id: accountId.trim(),
@@ -130,19 +228,45 @@ function RunWorkspace() {
           <div className="grid gap-4 md:grid-cols-2">
             <label className="flex flex-col gap-1.5">
               <span className="text-eyebrow">Domain</span>
-              <Input
+              <Select
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
-                placeholder="customer_success"
-              />
+              >
+                {domains.length === 0 && (
+                  <option value={domain}>{domain}</option>
+                )}
+                {domains.map((d) => (
+                  <option key={d.key} value={d.key}>
+                    {d.display_name}
+                  </option>
+                ))}
+              </Select>
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-eyebrow">Account ID</span>
-              <Input
-                value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
-                placeholder="acct_001"
-              />
+              <span className="text-eyebrow">Account</span>
+              {accountsFailed ? (
+                <Input
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                  placeholder="Account ID"
+                />
+              ) : (
+                <Select
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                  disabled={accounts.length === 0}
+                >
+                  {accounts.length === 0 ? (
+                    <option value="">No accounts for this domain</option>
+                  ) : (
+                    accounts.map((a) => (
+                      <option key={a.account_id} value={a.account_id}>
+                        {accountLabel(a)}
+                      </option>
+                    ))
+                  )}
+                </Select>
+              )}
             </label>
           </div>
           <label className="flex flex-col gap-1.5">
@@ -169,7 +293,10 @@ function RunWorkspace() {
             ))}
           </div>
           <div className="flex items-center gap-2">
-            <Button type="submit" disabled={busy || !signalText.trim()}>
+            <Button
+              type="submit"
+              disabled={busy || !signalText.trim() || !accountId.trim()}
+            >
               <Play className="h-4 w-4" />
               {busy ? "Running" : "Run agent"}
             </Button>
@@ -185,7 +312,7 @@ function RunWorkspace() {
           </div>
         </form>
         {error && (
-          <p className="mt-3 rounded-md bg-rose-500/10 px-3 py-2 text-sm text-rose-600 ring-1 ring-inset ring-rose-500/20">
+          <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive ring-1 ring-inset ring-destructive/20">
             {error}
           </p>
         )}
@@ -212,7 +339,7 @@ function RunWorkspace() {
               {
                 icon: CheckCircle2,
                 title: "3. Approve or edit",
-                desc: "Nothing executes until you give the play a human green light.",
+                desc: "Nothing executes until a human approves the play.",
               },
             ].map((step) => {
               const Icon = step.icon;

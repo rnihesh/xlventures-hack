@@ -16,7 +16,7 @@ function ScoreBar({ score, chosen }: { score: number; chosen: boolean }) {
         <div
           className={cn(
             "h-full rounded-full transition-all duration-700 ease-out",
-            chosen ? "bg-emerald-500" : "bg-muted-foreground/50",
+            chosen ? "bg-primary" : "bg-muted-foreground/50",
           )}
           style={{ width: `${pct}%` }}
         />
@@ -72,7 +72,7 @@ export function Alternatives({ alternatives, className }: AlternativesProps) {
                 className={cn(
                   "rounded-lg border px-3 py-2.5",
                   chosen
-                    ? "border-emerald-500/30 bg-emerald-500/5"
+                    ? "border-primary/30 bg-primary/5"
                     : "border-border bg-muted/30",
                 )}
               >
@@ -103,8 +103,8 @@ export function Alternatives({ alternatives, className }: AlternativesProps) {
                 )}
 
                 {!chosen && alt.why_not && (
-                  <p className="mt-1.5 flex gap-1.5 rounded-md border-l-2 border-amber-500/60 bg-amber-500/5 px-2 py-1 text-xs text-amber-700 dark:text-amber-400">
-                    <span className="font-semibold">Why not:</span>
+                  <p className="mt-1.5 flex gap-1.5 rounded-md border-l-2 border-muted-foreground/40 bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+                    <span className="font-semibold text-foreground/80">Why not:</span>
                     <span className="text-foreground/70">{alt.why_not}</span>
                   </p>
                 )}

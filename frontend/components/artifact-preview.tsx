@@ -182,7 +182,7 @@ export function ArtifactPreview({
               className="h-8 px-2.5"
             >
               {copied ? (
-                <Check className="h-3.5 w-3.5 text-emerald-500" />
+                <Check className="h-3.5 w-3.5 text-primary" />
               ) : (
                 <Copy className="h-3.5 w-3.5" />
               )}

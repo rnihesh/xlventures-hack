@@ -42,14 +42,30 @@ export interface LearningEpisode {
   improved?: boolean;
 }
 
+// One point on the REAL acceptance trend: the cumulative acceptance rate after
+// each recorded decision, in chronological order. Comes straight from
+// /learning, computed from actual outcomes (never a synthetic curve).
+export interface TrendPoint {
+  index: number;
+  account_id?: string;
+  decision?: string;
+  accepted?: boolean;
+  rate: number;
+}
+
 export interface LearningData {
   episodes: LearningEpisode[];
   accepted_rate: number;
+  trend?: TrendPoint[];
+  decided?: number;
   before_after: {
     kpi: string;
     before: number | string;
     after: number | string;
     note?: string;
+    // Projected, not actual. has_data is false until real NRR metrics exist.
+    has_data?: boolean;
+    projected?: boolean;
   };
 }
 
@@ -59,22 +75,22 @@ function decisionMeta(decision?: string | null) {
     return {
       label: "Accepted",
       icon: CheckCircle2,
-      tone: "text-emerald-500",
-      chip: "bg-emerald-500/10 text-emerald-500 ring-emerald-500/20",
+      tone: "text-primary",
+      chip: "bg-primary/10 text-primary ring-primary/20",
     };
   if (d.includes("reject") || d.includes("dismiss"))
     return {
       label: "Rejected",
       icon: XCircle,
-      tone: "text-rose-500",
-      chip: "bg-rose-500/10 text-rose-500 ring-rose-500/20",
+      tone: "text-destructive",
+      chip: "bg-destructive/10 text-destructive ring-destructive/20",
     };
   if (d.includes("edit"))
     return {
       label: "Edited",
       icon: PencilLine,
-      tone: "text-amber-500",
-      chip: "bg-amber-500/10 text-amber-500 ring-amber-500/20",
+      tone: "text-primary",
+      chip: "bg-primary/10 text-primary ring-primary/25",
     };
   return {
     label: "Pending",
@@ -92,21 +108,6 @@ function numeric(v: number | string | undefined): number | null {
     return Number.isFinite(n) ? n : null;
   }
   return null;
-}
-
-/** Build a gently rising acceptance-rate series that lands on `rate`. */
-function trendSeries(rate: number, points = 12): number[] {
-  const end = Math.max(0.05, Math.min(0.98, rate));
-  const start = Math.max(0.05, end - 0.34);
-  const out: number[] = [];
-  for (let i = 0; i < points; i += 1) {
-    const t = i / (points - 1);
-    // ease-out curve plus a little deterministic wobble
-    const eased = start + (end - start) * (1 - Math.pow(1 - t, 2));
-    const wobble = Math.sin(i * 1.7) * 0.012;
-    out.push(Math.max(0.03, Math.min(0.99, eased + wobble)));
-  }
-  return out;
 }
 
 function Sparkline({ series }: { series: number[] }) {
@@ -154,10 +155,16 @@ export function LearningPanel({ data }: { data: LearningData }) {
   const { episodes, accepted_rate, before_after } = data;
   const before = numeric(before_after.before);
   const after = numeric(before_after.after);
-  const hasDelta = before !== null && after !== null;
+  const nrrHasData = before_after.has_data !== false;
+  const hasDelta = nrrHasData && before !== null && after !== null;
   const delta = hasDelta ? after! - before! : null;
   const improved = delta !== null ? delta >= 0 : true;
-  const series = trendSeries(accepted_rate);
+  // The acceptance trend is the REAL cumulative series from /learning, one
+  // point per recorded decision. No synthetic curve.
+  const series = (data.trend ?? [])
+    .map((p) => p.rate)
+    .filter((r) => Number.isFinite(r));
+  const decided = data.decided ?? series.length;
 
   // Surface the most instructive "wrong call that got corrected".
   const learnedFrom =
@@ -175,44 +182,59 @@ export function LearningPanel({ data }: { data: LearningData }) {
             <CardDescription className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide">
               <TrendingUp className="h-3.5 w-3.5" />
               Outcome delta
+              <span
+                className="ml-auto rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground"
+                title="Projection, not an actual. Derived from the outcome simulator across decided episodes, weighted by confidence and the recorded human decision."
+              >
+                Projected
+              </span>
             </CardDescription>
             <CardTitle className="text-base">{before_after.kpi}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-end gap-3">
-              <div className="flex flex-col">
-                <span className="text-xs text-muted-foreground">Before</span>
-                <span className="text-2xl font-semibold tabular-nums text-muted-foreground">
-                  {String(before_after.before)}
-                </span>
-              </div>
-              <ArrowRight className="mb-2 h-5 w-5 text-muted-foreground" />
-              <div className="flex flex-col">
-                <span className="text-xs text-muted-foreground">After</span>
-                <span
-                  className={cn(
-                    "text-3xl font-semibold tabular-nums",
-                    improved ? "text-emerald-500" : "text-rose-500"
-                  )}
-                >
-                  {String(before_after.after)}
-                </span>
-              </div>
-            </div>
-            {delta !== null ? (
-              <div
-                className={cn(
-                  "mt-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
-                  improved
-                    ? "bg-emerald-500/10 text-emerald-500 ring-emerald-500/20"
-                    : "bg-rose-500/10 text-rose-500 ring-rose-500/20"
-                )}
-              >
-                <TrendingUp className="h-3 w-3" />
-                {improved ? "+" : ""}
-                {delta.toFixed(Math.abs(delta) < 1 ? 2 : 0)} since feedback loop
-              </div>
-            ) : null}
+            {nrrHasData ? (
+              <>
+                <div className="flex items-end gap-3">
+                  <div className="flex flex-col">
+                    <span className="text-xs text-muted-foreground">Before</span>
+                    <span className="font-mono text-2xl font-semibold tabular text-muted-foreground">
+                      {String(before_after.before)}
+                    </span>
+                  </div>
+                  <ArrowRight className="mb-2 h-5 w-5 text-muted-foreground" />
+                  <div className="flex flex-col">
+                    <span className="text-xs text-muted-foreground">After</span>
+                    <span
+                      className={cn(
+                        "font-mono text-3xl font-semibold tabular",
+                        improved ? "text-primary" : "text-destructive"
+                      )}
+                    >
+                      {String(before_after.after)}
+                    </span>
+                  </div>
+                </div>
+                {delta !== null ? (
+                  <div
+                    className={cn(
+                      "mt-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
+                      improved
+                        ? "bg-primary/10 text-primary ring-primary/20"
+                        : "bg-destructive/10 text-destructive ring-destructive/20"
+                    )}
+                  >
+                    <TrendingUp className="h-3 w-3" />
+                    {improved ? "+" : ""}
+                    {delta.toFixed(Math.abs(delta) < 1 ? 2 : 0)} projected
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Projected NRR appears once decided episodes carry a measured
+                metric. Run more outcomes to populate it.
+              </p>
+            )}
             {before_after.note ? (
               <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
                 {before_after.note}
@@ -243,18 +265,21 @@ export function LearningPanel({ data }: { data: LearningData }) {
             </div>
           </CardHeader>
           <CardContent>
-            <Sparkline series={series} />
+            {series.length >= 2 ? (
+              <Sparkline series={series} />
+            ) : (
+              <div className="flex h-14 items-center text-xs text-muted-foreground">
+                Trend appears once at least two decisions are recorded.
+              </div>
+            )}
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              As outcomes are recorded, the recommender reweights its playbooks.
-              Acceptance has climbed from{" "}
-              <span className="font-medium text-foreground">
-                {Math.round(series[0] * 100)}%
-              </span>{" "}
-              to{" "}
-              <span className="font-medium text-foreground">
+              Cumulative acceptance after each recorded decision (real, not a
+              modeled curve). Current acceptance is{" "}
+              <span className="font-mono font-medium tabular text-foreground">
                 {Math.round(accepted_rate * 100)}%
               </span>{" "}
-              across {episodes.length} logged episodes.
+              across {decided}{" "}
+              {decided === 1 ? "decided episode" : "decided episodes"}.
             </p>
           </CardContent>
         </Card>
@@ -283,7 +308,7 @@ export function LearningPanel({ data }: { data: LearningData }) {
                   {learnedFrom.recommendation?.action?.title ||
                     learnedFrom.action_key}
                 </p>
-                <span className="text-xs text-rose-500">
+                <span className="text-xs text-destructive">
                   {decisionMeta(learnedFrom.decision).label}
                   {learnedFrom.reason ? ` -> ${learnedFrom.reason}` : ""}
                 </span>
@@ -293,7 +318,7 @@ export function LearningPanel({ data }: { data: LearningData }) {
                 <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Now
                 </span>
-                <p className="font-medium text-emerald-500">
+                <p className="font-medium text-primary">
                   Reweighted toward the preferred play
                 </p>
                 <span className="text-xs text-muted-foreground">

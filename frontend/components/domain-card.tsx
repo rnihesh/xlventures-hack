@@ -38,7 +38,7 @@ export function DomainCard({
       )}
     >
       {active ? (
-        <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-500 ring-1 ring-inset ring-emerald-500/20">
+        <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary ring-1 ring-inset ring-primary/20">
           <CheckCircle2 className="h-3 w-3" />
           Active
         </span>

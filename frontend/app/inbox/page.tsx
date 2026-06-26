@@ -2,15 +2,35 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Inbox as InboxIcon, Play, Radar, SlidersHorizontal } from "lucide-react";
+import {
+  ArrowRight,
+  Download,
+  Inbox as InboxIcon,
+  Loader2,
+  Play,
+  Plus,
+  Radar,
+  SlidersHorizontal,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/states";
-import { riskVariant, formatArr, healthTone } from "@/components/account-table";
+import { toast } from "@/components/ui/toast";
+import {
+  AddAccountButton,
+  AddAccountDialog,
+} from "@/components/add-account-dialog";
+import {
+  riskVariant,
+  formatArr,
+  healthTone,
+  healthLabel,
+} from "@/components/account-table";
 import { cn } from "@/lib/utils";
 import { getAccounts } from "@/lib/api";
+import { importDemoAccounts } from "@/lib/api/accounts-admin";
 import type { Account } from "@/lib/types";
 
 const RISK_ORDER: Record<string, number> = { high: 3, medium: 2, low: 1 };
@@ -46,21 +66,25 @@ function TriageRow({ account }: { account: Account }) {
             {account.name}
           </Link>
           <Badge variant={riskVariant(account.risk_level)}>
-            {String(account.risk_level)} risk
+            {String(account.risk_level)} churn risk
           </Badge>
           <span className="text-xs text-muted-foreground">
-            health {account.health_score} · {formatArr(account.arr)} ARR
+            Health {account.health_score} ({healthLabel(account.health_score)}){" "}
+            · {formatArr(account.arr)} ARR
           </span>
         </div>
         <p className="mt-1 flex items-start gap-1.5 text-sm text-muted-foreground">
           <Radar className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
-          <span className="line-clamp-2">{account.last_signal}</span>
+          <span className="line-clamp-2">
+            <span className="text-muted-foreground/70">Latest signal: </span>
+            {account.last_signal}
+          </span>
         </p>
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
         <Button asChild variant="outline" size="sm">
-          <Link href={`/accounts/${account.account_id}`}>360</Link>
+          <Link href={`/accounts/${account.account_id}`}>View account</Link>
         </Button>
         <Button asChild size="sm">
           <Link href={runHref(account)}>
@@ -78,12 +102,39 @@ export default function InboxPage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [error, setError] = useState(false);
   const [nonce, setNonce] = useState(0);
+  const [importing, setImporting] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   const retry = useCallback(() => {
     setError(false);
     setAccounts(null);
     setNonce((n) => n + 1);
   }, []);
+
+  // Re-fetch in place after a mutation without flashing the skeleton.
+  const refresh = useCallback(() => {
+    setError(false);
+    setNonce((n) => n + 1);
+  }, []);
+
+  const onImportDemo = useCallback(async () => {
+    setImporting(true);
+    try {
+      const { imported } = await importDemoAccounts();
+      toast(`Imported ${imported} demo accounts`, {
+        variant: "success",
+        description: "Your inbox is ready to triage.",
+      });
+      retry();
+    } catch {
+      toast("Could not import demo accounts", {
+        variant: "error",
+        description: "Check your connection and try again.",
+      });
+    } finally {
+      setImporting(false);
+    }
+  }, [retry]);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -132,15 +183,23 @@ export default function InboxPage() {
             risk then health.
           </p>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/accounts">
-            All accounts
-            <ArrowRight className="ml-1 h-4 w-4" />
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline">
+            <Link href="/accounts">
+              All accounts
+              <ArrowRight className="ml-1 h-4 w-4" />
+            </Link>
+          </Button>
+          <AddAccountButton onCreated={refresh} />
+        </div>
       </header>
 
-      <div className="mb-4 flex items-center gap-2">
+      <div
+        className={cn(
+          "mb-4 flex items-center gap-2",
+          accounts !== null && accounts.length === 0 && "hidden",
+        )}
+      >
         <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
         <div className="flex flex-wrap gap-1.5">
           {FILTERS.map((f) => (
@@ -179,6 +238,32 @@ export default function InboxPage() {
               <Skeleton className="h-8 w-24" />
             </div>
           ))
+        ) : accounts.length === 0 ? (
+          <EmptyState
+            icon={InboxIcon}
+            title="No accounts yet"
+            description="Add your first account or import the demo set to start triaging next best actions."
+          >
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+              <Button type="button" onClick={() => setAddOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Add account
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onImportDemo}
+                disabled={importing}
+              >
+                {importing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                Import demo accounts
+              </Button>
+            </div>
+          </EmptyState>
         ) : queue.length === 0 ? (
           <EmptyState
             icon={InboxIcon}
@@ -195,6 +280,12 @@ export default function InboxPage() {
           ))
         )}
       </div>
+
+      <AddAccountDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onCreated={refresh}
+      />
     </div>
   );
 }

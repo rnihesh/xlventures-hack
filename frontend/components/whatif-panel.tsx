@@ -224,7 +224,7 @@ export function WhatIfPanel({
         </div>
 
         {error ? (
-          <p className="text-sm text-rose-500" role="alert">
+          <p className="text-sm text-destructive" role="alert">
             {error}
           </p>
         ) : null}

@@ -1,21 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   Check,
+  CheckCircle2,
   Copy,
   Hash,
   ListTodo,
   Loader2,
   Mail,
+  PlugZap,
   Send,
+  Settings,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
 import {
   Card,
   CardContent,
@@ -28,11 +31,13 @@ import { cn } from "@/lib/utils";
 import type { Recommendation } from "@/lib/types";
 import {
   executeAction,
+  sendArtifact,
   type Artifact,
   type ArtifactType,
   type AuditRecord,
   type CrmTaskArtifact,
   type EmailArtifact,
+  type SendResult,
   type SlackArtifact,
 } from "@/lib/api/actions";
 
@@ -61,6 +66,21 @@ const TYPE_LABEL: Record<ArtifactType, string> = {
   crm_task: "CRM task",
   slack: "Slack handoff",
 };
+
+// Short, human channel noun used in send results and the connect-in-settings
+// hint, eg "Connect Email in Settings to send".
+const CHANNEL_NOUN: Record<ArtifactType, string> = {
+  email: "Email",
+  crm_task: "CRM",
+  slack: "Slack",
+};
+
+// A not-sent result is a missing-connection state (vs a hard failure) when the
+// backend reports a *_not_configured / *_not_connected reason.
+function isNotConfigured(reason?: string): boolean {
+  if (!reason) return true;
+  return /not_configured|not_connected/.test(reason);
+}
 
 function isEmail(a: Artifact, t: ArtifactType): a is EmailArtifact {
   return t === "email";
@@ -93,7 +113,7 @@ function CopyButton({ text }: { text: string }) {
       onClick={copy}
       className="gap-1.5"
     >
-      {copied ? <Check className="text-emerald-500" /> : <Copy />}
+      {copied ? <Check className="text-primary" /> : <Copy />}
       {copied ? "Copied" : "Copy"}
     </Button>
   );
@@ -127,6 +147,10 @@ export function ExecutePanel({
   const [artifact, setArtifact] = useState<Artifact | null>(null);
   const [audit, setAudit] = useState<AuditRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<SendResult | null>(null);
+
+  const sent = sendResult?.sent === true;
 
   const resolvedAccountId =
     accountId ?? recommendation?.account_id ?? null;
@@ -134,6 +158,7 @@ export function ExecutePanel({
   async function run(type: ArtifactType) {
     setPendingType(type);
     setError(null);
+    setSendResult(null);
     try {
       const res = await executeAction({
         artifact_type: type,
@@ -178,6 +203,55 @@ export function ExecutePanel({
 
   function patch(next: Partial<Artifact>) {
     setArtifact((prev) => (prev ? ({ ...prev, ...next } as Artifact) : prev));
+    // An edit invalidates a prior send so the user can re-send the revision.
+    setSendResult(null);
+  }
+
+  // Recipient shown in the success line: where the artifact actually went.
+  function sentTo(result: SendResult): string | null {
+    if (result.to) return result.to;
+    if (activeType && isSlack(artifact as Artifact, activeType)) {
+      return (artifact as SlackArtifact).channel;
+    }
+    if (activeType === "email" && resolvedAccountId) return resolvedAccountId;
+    return null;
+  }
+
+  // Really dispatch the (possibly edited) artifact through its channel. The
+  // human stays in the loop: this only runs on an explicit click, and the
+  // result is rendered inline (success or connect-in-settings), never a throw.
+  async function send() {
+    if (!artifact || !activeType || sending) return;
+    setSending(true);
+    setError(null);
+    const action = recommendation?.action;
+    try {
+      const result = await sendArtifact({
+        artifact_type: activeType,
+        artifact,
+        run_id: runId ?? undefined,
+        account_id: resolvedAccountId ?? undefined,
+        recommendation_id: recommendation?.id ?? undefined,
+        action_key: action?.key ?? undefined,
+      });
+      setSendResult(result);
+      if (result.sent) {
+        const where = sentTo(result);
+        toast(`${TYPE_LABEL[activeType]} sent`, {
+          description: where
+            ? `Delivered to ${where}.`
+            : "Delivered successfully.",
+          variant: "success",
+        });
+      } else {
+        toast(`${CHANNEL_NOUN[activeType]} not connected`, {
+          description: "Connect it in Settings, then send again.",
+          variant: "info",
+        });
+      }
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -228,20 +302,39 @@ export function ExecutePanel({
         </div>
 
         {error ? (
-          <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>
+          <p className="text-sm text-destructive">{error}</p>
         ) : null}
 
         {artifact && activeType ? (
-          <>
-            <Separator />
-            <div className="flex items-center justify-between gap-3">
+          <div className="space-y-4 rounded-xl border border-border bg-background/50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold">
                   {TYPE_LABEL[activeType]}
                 </span>
-                <Badge variant="outline">Editable preview</Badge>
+                <Badge variant={sent ? "success" : "outline"}>
+                  {sent ? "Sent" : "Editable preview"}
+                </Badge>
               </div>
-              <CopyButton text={copyText()} />
+              <div className="flex items-center gap-2">
+                <CopyButton text={copyText()} />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={send}
+                  disabled={sent || sending}
+                  className="gap-1.5"
+                >
+                  {sending ? (
+                    <Loader2 className="animate-spin" />
+                  ) : sent ? (
+                    <Check />
+                  ) : (
+                    <Send />
+                  )}
+                  {sending ? "Sending" : sent ? "Sent" : "Send"}
+                </Button>
+              </div>
             </div>
 
             {isEmail(artifact, activeType) ? (
@@ -330,7 +423,67 @@ export function ExecutePanel({
                 </Field>
               </div>
             ) : null}
-          </>
+
+            {sendResult ? (
+              sendResult.sent ? (
+                <div className="flex items-start gap-3 rounded-lg border border-primary/25 bg-primary/5 p-3">
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <div className="space-y-0.5 text-sm">
+                    <p className="font-medium text-foreground">
+                      {CHANNEL_NOUN[activeType]} sent
+                      {sentTo(sendResult)
+                        ? ` to ${sentTo(sendResult)}`
+                        : ""}
+                    </p>
+                    {sendResult.detail ? (
+                      <p className="text-muted-foreground">
+                        {sendResult.detail}
+                      </p>
+                    ) : (
+                      <p className="text-muted-foreground">
+                        Delivered and logged to the audit trail.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : isNotConfigured(sendResult.reason) ? (
+                <div className="flex flex-wrap items-start gap-3 rounded-lg border border-border bg-muted/40 p-3">
+                  <PlugZap className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <div className="min-w-0 flex-1 space-y-2 text-sm">
+                    <div className="space-y-0.5">
+                      <p className="font-medium text-foreground">
+                        Connect {CHANNEL_NOUN[activeType]} in Settings to send
+                      </p>
+                      <p className="text-muted-foreground">
+                        {sendResult.detail ??
+                          `Your draft is saved. Add ${CHANNEL_NOUN[activeType]} credentials, then send again.`}
+                      </p>
+                    </div>
+                    <Button asChild size="sm" variant="outline" className="gap-1.5">
+                      <Link href="/settings">
+                        <Settings />
+                        Open Settings
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start gap-3 rounded-lg border border-destructive/25 bg-destructive/5 p-3">
+                  <Send className="mt-0.5 size-4 shrink-0 text-destructive" />
+                  <div className="space-y-0.5 text-sm">
+                    <p className="font-medium text-destructive">
+                      Could not send {CHANNEL_NOUN[activeType]}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {sendResult.detail ??
+                        sendResult.reason ??
+                        "The channel rejected the send. Try again or edit the draft."}
+                    </p>
+                  </div>
+                </div>
+              )
+            ) : null}
+          </div>
         ) : (
           <p className="text-sm text-muted-foreground">
             Pick an action to generate a draft you can edit and copy.

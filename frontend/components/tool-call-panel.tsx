@@ -68,6 +68,25 @@ function nodeName(data: Record<string, unknown>): string {
   return readStr(data, "node") || readStr(data, "name") || "node";
 }
 
+// Map each graph node to the underlying tool/function it invokes, so the Tool
+// calls view reads as a function-call log (distinct from the narrative trace).
+const NODE_TO_TOOL: Record<string, string> = {
+  planner: "plan_strategy",
+  retrieval: "search_knowledge",
+  risk_scorer: "score_risk",
+  play_recommender: "rank_plays",
+  outcome_simulator: "simulate_outcome",
+  drafter: "draft_artifact",
+  critic: "verify_and_score",
+  policy_gate: "evaluate_policy",
+  hitl_gate: "request_approval",
+  commit: "write_episode",
+};
+
+function toolForNode(node: string): string {
+  return NODE_TO_TOOL[node] ?? node;
+}
+
 function buildCalls(events: AgentEvent[]): ToolCall[] {
   const calls: ToolCall[] = [];
   // Index of the most recent unfinished call per node, so a finish event
@@ -83,7 +102,7 @@ function buildCalls(events: AgentEvent[]): ToolCall[] {
         key: `call:${evt.seq}:${node}`,
         seq: evt.seq,
         node,
-        tool: node,
+        tool: toolForNode(node),
         status: "running",
         startedTs: evt.ts,
       });
@@ -94,7 +113,7 @@ function buildCalls(events: AgentEvent[]): ToolCall[] {
       const idx = openByNode.get(node);
       const target = idx !== undefined ? calls[idx] : undefined;
 
-      const tool = readStr(stepData, "tool") || node;
+      const tool = readStr(stepData, "tool") || toolForNode(node);
       const inputsSummary = readStr(stepData, "inputs_summary");
       const outputsSummary =
         readStr(stepData, "outputs_summary") || readStr(data, "summary");
@@ -156,10 +175,9 @@ function fmtLatency(ms?: number): string {
   return `${(ms / 1000).toFixed(ms < 10000 ? 2 : 1)} s`;
 }
 
-function latencyTone(ms?: number): "muted" | "success" | "warning" | "danger" {
+function latencyTone(ms?: number): "muted" | "danger" {
   if (ms === undefined) return "muted";
-  if (ms < 250) return "success";
-  if (ms < 1500) return "warning";
+  if (ms < 1500) return "muted";
   return "danger";
 }
 
@@ -180,10 +198,10 @@ function ToolCallRow({ call, index }: ToolCallRowProps) {
   const [open, setOpen] = useState(false);
   const dotTone =
     call.status === "running"
-      ? "bg-amber-400 animate-pulse"
+      ? "bg-primary animate-pulse"
       : call.status === "error"
-        ? "bg-rose-500"
-        : "bg-emerald-500";
+        ? "bg-destructive"
+        : "bg-foreground/50";
 
   return (
     <li className="animate-rise overflow-hidden rounded-lg border border-border bg-card">
@@ -225,7 +243,7 @@ function ToolCallRow({ call, index }: ToolCallRowProps) {
             label="output"
             value={call.outputsSummary}
             mono
-            tone="emerald"
+            tone="accent"
           />
           {call.raw && Object.keys(call.raw).length > 0 && (
             <details className="group">
@@ -252,7 +270,7 @@ function Field({
   label: string;
   value?: string;
   mono?: boolean;
-  tone?: "emerald";
+  tone?: "accent";
 }) {
   return (
     <div>
@@ -263,7 +281,7 @@ function Field({
         className={cn(
           "mt-0.5 break-words text-foreground",
           mono && "font-mono text-[11px]",
-          tone === "emerald" && "text-emerald-600 dark:text-emerald-400",
+          tone === "accent" && "text-primary",
           !value && "italic text-muted-foreground",
         )}
       >
@@ -293,7 +311,7 @@ export function ToolCallPanel({ events, className }: ToolCallPanelProps) {
             <span
               className={cn(
                 "h-2 w-2 rounded-full",
-                active ? "animate-pulse bg-amber-400" : "bg-muted-foreground/40",
+                active ? "animate-pulse bg-primary" : "bg-muted-foreground/40",
               )}
             />
             Tool calls

@@ -54,19 +54,19 @@ const STATUS_META: Record<
     label: "Pass",
     icon: CheckCircle2,
     badge: "success",
-    tone: "text-emerald-500",
+    tone: "text-primary",
   },
   warn: {
     label: "Warn",
     icon: AlertTriangle,
     badge: "warning",
-    tone: "text-amber-500",
+    tone: "text-primary",
   },
   fail: {
     label: "Fail",
     icon: XCircle,
     badge: "danger",
-    tone: "text-rose-500",
+    tone: "text-destructive",
   },
 };
 
@@ -100,13 +100,13 @@ export function PolicyPanel({ gates, domain, className }: PolicyPanelProps) {
   );
 
   return (
-    <Card className={cn(holding && "border-amber-500/40", className)}>
+    <Card className={cn(holding && "border-primary/40", className)}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardDescription className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide">
               {holding ? (
-                <ShieldAlert className="h-3.5 w-3.5 text-amber-500" />
+                <ShieldAlert className="h-3.5 w-3.5 text-primary" />
               ) : (
                 <ShieldCheck className="h-3.5 w-3.5 text-primary" />
               )}
@@ -143,7 +143,7 @@ export function PolicyPanel({ gates, domain, className }: PolicyPanelProps) {
                   key={gate.rule_id}
                   className={cn(
                     "flex items-start gap-3 px-6 py-3.5",
-                    flagged && "bg-amber-500/[0.06]",
+                    flagged && "bg-primary/[0.06]",
                   )}
                 >
                   <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", meta.tone)} />

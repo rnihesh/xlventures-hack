@@ -7,6 +7,8 @@ import { DomainCard, type DomainSummary } from "@/components/domain-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/states";
 import { getDomains } from "@/lib/api";
+import { toast } from "@/components/ui/toast";
+import { getActiveDomain, setActiveDomain } from "@/lib/active-domain";
 
 const FALLBACK: DomainSummary[] = [
   {
@@ -29,10 +31,30 @@ const FALLBACK: DomainSummary[] = [
   },
 ];
 
+// The persisted active pack wins when it is present in the list; otherwise the
+// flagship Customer Success pack is the default active selection.
+function resolveActive(list: DomainSummary[]): string | null {
+  const stored = getActiveDomain();
+  if (list.some((d) => d.key === stored)) return stored;
+  return (
+    list.find((d) => d.key === "customer_success")?.key ?? list[0]?.key ?? null
+  );
+}
+
 export default function DomainsPage() {
   const [domains, setDomains] = useState<DomainSummary[] | null>(null);
   const [active, setActive] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const handleActivate = (key: string) => {
+    setActive(key);
+    setActiveDomain(key);
+    const name = domains?.find((d) => d.key === key)?.display_name ?? key;
+    toast(`${name} is now the active pack`, {
+      description: "New runs default to this domain on the Run page.",
+      variant: "success",
+    });
+  };
 
   useEffect(() => {
     let alive = true;
@@ -42,12 +64,12 @@ export default function DomainsPage() {
         const list = Array.isArray(res) && res.length > 0 ? res : FALLBACK;
         if (alive) {
           setDomains(list);
-          setActive(list[0]?.key ?? null);
+          setActive(resolveActive(list));
         }
       } catch {
         if (alive) {
           setDomains(FALLBACK);
-          setActive(FALLBACK[0].key);
+          setActive(resolveActive(FALLBACK));
         }
       } finally {
         if (alive) setLoading(false);
@@ -120,7 +142,7 @@ export default function DomainsPage() {
                   key={d.key}
                   domain={d}
                   active={active === d.key}
-                  onActivate={setActive}
+                  onActivate={handleActivate}
                 />
               ))}
             </div>
