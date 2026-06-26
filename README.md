@@ -93,11 +93,27 @@ docs/           PLAN.md and design docs
 
 ## How to run
 
-Copy the environment template first. Every value is optional; blanks select the offline fallbacks.
+Config lives in a single root `.env` (already templated in `.env.example`). Every value is optional: with all blanks the app runs fully offline with deterministic stubs (no OpenAI key, no database). Copy the template if you do not already have a `.env`:
 
 ```bash
 cp .env.example .env
 ```
+
+### Quickstart (two terminals)
+
+```bash
+# terminal 1: backend (loads ./.env, http://localhost:8000)
+make install        # cd backend && uv sync --extra dev
+make api            # live mode (uses OPENAI_API_KEY if set, else offline)
+#   or: make demo   # forced deterministic DEMO_MODE for recording the demo
+
+# terminal 2: frontend (http://localhost:3000)
+cd frontend && npm install && npm run dev
+```
+
+Open http://localhost:3000. The backend env (including `DEMO_MODE`, `APP_TOKEN`, `DATABASE_URL`) is loaded from `./.env` via `uv run --env-file`. The frontend reads `NEXT_PUBLIC_API_URL` from `frontend/.env.local`.
+
+One-command alternative (Docker): `make dev` brings up Postgres + pgvector, the API, and the web app together, reading the same root `.env`.
 
 ### Backend (uv)
 
