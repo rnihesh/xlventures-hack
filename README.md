@@ -1,8 +1,8 @@
-# Intelligent Next Best Action — Agentic Decision Intelligence Platform
+# Intelligent Next Best Action: Agentic Decision Intelligence Platform
 
 XLVentures Hackathon · Project 2 (selected).
 
-A domain-agnostic agentic decision engine that turns raw business signals into **explainable, confidence-scored Next Best Actions** — gated by human-in-the-loop approval and getting measurably smarter every time a human says yes or no.
+A domain-agnostic agentic decision engine that turns raw business signals into **explainable, confidence-scored Next Best Actions**, gated by human-in-the-loop approval and getting measurably smarter every time a human says yes or no.
 
 - **Flagship domain:** Customer Success / Churn (engine is domain-agnostic via YAML Domain Packs).
 - **Orchestration:** LangGraph (dynamic planner + specialist agents, durable checkpointing, HITL interrupts, memory store).
