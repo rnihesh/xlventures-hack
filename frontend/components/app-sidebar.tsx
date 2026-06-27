@@ -15,6 +15,7 @@ import {
   GraduationCap,
   FlaskConical,
   Workflow,
+  Network,
   Boxes,
   SlidersHorizontal,
   Settings,
@@ -246,6 +247,12 @@ const SECTIONS: NavSection[] = [
         href: "/domains",
         icon: Boxes,
         match: (p) => p.startsWith("/domains"),
+      },
+      {
+        label: "Workflow",
+        href: "/workflow",
+        icon: Network,
+        match: (p) => p.startsWith("/workflow"),
       },
       {
         label: "Rules",
