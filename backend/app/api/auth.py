@@ -84,6 +84,7 @@ def _set_session_cookie(response: Response, token: str) -> None:
         secure=secure,
         samesite="lax",
         path="/",
+        domain=settings.cookie_domain or None,
     )
 
 
@@ -193,7 +194,9 @@ async def login(payload: LoginRequest, response: Response) -> dict:
 async def logout(response: Response) -> dict:
     """Clear the session cookie."""
 
-    response.delete_cookie(key=SESSION_COOKIE, path="/")
+    response.delete_cookie(
+        key=SESSION_COOKIE, path="/", domain=settings.cookie_domain or None
+    )
     return {"ok": True}
 
 
@@ -259,6 +262,7 @@ async def google_start(response: Response) -> dict:
         secure=settings.app_env.lower() in {"production", "prod", "staging"},
         samesite="lax",
         path="/",
+        domain=settings.cookie_domain or None,
     )
     return {"configured": True, "url": google_oauth.consent_url(state=state)}
 
@@ -277,7 +281,9 @@ async def google_exchange(
     # single-use server set. The cookie binds the flow to the initiating agent
     # (the shared set alone is not enough against login CSRF).
     cookie_state = request.cookies.get(_GOOGLE_STATE_COOKIE)
-    response.delete_cookie(_GOOGLE_STATE_COOKIE, path="/")
+    response.delete_cookie(
+        _GOOGLE_STATE_COOKIE, path="/", domain=settings.cookie_domain or None
+    )
     if (
         not body.state
         or not cookie_state

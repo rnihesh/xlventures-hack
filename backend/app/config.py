@@ -69,6 +69,11 @@ class Settings(BaseSettings):
     langsmith_tracing: bool = False
     langsmith_endpoint: str | None = None
 
+    # Domain for the session cookie. Blank = host-only (local dev). Set to a
+    # parent domain (e.g. ".niheshr.com") so the cookie is shared between the
+    # frontend (aperture.niheshr.com) and the API (aperture-api.niheshr.com).
+    cookie_domain: str = ""
+
     # --- CORS ----------------------------------------------------------------
     # Comma-separated exact origins (e.g. "http://localhost:3200,http://localhost:3001").
     cors_origins: str = "http://localhost:3200"
