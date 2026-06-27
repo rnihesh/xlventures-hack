@@ -10,10 +10,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8200";
+
+// The public origin of THIS app. Behind a reverse proxy the server binds to
+// 0.0.0.0:3200, so req.url would redirect the browser to 0.0.0.0. Build the
+// origin from the forwarded host/proto (nginx sets them), falling back to the
+// configured site URL, then req.url for local dev.
+function publicOrigin(req: NextRequest): string {
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+  const proto =
+    req.headers.get("x-forwarded-proto") ||
+    new URL(req.url).protocol.replace(":", "");
+  if (host) return `${proto}://${host}`;
+  return process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin;
+}
 
 function loginError(req: NextRequest, reason: string): NextResponse {
-  const url = new URL("/login", req.url);
+  const url = new URL("/login", publicOrigin(req));
   url.searchParams.set("error", reason);
   return NextResponse.redirect(url);
 }
@@ -45,7 +58,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       return loginError(req, "google");
     }
 
-    const redirectRes = NextResponse.redirect(new URL("/dashboard", req.url));
+    const redirectRes = NextResponse.redirect(
+      new URL("/dashboard", publicOrigin(req)),
+    );
     // Relay the backend's session cookie to the browser so the user is signed in.
     const setCookie = res.headers.get("set-cookie");
     if (setCookie) {
