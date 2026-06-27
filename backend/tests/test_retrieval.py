@@ -65,3 +65,31 @@ async def test_empty_query_returns_no_evidence() -> None:
 
     retriever: Retriever = get_retriever("customer_success")
     assert await retriever.search("   ", account_id=None, k=5) == []
+
+
+async def test_ingested_evidence_is_org_scoped() -> None:
+    """One org's ingested evidence is never retrieved by another org.
+
+    Uses a fresh retriever so the assertion is isolated from the shared corpus.
+    Seed knowledge (org_id None) stays shared; ingested chunks are private to
+    their owning org.
+    """
+
+    retriever = Retriever("customer_success")
+    marker = "zzqphlx unique competitor bake-off before the renewal"
+    retriever.add_document(
+        doc_id="ingest::test::orgA",
+        account_id=None,
+        source_type="meeting_notes",
+        title="Org A private note",
+        text=marker,
+        org_id="org_a",
+    )
+
+    mine = await retriever.search(marker, account_id=None, k=5, org_id="org_a")
+    assert any(marker in ev.snippet for ev in mine), "owner org must see its evidence"
+
+    theirs = await retriever.search(marker, account_id=None, k=5, org_id="org_b")
+    assert all(
+        marker not in ev.snippet for ev in theirs
+    ), "a different org must not retrieve another org's ingested evidence"

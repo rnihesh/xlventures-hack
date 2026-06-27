@@ -65,6 +65,7 @@ class WebSearchConnector:
         account_id: Optional[str] = None,
         domain: str = "customer_success",
         title: Optional[str] = None,
+        org_id: Optional[str] = None,
         **_: Any,
     ) -> IngestResult:
         """Run a live search for ``query`` and ingest the snippets it returns."""
@@ -113,4 +114,5 @@ class WebSearchConnector:
             title=title or f"Web search: {q}",
             account_id=account_id,
             domain=domain,
+            org_id=org_id,
         )

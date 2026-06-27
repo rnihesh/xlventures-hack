@@ -155,6 +155,7 @@ async def _persist_pgvector(
                     "start_char": chunk.start,
                     "end_char": chunk.end,
                     "embedding": matrix[i].tolist(),
+                    "org_id": chunk.org_id,
                 }
             )
         return await repo.upsert_chunks(rows)
@@ -169,6 +170,7 @@ async def ingest_text(
     title: Optional[str] = None,
     account_id: Optional[str] = None,
     domain: str = "customer_success",
+    org_id: Optional[str] = None,
 ) -> IngestResult:
     """Ingest raw interaction text into the live retrieval corpus.
 
@@ -176,6 +178,10 @@ async def ingest_text(
     chunking, embedding (hash fallback), and the in-memory index never require a
     network or a database. When a database is configured the chunks are also
     persisted to pgvector for durable semantic retrieval.
+
+    ``org_id`` is the owning tenant: it stamps every chunk (in-memory and
+    pgvector) so only that org retrieves this evidence. None keeps the document
+    shared (used by seed/offline paths that pre-date multi-tenant scoping).
     """
     body = (text or "").strip()
     if not body:
@@ -201,6 +207,7 @@ async def ingest_text(
         source_type=src,
         title=clean_title,
         text=body,
+        org_id=org_id,
     )
     if not chunks:
         return IngestResult(

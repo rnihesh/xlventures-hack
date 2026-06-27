@@ -76,6 +76,20 @@ def test_update_and_delete_account(client) -> None:
     assert client.delete(f"/accounts/{account_id}").status_code == 404
 
 
+def test_update_account_with_notes_ingests_org_scoped(client) -> None:
+    """Updating an account WITH notes must not 500 (org-scoped note ingest)."""
+
+    created = client.post("/accounts", json={"name": "Notes Co"}).json()
+    account_id = created["account_id"]
+
+    upd = client.put(
+        f"/accounts/{account_id}",
+        json={"risk_level": "high", "notes": "Sponsor churned, renewal exposed."},
+    )
+    assert upd.status_code == 200, upd.text
+    assert upd.json()["risk_level"] == "high"
+
+
 def test_import_demo_populates_and_isolated(app, client) -> None:
     """import-demo fills a fresh org; another org never sees its accounts."""
 

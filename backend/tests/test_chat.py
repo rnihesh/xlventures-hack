@@ -144,6 +144,53 @@ def test_get_last_run_and_tag_run_offline() -> None:
     assert any(t["tool"] == "tag_run" for t in tagged["trace"])
 
 
+def test_chat_search_is_org_scoped() -> None:
+    """A chat search/run under org A never surfaces org B's ingested evidence.
+
+    Org B ingests a private note carrying a unique token through the chat tools.
+    Org A then searches for that token through the chat tools and must NOT see
+    it (tenant isolation), while org B retrieves its own evidence and the shared
+    seed corpus stays visible to org A. This exercises the full thread: the
+    authenticated org passed to the agent binds every tool to that tenant.
+    """
+
+    secret = "Qwizzlebrump"
+    note = f"ingest this note: {secret} renewal risk escalation for the Vandelay account"
+    query = f"what do we know about {secret}"
+
+    async def run():
+        # Org B ingests private evidence through the chat layer.
+        ingest = await chat_agent.answer(
+            [{"role": "user", "content": note}], org_id="org_b"
+        )
+        # Org A searches for the same token through the chat layer.
+        org_a = await chat_agent.answer(
+            [{"role": "user", "content": query}], org_id="org_a"
+        )
+        # Org B searches for its own token.
+        org_b = await chat_agent.answer(
+            [{"role": "user", "content": query}], org_id="org_b"
+        )
+        # Org A still sees the shared seed corpus (org_id is None).
+        seed = await chat_agent.answer(
+            [{"role": "user", "content": "what do we know about health score and renewal risk"}],
+            org_id="org_a",
+        )
+        return ingest, org_a, org_b, seed
+
+    ingest, org_a, org_b, seed = asyncio.run(run())
+
+    assert any(t["tool"] == "ingest_interaction" for t in ingest["trace"])
+    assert any(t["tool"] == "search_knowledge" for t in org_a["trace"])
+
+    # Tenant isolation: org A never surfaces org B's private token.
+    assert secret.lower() not in org_a["answer"].lower()
+    # Org B retrieves its own ingested evidence.
+    assert secret.lower() in org_b["answer"].lower()
+    # Shared seed knowledge remains visible across orgs.
+    assert "snippet" in seed["answer"].lower() or "health" in seed["answer"].lower()
+
+
 def test_recommend_phrasing_still_runs_nba_not_send() -> None:
     """'what do we recommend for ACC-1001' runs the NBA pipeline, not a send."""
 

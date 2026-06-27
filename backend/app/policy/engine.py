@@ -299,6 +299,35 @@ def evaluate(
     return results
 
 
+def effective_policy_rules(
+    domain: str, overrides: Optional[Dict[str, Any]] = None
+) -> List[PolicyRule]:
+    """Resolve the policy rules for ``domain`` with an org's overrides applied.
+
+    Bridges the configurable-rules store to the evaluator: it merges the org's
+    ``overrides`` onto the base pack policies (via the pack loader) and returns
+    validated :class:`PolicyRule` objects ready to pass to :func:`evaluate`. So
+    a caller honours an org's edited rules with::
+
+        rules = effective_policy_rules(domain, overrides)
+        results = evaluate(recommendation, account, rules)
+
+    Falls back to the base policies if the override cannot be applied, so policy
+    evaluation never breaks on a malformed override.
+    """
+
+    try:
+        from app.packs.loader import effective_rules
+        from app.policy.rules import parse_policies
+
+        merged = effective_rules(domain, overrides or {})
+        return parse_policies(merged.get("policies"))
+    except Exception:  # noqa: BLE001 - degrade to base policies, never raise
+        from app.policy.rules import load_policies
+
+        return load_policies(domain)
+
+
 def evaluation_summary(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Aggregate gate results for quick consumption by the planner and UI."""
 

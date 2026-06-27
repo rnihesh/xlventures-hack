@@ -53,3 +53,7 @@ class Chunk:
     start: int
     end: int
     context: str
+    # Owning org for tenant scoping. None means shared knowledge (the seeded
+    # corpus) visible to every org; an org id restricts the chunk to that org so
+    # one tenant never retrieves another tenant's ingested evidence.
+    org_id: str | None = None

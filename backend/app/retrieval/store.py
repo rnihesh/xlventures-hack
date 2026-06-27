@@ -76,18 +76,27 @@ class Retriever:
             )
 
     # -- helpers ----------------------------------------------------------
-    def _candidate_indices(self, account_id: str | None) -> list[int]:
+    def _candidate_indices(
+        self, account_id: str | None, org_id: str = _DEMO_ORG
+    ) -> list[int]:
         """Indices eligible for this query.
 
-        Account-scoped queries see that account's chunks plus all shared
-        knowledge (account_id is None: KB articles + playbooks).
+        Tenant scoping first: a chunk is visible only when it is shared seed
+        knowledge (``chunk.org_id is None``) or owned by the querying ``org_id``,
+        so one org never retrieves another org's ingested evidence. Within that,
+        account-scoped queries additionally see that account's chunks plus all
+        shared (account_id is None) knowledge.
         """
+
+        def _org_ok(c: Chunk) -> bool:
+            return c.org_id is None or c.org_id == org_id
+
         if account_id is None:
-            return list(range(len(self._chunks)))
+            return [i for i, c in enumerate(self._chunks) if _org_ok(c)]
         return [
             i
             for i, c in enumerate(self._chunks)
-            if c.account_id == account_id or c.account_id is None
+            if _org_ok(c) and (c.account_id == account_id or c.account_id is None)
         ]
 
     async def _ensure_vector_backend(self) -> object | None:
@@ -200,7 +209,7 @@ class Retriever:
         if not query or not query.strip() or not self._chunks:
             return []
 
-        candidates = self._candidate_indices(account_id)
+        candidates = self._candidate_indices(account_id, org_id)
         if not candidates:
             return []
         allowed = set(candidates)
@@ -251,6 +260,7 @@ class Retriever:
         source_type: str,
         title: str,
         text: str,
+        org_id: str | None = None,
     ) -> list[Chunk]:
         """Index a new document into the live corpus so it is retrievable now.
 
@@ -270,6 +280,7 @@ class Retriever:
             source_type=source_type,
             title=title,
             text=text,
+            org_id=org_id,
         )
         if not new_chunks:
             return []

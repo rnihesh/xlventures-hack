@@ -11,9 +11,41 @@ All assertions hold offline (no DATABASE_URL, no AWS / Slack / Google creds):
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Dict
 
 from app.repositories import connectors as connectors_repo
+from app.services import slack as slack_service
+
+# A rich, pending recommendation used to exercise the Slack approval handoff.
+_PENDING_REC: Dict[str, Any] = {
+    "id": "rec_handoff_1",
+    "account_id": "acc_demo",
+    "action": {
+        "key": "schedule_ebr",
+        "title": "Schedule an executive business review",
+        "description": "Re-engage the sponsor before renewal.",
+    },
+    "rationale": "Usage fell sharply and the sponsor went quiet ahead of renewal.",
+    "confidence": {"score": 0.72, "label": "high", "method": "ensemble"},
+    "risk_opportunity": {
+        "type": "risk",
+        "summary": "Churn risk: usage down 32% with renewal in 45 days.",
+    },
+    "alternatives": [
+        {
+            "action": {"key": "schedule_ebr", "title": "Schedule an executive business review"},
+            "score": 0.72,
+            "why_not": None,
+            "chosen": True,
+        },
+        {
+            "action": {"key": "reonboard_email", "title": "Send a re-onboarding email"},
+            "score": 0.4,
+            "why_not": "Lower expected impact than a live review.",
+        },
+    ],
+}
 
 
 async def test_connectors_upsert_list_delete() -> None:
@@ -152,3 +184,114 @@ def test_execute_send_invalid_channel(client) -> None:
         json={"artifact_type": "carrier_pigeon", "artifact": {}},
     )
     assert resp.status_code == 422
+
+
+def test_approval_handoff_not_configured(client) -> None:
+    """With no Slack webhook saved, the handoff degrades to sent=False."""
+
+    # Ensure the demo org has no slack webhook so we hit the unconfigured path.
+    client.delete("/integrations/slack")
+
+    resp = client.post(
+        "/execute/approval-handoff",
+        json={"recommendation": _PENDING_REC, "account_id": "acc_demo"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["sent"] is False
+    assert body["reason"] == "slack_not_configured"
+    assert body["channel"] == "slack"
+
+
+def test_approval_handoff_posts_when_configured(client, monkeypatch) -> None:
+    """A saved webhook makes the handoff post a rich, org-scoped approval message."""
+
+    # A different tenant's webhook must never be used for this org's handoff.
+    asyncio.run(
+        connectors_repo.upsert(
+            "org_other_tenant", "slack", {"webhook_url": "https://hooks.slack.test/other"}
+        )
+    )
+
+    captured: Dict[str, Any] = {}
+
+    def fake_post(webhook_url: str | None, text: str) -> Dict[str, Any]:
+        captured["webhook_url"] = webhook_url
+        captured["text"] = text
+        return {"sent": True}
+
+    # Patch the module attribute the endpoint resolves at call time (no network).
+    monkeypatch.setattr(slack_service, "post_message", fake_post)
+
+    saved = client.put(
+        "/integrations/slack",
+        json={"config": {"webhook_url": "https://hooks.slack.test/demo"}},
+    )
+    assert saved.status_code == 200, saved.text
+
+    resp = client.post(
+        "/execute/approval-handoff",
+        json={"recommendation": _PENDING_REC, "account_id": "acc_demo"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["sent"] is True
+    assert body["channel"] == "slack"
+
+    # Org-scoped: it used the demo org's webhook, not the other tenant's.
+    assert captured["webhook_url"] == "https://hooks.slack.test/demo"
+
+    # The message is rich and flags the pending-approval state.
+    text = captured["text"]
+    assert "pending human approval" in text.lower()
+    assert "Schedule an executive business review" in text
+    assert "Send a re-onboarding email" in text  # top alternative
+    assert "72%" in text  # confidence score
+
+    client.delete("/integrations/slack")
+
+
+def test_approval_handoff_requires_recommendation(client) -> None:
+    """Without a recommendation or resolvable run, the handoff is rejected 422."""
+
+    resp = client.post("/execute/approval-handoff", json={"account_id": "acc_demo"})
+    assert resp.status_code == 422
+
+
+def test_approval_handoff_does_not_read_other_orgs_run(client, monkeypatch) -> None:
+    """A run owned by another org must not be resolvable through the handoff.
+
+    Pushing another tenant's recommendation (and its signal) into the caller's
+    Slack channel would be a cross-org leak, so the run is treated as absent and
+    the request is rejected 422 rather than posting anything.
+    """
+
+    from app.api.runs import _RUNS
+
+    run_id = "run_other_org_secret"
+    _RUNS[run_id] = {
+        "run_id": run_id,
+        "org_id": "org_other_tenant",
+        "domain": "customer_success",
+        "account_id": "acc_secret",
+        "signal": {"type": "email", "content": "confidential churn signal"},
+        "recommendation": _PENDING_REC,
+    }
+
+    posted: Dict[str, Any] = {}
+
+    def fake_post(webhook_url: str | None, text: str) -> Dict[str, Any]:
+        posted["text"] = text
+        return {"sent": True}
+
+    monkeypatch.setattr(slack_service, "post_message", fake_post)
+    try:
+        resp = client.post(
+            "/execute/approval-handoff",
+            json={"run_id": run_id},
+        )
+        assert resp.status_code == 422
+        # Nothing from the other org's run was ever posted.
+        assert "text" not in posted
+    finally:
+        _RUNS.pop(run_id, None)

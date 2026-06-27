@@ -21,6 +21,7 @@ import logging
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 from app.api._org import current_org
@@ -164,7 +165,9 @@ async def slack_test(org_id: str = Depends(current_org)) -> Dict[str, Any]:
     webhook = ((connector or {}).get("config") or {}).get("webhook_url")
     if not webhook:
         raise HTTPException(status_code=400, detail="slack_not_configured")
-    result = post_message(
+    # post_message is a synchronous HTTP call; run it off the event loop.
+    result = await run_in_threadpool(
+        post_message,
         webhook,
         "Aperture test: your Slack handoff is connected. Approved plays will post here.",
     )
@@ -202,7 +205,9 @@ async def google_exchange(
     if not expected or not body.state or not secrets.compare_digest(expected, body.state):
         return {"connected": False, "reason": "invalid_state"}
 
-    result = google_oauth.exchange_code(body.code)
+    # exchange_code performs synchronous httpx calls to Google; offload it so
+    # the token exchange never blocks the event loop.
+    result = await run_in_threadpool(google_oauth.exchange_code, body.code)
     if not result.get("ok"):
         return {
             "connected": False,

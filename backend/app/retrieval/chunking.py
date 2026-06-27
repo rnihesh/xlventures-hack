@@ -71,8 +71,13 @@ def chunk_document(
     source_type: str,
     title: str,
     text: str,
+    org_id: str | None = None,
 ) -> list[Chunk]:
-    """Split a single document into contextual chunks with exact spans."""
+    """Split a single document into contextual chunks with exact spans.
+
+    ``org_id`` stamps each chunk with its owning tenant (None = shared/seed
+    knowledge) so the retriever can keep one org's ingested evidence private.
+    """
     chunks: list[Chunk] = []
 
     def _emit(start: int, end: int) -> None:
@@ -96,6 +101,7 @@ def chunk_document(
                 start=start,
                 end=end,
                 context=context,
+                org_id=org_id,
             )
         )
 

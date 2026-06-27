@@ -28,8 +28,10 @@ import logging
 import uuid
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+
+from app.api._org import current_org
 
 logger = logging.getLogger("app.api.whatif")
 
@@ -100,15 +102,25 @@ def _baseline_context(account_id: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Graph execution
 # ---------------------------------------------------------------------------
-async def _run_pipeline(domain: str, account_id: str, signal: Dict[str, Any]) -> Dict[str, Any]:
-    """Invoke the real planner graph once and return its final merged state."""
+async def _run_pipeline(
+    domain: str, account_id: str, signal: Dict[str, Any], org_id: str
+) -> Dict[str, Any]:
+    """Invoke the real planner graph once and return its final merged state.
+
+    The org is bound (and the loader hydrated from storage) so a what-if on an
+    org-uploaded domain resolves THIS org's pack, never another tenant's via the
+    domain-keyed loader fallback.
+    """
 
     from app.deps import get_checkpointer
     from app.graph.planner import build_graph
+    from app.packs.loader import reset_pack_org, set_pack_org
+    from app.repositories import org_packs as org_packs_repo
 
     run_id = f"whatif_{uuid.uuid4().hex[:12]}"
     initial_state = {
         "run_id": run_id,
+        "org_id": org_id,
         "domain": domain,
         "account_id": account_id,
         "signal": signal,
@@ -120,9 +132,18 @@ async def _run_pipeline(domain: str, account_id: str, signal: Dict[str, Any]) ->
     }
     config = {"configurable": {"thread_id": run_id}}
 
+    try:
+        await org_packs_repo.hydrate_loader(org_id)
+    except Exception:  # noqa: BLE001 - hydration is best effort
+        logger.warning("org pack hydration failed for org %s", org_id)
+
     checkpointer = await get_checkpointer()
     graph = build_graph(checkpointer)
-    final_state = await graph.ainvoke(initial_state, config=config)
+    token = set_pack_org(org_id)
+    try:
+        final_state = await graph.ainvoke(initial_state, config=config)
+    finally:
+        reset_pack_org(token)
     return dict(final_state or {})
 
 
@@ -190,7 +211,9 @@ def _label_for(score: float) -> str:
 # Endpoint
 # ---------------------------------------------------------------------------
 @router.post("/whatif")
-async def whatif(body: WhatIfIn) -> Dict[str, Any]:
+async def whatif(
+    body: WhatIfIn, org_id: str = Depends(current_org)
+) -> Dict[str, Any]:
     """Re-plan with a couple of overridden inputs and report the delta."""
 
     domain = body.domain or "customer_success"
@@ -215,7 +238,7 @@ async def whatif(body: WhatIfIn) -> Dict[str, Any]:
 
     # --- Run the real pipeline for a grounded baseline ----------------------
     try:
-        state = await _run_pipeline(domain, account_id, signal)
+        state = await _run_pipeline(domain, account_id, signal, org_id)
     except Exception:  # noqa: BLE001 - never fail the what-if; degrade offline
         logger.exception("what-if pipeline failed for %s", account_id)
         state = {}

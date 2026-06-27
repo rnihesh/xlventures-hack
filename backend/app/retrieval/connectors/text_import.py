@@ -76,6 +76,7 @@ class TextImportConnector(Connector):
         title: Optional[str] = None,
         account_id: Optional[str] = None,
         domain: str = "customer_success",
+        org_id: Optional[str] = None,
         **_: Any,
     ) -> IngestResult:
         """Normalize tabular payloads, then funnel through the shared ingest."""
@@ -88,4 +89,5 @@ class TextImportConnector(Connector):
             title=title,
             account_id=account_id,
             domain=domain,
+            org_id=org_id,
         )
