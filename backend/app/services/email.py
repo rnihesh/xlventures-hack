@@ -39,21 +39,13 @@ def is_valid_email(addr: str | None) -> bool:
 def _build_message(link: str) -> tuple[str, str, str]:
     """Return (subject, text body, html body) for the verification email."""
 
-    subject = "Verify your email"
-    text_body = (
-        "Welcome to the Next Best Action platform.\n\n"
-        "Please verify your email by opening the link below:\n"
-        f"{link}\n\n"
-        "If you did not create an account, you can ignore this message."
+    from app.services.email_templates import (
+        verification_html,
+        verification_subject,
+        verification_text,
     )
-    html_body = (
-        "<p>Welcome to the Next Best Action platform.</p>"
-        "<p>Please verify your email by clicking the link below:</p>"
-        f'<p><a href="{link}">Verify my email</a></p>'
-        f"<p>Or paste this URL into your browser:<br>{link}</p>"
-        "<p>If you did not create an account, you can ignore this message.</p>"
-    )
-    return subject, text_body, html_body
+
+    return verification_subject(), verification_text(link), verification_html(link)
 
 
 def send_verification(to: str, link: str) -> dict[str, Any]:
@@ -146,6 +138,8 @@ def send_email(
         logger.info("boto3 unavailable (%s); skipping email send", exc)
         return {"sent": False, "reason": "ses_not_configured"}
 
+    from app.services.email_templates import outreach_html
+
     try:
         client = boto3.client("ses", region_name=settings.aws_region)
         response = client.send_email(
@@ -153,7 +147,10 @@ def send_email(
             Destination={"ToAddresses": [to]},
             Message={
                 "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body": {"Text": {"Data": body, "Charset": "UTF-8"}},
+                "Body": {
+                    "Text": {"Data": body, "Charset": "UTF-8"},
+                    "Html": {"Data": outreach_html(body), "Charset": "UTF-8"},
+                },
             },
         )
         message_id = response.get("MessageId")
