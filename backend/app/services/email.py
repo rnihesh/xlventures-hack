@@ -11,11 +11,29 @@ link) without ever taking the API down because email could not be sent.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from app.config import settings
 
 logger = logging.getLogger("app.services.email")
+
+# A pragmatic email shape check. The point is to reject obvious non-addresses
+# (a contact NAME like "Marcus Reyes", or a value with stray whitespace/control
+# characters) before they reach SES, which would otherwise fail with an opaque
+# "Local address contains control or whitespace" error.
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
+
+def is_valid_email(addr: str | None) -> bool:
+    """True when ``addr`` looks like a single, clean email address."""
+
+    if not addr:
+        return False
+    candidate = addr.strip()
+    if any(ord(c) < 32 for c in candidate):
+        return False
+    return bool(_EMAIL_RE.match(candidate))
 
 
 def _build_message(link: str) -> tuple[str, str, str]:
@@ -113,6 +131,13 @@ def send_email(
     if not source:
         logger.info("SES sender not configured; skipping email send")
         return {"sent": False, "reason": "ses_not_configured"}
+
+    # Reject a non-address (e.g. a contact's name) before it reaches SES so the
+    # caller gets a clear reason instead of an opaque SES whitespace error.
+    if not is_valid_email(to):
+        logger.info("Invalid email recipient %r; skipping send", to)
+        return {"sent": False, "reason": "invalid_recipient", "detail": to}
+    to = to.strip()
 
     try:
         import boto3
