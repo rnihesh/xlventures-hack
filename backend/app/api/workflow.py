@@ -208,78 +208,29 @@ async def _llm_plan(message: str, view: Dict[str, Any]) -> Optional[Dict[str, An
         return None
 
 
-def _deterministic_plan(message: str, view: Dict[str, Any]) -> Dict[str, Any]:
-    """Offline fallback: parse a few simple commands against the current rosters."""
-    import re
-
-    selectable = _selectable_caps(view)
-    msg = message.lower()
-    # Resolve a capability mentioned in the text (by key or a loose word match).
-    def caps_in(text: str) -> List[str]:
-        found = []
-        for cap in selectable:
-            if cap in text or cap.replace("_", " ") in text:
-                found.append(cap)
-        return found
-
-    # Resolve target decision point(s) from the original message.
-    targets = [dp["key"] for dp in view["decision_points"] if dp["key"] in msg or dp["label"].lower() in msg]
-
-    # Strip decision-point names before matching COMMAND keywords so a label word
-    # (e.g. "drop" in "health drop") cannot be mistaken for the "drop" command.
-    kw = msg
-    for dp in view["decision_points"]:
-        for token in (dp["label"].lower(), dp["key"], dp["key"].replace("_", " ")):
-            kw = kw.replace(token, " ")
-
-    rosters = {dp["key"]: list(dp["roster"]) for dp in view["decision_points"]}
-    seq = view["sequence"]
-    changes: Dict[str, List[str]] = {}
-    mentioned = caps_in(msg)
-    scope = targets or [dp["key"] for dp in view["decision_points"]]
-    wants_all = bool(re.search(r"\b(all|everything|every)\b", kw))
-
-    remove_kw = bool(re.search(r"\b(remove|drop|exclude|without|disable|turn off|turn of)\b", kw))
-    add_kw = bool(re.search(r"\b(add|include|enable|activate|also run)\b", kw))
-    only_kw = bool(re.search(r"\bonly\b", kw))
-    reset_kw = bool(re.search(r"\b(reset|default|revert|restore)\b", kw))
-
-    if reset_kw:
-        for k in scope:
-            base = next(dp["base_roster"] for dp in view["decision_points"] if dp["key"] == k)
-            changes[k] = [c for c in base if c in selectable]
-    elif remove_kw and (mentioned or wants_all):
-        rem = set(mentioned) if mentioned else set(selectable)  # "remove all" empties it
-        for k in scope:
-            changes[k] = [c for c in rosters[k] if c not in rem]
-    elif add_kw and (mentioned or wants_all):
-        add = set(mentioned) if mentioned else set(selectable)  # "add all"
-        for k in scope:
-            current = set(rosters[k]) | add
-            changes[k] = [c for c in seq if c in current and c in selectable]
-    elif only_kw and mentioned:
-        for k in scope:
-            changes[k] = [c for c in seq if c in set(mentioned)]
-    reply = (
-        "Updated the roster." if changes else
-        "Tell me what to change, for example 'remove the outcome simulator from renewal risk', "
-        "'add all to health drop', or 'reset all to defaults'."
-    )
-    return {"changes": changes, "reply": reply}
-
-
 @router.post("/{domain}/assistant")
 async def workflow_assistant(
     domain: str, body: AssistantIn, org_id: str = Depends(current_org)
 ) -> Dict[str, Any]:
-    """Edit the workflow from a natural-language instruction (context aware).
+    """Edit the workflow from a natural-language instruction (AI, context aware).
 
-    Reads the org's current effective workflow, asks the model (or an offline
-    parser) for the new rosters, validates them against the selectable
+    Reads the org's current effective workflow, asks the model to turn the
+    instruction into new rosters, validates them against the selectable
     specialists, persists, and returns the updated view plus a short reply.
+    There is NO keyword fallback: when the model is unavailable the assistant
+    says so honestly rather than guessing.
     """
     view = await _view(org_id, domain)
-    plan = await _llm_plan(body.message, view) or _deterministic_plan(body.message, view)
+    plan = await _llm_plan(body.message, view)
+    if plan is None:
+        return {
+            "reply": (
+                "I could not reach the model to edit the workflow right now. "
+                "You can still toggle specialists on or off and Save above."
+            ),
+            "changes": {},
+            "view": view,
+        }
     changes = _validate_changes(plan.get("changes") or {}, view)
     reply = str(plan.get("reply") or "").strip() or "Done."
 
