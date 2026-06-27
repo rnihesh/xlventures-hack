@@ -70,8 +70,12 @@ class Settings(BaseSettings):
     langsmith_endpoint: str | None = None
 
     # --- CORS ----------------------------------------------------------------
-    # Comma-separated list in env (e.g. "http://localhost:3200,http://localhost:3001").
+    # Comma-separated exact origins (e.g. "http://localhost:3200,http://localhost:3001").
     cors_origins: str = "http://localhost:3200"
+    # Regex matching whole origins, for wildcard subdomains. Defaults to any
+    # niheshr.com subdomain over http or https (aperture.niheshr.com,
+    # aperture-api.niheshr.com, ...). Override with CORS_ORIGIN_REGEX.
+    cors_origin_regex: str = r"https?://([a-z0-9-]+\.)*niheshr\.com"
 
     @field_validator("jwt_secret", mode="before")
     @classmethod
