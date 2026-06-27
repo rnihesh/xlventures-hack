@@ -30,6 +30,11 @@ from app.memory.types import Episode, Outcome, normalize_decision
 
 logger = logging.getLogger("app.memory.store")
 
+# Tenant that owns unscoped (seeded day-zero) episodes. Kept in sync with
+# app.api._org.DEMO_ORG; defined locally to avoid importing the API layer into
+# the memory store (and the import cycle that would create).
+_DEMO_ORG = "org_demo"
+
 _WORD_RE = re.compile(r"[a-z0-9]+")
 
 # Light stopword list so similarity keys on meaningful tokens.
@@ -83,6 +88,15 @@ class Memory:
     def all_episodes(self) -> List[Episode]:
         """All stored episodes (insertion order)."""
         return list(self._episodes.values())
+
+    def get_episode(self, episode_id: str) -> Optional[Episode]:
+        """Return a single stored episode by id, or ``None`` if absent.
+
+        Callers that accept an opaque, caller-supplied ``episode_id`` must use
+        this to resolve the episode and verify org ownership BEFORE mutating it,
+        so one tenant cannot write outcomes onto another tenant's episode.
+        """
+        return self._episodes.get(episode_id)
 
     def _ensure_distilled(self) -> None:
         if not self._distilled:
@@ -178,8 +192,22 @@ class Memory:
 
     # -- frozen interface ----------------------------------------------------
 
+    def _owns(self, ep: Episode, org_id: Optional[str]) -> bool:
+        """True when ``ep`` is visible to ``org_id`` (tenant isolation).
+
+        An unscoped (seeded day-zero) episode belongs to the Demo org, mirroring
+        the learning / timeline surfaces. ``org_id is None`` means "no tenant
+        filter" (legacy callers): every episode is visible, preserving the old
+        behavior. A concrete ``org_id`` only ever sees its own episodes, so recall
+        can never surface another tenant's situation or recommendation even when
+        two orgs share an account id (e.g. both ran import-demo).
+        """
+        if org_id is None:
+            return True
+        return (getattr(ep, "org_id", None) or _DEMO_ORG) == org_id
+
     async def recall_similar(
-        self, account_id: str, situation: str, k: int = 3
+        self, account_id: str, situation: str, k: int = 3, org_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Return up to ``k`` past episodes most similar to ``situation``.
 
@@ -187,6 +215,11 @@ class Memory:
         last time" story surfaces first, but cross-account precedents are still
         eligible. Each result includes a ``what_changed`` note when it is a
         prior decision on the same account.
+
+        ``org_id`` scopes recall to the caller's tenant: only that org's episodes
+        (plus the seeded Demo history when the caller IS the Demo org) are
+        eligible, so one tenant never reads another's episodes through this path.
+        ``None`` keeps the unscoped, all-tenants behavior for legacy callers.
         """
 
         # Hydrate persisted episodes (no-op offline) so recall spans history.
@@ -194,12 +227,14 @@ class Memory:
 
         # Prefer a pgvector similarity search when persistence is enabled; fall
         # back to the in-memory lexical similarity otherwise (or on any error).
-        vector_results = await self._recall_via_pgvector(account_id, situation, k)
+        vector_results = await self._recall_via_pgvector(account_id, situation, k, org_id)
         if vector_results is not None:
             return vector_results
 
         scored: List[tuple[float, Episode]] = []
         for ep in self._episodes.values():
+            if not self._owns(ep, org_id):
+                continue
             sim = _similarity(situation, ep.situation)
             if ep.account_id == account_id:
                 sim = min(1.0, sim + 0.15)  # same-account boost
@@ -215,12 +250,14 @@ class Memory:
         ]
 
     async def _recall_via_pgvector(
-        self, account_id: str, situation: str, k: int
+        self, account_id: str, situation: str, k: int, org_id: Optional[str] = None
     ) -> Optional[List[Dict[str, Any]]]:
         """Vector-search recall over persisted episode embeddings.
 
         Returns formatted results when pgvector is available and usable, or
-        ``None`` to signal the caller to use the in-memory fallback.
+        ``None`` to signal the caller to use the in-memory fallback. Honors the
+        same ``org_id`` tenant filter as the in-memory path so vector recall can
+        never surface another tenant's episodes.
         """
         if self._repo is None or k <= 0:
             return None
@@ -241,6 +278,8 @@ class Memory:
             try:
                 ep = Episode(**{p: v for p, v in payload.items() if p != "similarity"})
             except Exception:  # noqa: BLE001 - skip malformed rows
+                continue
+            if not self._owns(ep, org_id):
                 continue
             if ep.account_id == account_id:
                 sim = min(1.0, sim + 0.15)  # same-account boost

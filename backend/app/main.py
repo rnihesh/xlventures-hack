@@ -53,6 +53,18 @@ async def lifespan(app: FastAPI):
         logger.warning("Failed to initialize checkpointer: %s", exc)
         app.state.checkpointer = None
 
+    # Hydrate the episodic memory store from the database so the learning,
+    # eval-outcome, and account-timeline surfaces see every org's persisted
+    # decisions (not just the in-memory seeds + this-process writes). Without
+    # this, a real org's durable episodes only appear after a write/recall.
+    try:
+        from app.memory.store import get_memory
+
+        await get_memory()._ensure_db()
+        logger.info("Memory store hydrated from database.")
+    except Exception as exc:  # noqa: BLE001 - best effort startup
+        logger.warning("Failed to hydrate memory store: %s", exc)
+
     yield
 
     # --- Shutdown --------------------------------------------------------
@@ -85,7 +97,19 @@ def create_app() -> FastAPI:
     )
 
     # Import routers lazily here to avoid import cycles with app.deps/app.config.
-    from app.api import accounts, auth, domains, health, ingest, integrations, runs, whatif
+    from app.api import (
+        accounts,
+        agents,
+        auth,
+        contacts,
+        domains,
+        health,
+        ingest,
+        integrations,
+        rules,
+        runs,
+        whatif,
+    )
 
     app.include_router(health.router)
     app.include_router(auth.router)
@@ -95,6 +119,9 @@ def create_app() -> FastAPI:
     app.include_router(whatif.router)
     app.include_router(ingest.router)
     app.include_router(integrations.router)
+    app.include_router(contacts.router)
+    app.include_router(rules.router)
+    app.include_router(agents.router)
 
     # Generic agentic chatbot over the whole platform (offline-safe).
     from app.api import chat
