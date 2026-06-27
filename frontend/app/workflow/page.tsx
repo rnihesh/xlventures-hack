@@ -10,17 +10,15 @@
 // any omitted point to its default. Fully offline-safe: with no backend the
 // view shows an error state and Save surfaces a real error rather than crashing.
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ReactFlow,
   Background,
+  BackgroundVariant,
+  Controls,
   Handle,
   Position,
+  MarkerType,
   type Edge,
   type Node,
   type NodeProps,
@@ -30,11 +28,19 @@ import {
   Network,
   Save,
   RotateCcw,
+  RefreshCw,
   Check,
-  CircleDot,
   Lock,
+  Radio,
+  Route,
+  ShieldCheck,
+  UserCheck,
+  Flag,
+  Sparkles,
+  type LucideIcon,
 } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +57,9 @@ import {
   type WorkflowView,
   type WorkflowRosters,
 } from "@/lib/api/workflow";
+
+const ACCENT = "#D97757";
+const EDGE_MUTED = "#d6d3d1";
 
 // Prettify a capability key ("risk_scorer") into a label ("Risk Scorer").
 function prettify(key: string): string {
@@ -72,69 +81,129 @@ function sameSet(a: string[], b: string[]): boolean {
 // Custom node
 // --------------------------------------------------------------------------
 
+type NodeState = "fixed" | "active" | "inactive" | "alwayson";
+
 type PipelineNodeData = {
   title: string;
   role: string;
-  state: "fixed" | "active" | "inactive" | "alwayson";
+  state: NodeState;
   clickable: boolean;
+  Icon: LucideIcon;
   onToggle?: () => void;
 };
 
 type PipelineNode = Node<PipelineNodeData, "pipeline">;
 
-function PipelineNodeView({ data }: NodeProps<PipelineNode>) {
-  const { title, role, state, clickable, onToggle } = data;
+function MiniSwitch({ on }: { on: boolean }) {
+  return (
+    <span
+      className={cn(
+        "relative inline-flex h-4 w-7 shrink-0 items-center rounded-full border transition-colors",
+        on ? "border-primary bg-primary" : "border-border bg-muted",
+      )}
+      aria-hidden
+    >
+      <span
+        className={cn(
+          "absolute h-3 w-3 rounded-full bg-white shadow-sm transition-transform",
+          on ? "translate-x-[14px]" : "translate-x-[2px]",
+        )}
+      />
+    </span>
+  );
+}
 
-  const tone =
-    state === "active"
-      ? "border-primary/60 bg-card ring-1 ring-primary/25"
-      : state === "inactive"
-        ? "border-dashed border-border bg-card opacity-40"
-        : state === "alwayson"
-          ? "border-border bg-secondary"
-          : "border-border bg-card";
+function PipelineNodeView({ data }: NodeProps<PipelineNode>) {
+  const { title, role, state, clickable, Icon, onToggle } = data;
+  const isActive = state === "active";
+  const isInactive = state === "inactive";
+
+  const cardTone = isActive
+    ? "border-primary/60 bg-card ring-1 ring-primary/30"
+    : isInactive
+      ? "border-dashed border-border bg-card opacity-45"
+      : state === "alwayson"
+        ? "border-border bg-secondary"
+        : "border-border bg-card";
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggle?.();
+  };
 
   return (
     <div
       onClick={clickable ? onToggle : undefined}
       role={clickable ? "button" : undefined}
-      aria-pressed={clickable ? state === "active" : undefined}
-      title={
-        clickable
-          ? state === "active"
-            ? `Click to remove ${title}`
-            : `Click to add ${title}`
-          : undefined
-      }
-      className={[
-        "w-[148px] select-none rounded-lg border px-3 py-2 text-center shadow-sm transition-colors",
-        tone,
+      aria-pressed={clickable ? isActive : undefined}
+      className={cn(
+        "relative w-[176px] select-none rounded-xl border py-2.5 pl-3 pr-2.5 shadow-sm transition-colors",
+        cardTone,
         clickable ? "cursor-pointer hover:border-primary/70" : "cursor-default",
-      ].join(" ")}
+      )}
     >
+      {isActive ? (
+        <span
+          className="absolute bottom-2 left-0 top-2 w-1 rounded-full bg-primary"
+          aria-hidden
+        />
+      ) : null}
+
       <Handle
         type="target"
         position={Position.Left}
         className="!h-1.5 !w-1.5 !border-0 !bg-border"
       />
-      <div className="flex items-center justify-center gap-1.5">
-        {state === "active" ? (
-          <CircleDot className="h-3 w-3 shrink-0 text-primary" aria-hidden />
+
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Icon
+            className={cn(
+              "h-3.5 w-3.5 shrink-0",
+              isActive ? "text-primary" : "text-muted-foreground",
+            )}
+            aria-hidden
+          />
+          <span className="truncate text-[13px] font-semibold tracking-tight text-foreground">
+            {title}
+          </span>
+        </div>
+        {clickable ? (
+          <button
+            type="button"
+            onClick={handleToggle}
+            aria-label={isActive ? `Turn off ${title}` : `Turn on ${title}`}
+            title={isActive ? "On (click to turn off)" : "Off (click to turn on)"}
+            className="shrink-0 rounded p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <MiniSwitch on={isActive} />
+          </button>
         ) : null}
-        <span className="truncate text-[13px] font-semibold tracking-tight text-foreground">
-          {title}
-        </span>
       </div>
-      <div className="mt-0.5 flex items-center justify-center gap-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-        {state === "alwayson" ? (
-          <>
-            <Lock className="h-2.5 w-2.5" aria-hidden />
-            <span>always on</span>
-          </>
+
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          {role}
+        </span>
+        {clickable ? (
+          <span
+            className={cn(
+              "rounded-full px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide",
+              isActive
+                ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/25"
+                : "bg-muted text-muted-foreground ring-1 ring-inset ring-border",
+            )}
+          >
+            {isActive ? "On" : "Off"}
+          </span>
         ) : (
-          <span>{role}</span>
+          <span className="flex items-center gap-1 rounded-full bg-muted px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-muted-foreground ring-1 ring-inset ring-border">
+            <Lock className="h-2.5 w-2.5" aria-hidden />
+            {state === "alwayson" ? "always on" : "fixed"}
+          </span>
         )}
       </div>
+
       <Handle
         type="source"
         position={Position.Right}
@@ -146,10 +215,16 @@ function PipelineNodeView({ data }: NodeProps<PipelineNode>) {
 
 const NODE_TYPES = { pipeline: PipelineNodeView };
 
-// Module-scope to satisfy the "no new object identity each render" guidance.
+// Module-scope to keep object identity stable across renders.
 const PRO_OPTIONS = { hideAttribution: true };
-const FIT_VIEW_OPTIONS = { padding: 0.18 };
-const EDGE_STYLE = { stroke: "hsl(var(--border))", strokeWidth: 1.5 };
+const FIT_VIEW_OPTIONS = { padding: 0.16 };
+const ROLE_ICON: Record<string, LucideIcon> = {
+  signal: Radio,
+  planner: Route,
+  policy: ShieldCheck,
+  hitl: UserCheck,
+  commit: Flag,
+};
 
 // --------------------------------------------------------------------------
 // Page
@@ -191,7 +266,7 @@ export default function WorkflowPage() {
     for (const dp of v.decision_points) rosters[dp.key] = [...dp.roster];
     setView(v);
     setOriginal(rosters);
-    setEdited(structuredCloneRosters(rosters));
+    setEdited(cloneRosters(rosters));
     setSelectedKey((prev) =>
       prev && v.decision_points.some((dp) => dp.key === prev)
         ? prev
@@ -223,7 +298,7 @@ export default function WorkflowPage() {
     return () => ctrl.abort();
   }, [domain, load]);
 
-  // The selectable specialist capabilities (the toggle candidates), in order.
+  // The selectable specialist candidates (the toggles), in order.
   const selectable = useMemo(
     () => (view ? view.specialists.filter((s) => !s.always_on) : []),
     [view],
@@ -244,13 +319,21 @@ export default function WorkflowPage() {
     [view, selectedKey],
   );
   const currentRoster = edited[selectedKey] ?? [];
-  const selectedBase = selectedDp?.base_roster ?? [];
 
-  // A decision point is overridden in the edited state if its roster differs
-  // from the base pack default.
   const isOverridden = useCallback(
     (key: string, base: string[]) => !sameSet(edited[key] ?? [], base),
     [edited],
+  );
+
+  const selectedOverridden = selectedDp
+    ? isOverridden(selectedDp.key, selectedDp.base_roster)
+    : false;
+  const anyOverridden = useMemo(
+    () =>
+      (view?.decision_points ?? []).some((dp) =>
+        isOverridden(dp.key, dp.base_roster),
+      ),
+    [view, isOverridden],
   );
 
   const dirty = useMemo(() => {
@@ -285,55 +368,44 @@ export default function WorkflowPage() {
       id: string;
       title: string;
       role: string;
-      state: PipelineNodeData["state"];
+      state: NodeState;
+      Icon: LucideIcon;
       cap?: string;
     };
 
     const specs: Spec[] = [
-      { id: "signal", title: "Signal", role: "input", state: "fixed" },
-      { id: "planner", title: "Planner", role: "router", state: "fixed" },
+      { id: "signal", title: "Signal", role: "input", state: "fixed", Icon: ROLE_ICON.signal },
+      { id: "planner", title: "Planner", role: "router", state: "fixed", Icon: ROLE_ICON.planner },
     ];
 
     for (const cap of view.sequence) {
-      if (alwaysOnCaps.has(cap)) {
-        specs.push({
-          id: `cap_${cap}`,
-          title: prettify(cap),
-          role: "specialist",
-          state: "alwayson",
-          cap,
-        });
-      } else if (selectableCaps.has(cap)) {
-        specs.push({
-          id: `cap_${cap}`,
-          title: prettify(cap),
-          role: "specialist",
-          state: currentRoster.includes(cap) ? "active" : "inactive",
-          cap,
-        });
-      } else {
-        specs.push({
-          id: `cap_${cap}`,
-          title: prettify(cap),
-          role: "specialist",
-          state: "fixed",
-          cap,
-        });
-      }
+      let state: NodeState = "fixed";
+      if (alwaysOnCaps.has(cap)) state = "alwayson";
+      else if (selectableCaps.has(cap))
+        state = currentRoster.includes(cap) ? "active" : "inactive";
+      specs.push({
+        id: `cap_${cap}`,
+        title: prettify(cap),
+        role: "specialist",
+        state,
+        Icon: Sparkles,
+        cap,
+      });
     }
 
-    specs.push({ id: "policy", title: "Policy Gate", role: "guardrail", state: "fixed" });
-    specs.push({ id: "hitl", title: "HITL", role: "approval", state: "fixed" });
-    specs.push({ id: "commit", title: "Commit", role: "output", state: "fixed" });
+    specs.push({ id: "policy", title: "Policy Gate", role: "guardrail", state: "fixed", Icon: ROLE_ICON.policy });
+    specs.push({ id: "hitl", title: "HITL", role: "approval", state: "fixed", Icon: ROLE_ICON.hitl });
+    specs.push({ id: "commit", title: "Commit", role: "output", state: "fixed", Icon: ROLE_ICON.commit });
 
     const builtNodes: PipelineNode[] = specs.map((s, i) => ({
       id: s.id,
       type: "pipeline",
-      position: { x: i * 196, y: 0 },
+      position: { x: i * 230, y: 0 },
       data: {
         title: s.title,
         role: s.role,
         state: s.state,
+        Icon: s.Icon,
         clickable: s.state === "active" || s.state === "inactive",
         onToggle: s.cap ? () => toggleCap(s.cap as string) : undefined,
       },
@@ -343,12 +415,26 @@ export default function WorkflowPage() {
 
     const builtEdges: Edge[] = [];
     for (let i = 0; i < specs.length - 1; i += 1) {
+      const a = specs[i];
+      const b = specs[i + 1];
+      // An edge touching a toggled-off specialist reads as a dormant branch.
+      const muted = a.state === "inactive" || b.state === "inactive";
+      const color = muted ? EDGE_MUTED : ACCENT;
       builtEdges.push({
-        id: `e_${specs[i].id}_${specs[i + 1].id}`,
-        source: specs[i].id,
-        target: specs[i + 1].id,
+        id: `e_${a.id}_${b.id}`,
+        source: a.id,
+        target: b.id,
         type: "smoothstep",
-        style: EDGE_STYLE,
+        animated: !muted,
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color,
+          width: 16,
+          height: 16,
+        },
+        style: muted
+          ? { stroke: color, strokeWidth: 1.5, strokeDasharray: "5 4" }
+          : { stroke: color, strokeWidth: 2 },
       });
     }
 
@@ -360,7 +446,7 @@ export default function WorkflowPage() {
     if (!view) return;
     setSaving(true);
     try {
-      // Only send the points that differ from the base pack; omitting a point
+      // Only send points that differ from the base pack; omitting a point
       // reverts it to the default on the backend.
       const rosters: WorkflowRosters = {};
       for (const dp of view.decision_points) {
@@ -384,12 +470,27 @@ export default function WorkflowPage() {
     }
   };
 
-  // Reset the selected decision point's roster to the base pack default. The
-  // change is local until Save, which then reverts the override on the backend.
+  // Reset the selected decision point's roster to the base pack default. Local
+  // until Save, which then reverts the override on the backend.
   const handleResetPoint = () => {
     if (!selectedDp) return;
     setSavedAt(false);
-    setEdited((prev) => ({ ...prev, [selectedDp.key]: [...selectedDp.base_roster] }));
+    setEdited((prev) => ({
+      ...prev,
+      [selectedDp.key]: [...selectedDp.base_roster],
+    }));
+  };
+
+  // Reset every decision point to its default. Save then clears the whole
+  // override (the diff map sent is empty).
+  const handleResetAll = () => {
+    if (!view) return;
+    setSavedAt(false);
+    setEdited((prev) => {
+      const next = { ...prev };
+      for (const dp of view.decision_points) next[dp.key] = [...dp.base_roster];
+      return next;
+    });
   };
 
   const domainOptions = useMemo(() => {
@@ -402,6 +503,14 @@ export default function WorkflowPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-8">
+      {/* Theme-matched react-flow controls (grayscale, bordered, rounded). */}
+      <style>{`
+.react-flow__controls.workflow-controls{border:1px solid hsl(var(--border));border-radius:8px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,0.06)}
+.react-flow__controls.workflow-controls .react-flow__controls-button{background:hsl(var(--card));border-bottom:1px solid hsl(var(--border));color:hsl(var(--foreground));width:26px;height:26px}
+.react-flow__controls.workflow-controls .react-flow__controls-button:hover{background:hsl(var(--secondary))}
+.react-flow__controls.workflow-controls .react-flow__controls-button svg{fill:currentColor;max-width:12px;max-height:12px}
+`}</style>
+
       <PageHeader
         eyebrow="Platform"
         title="Workflow Studio"
@@ -430,7 +539,7 @@ export default function WorkflowPage() {
       {loading ? (
         <div className="space-y-4">
           <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-[400px] w-full" />
+          <Skeleton className="h-[420px] w-full" />
           <Skeleton className="h-40 w-full" />
         </div>
       ) : error || !view ? (
@@ -473,7 +582,7 @@ export default function WorkflowPage() {
                   ))}
                 </Select>
               </div>
-              {selectedDp && isOverridden(selectedDp.key, selectedDp.base_roster) ? (
+              {selectedOverridden ? (
                 <Badge variant="success" className="self-start sm:self-auto">
                   Customized
                 </Badge>
@@ -501,7 +610,33 @@ export default function WorkflowPage() {
 
           {/* React Flow canvas: the pipeline left to right. */}
           <div className="panel overflow-hidden p-0">
-            <div className="h-[400px] w-full">
+            <div className="flex flex-col gap-2 border-b border-border px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <Network className="h-4 w-4 text-muted-foreground" />
+                <h3 className="text-sm font-semibold tracking-tight">
+                  Orchestration graph
+                </h3>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-primary" aria-hidden />
+                  Active
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className="h-0 w-4 border-t border-dashed"
+                    style={{ borderColor: EDGE_MUTED }}
+                    aria-hidden
+                  />
+                  Inactive
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Lock className="h-3 w-3" aria-hidden />
+                  Always on
+                </span>
+              </div>
+            </div>
+            <div className="h-[420px] w-full bg-background">
               <ReactFlow
                 key={domain}
                 nodes={nodes}
@@ -519,16 +654,25 @@ export default function WorkflowPage() {
                 maxZoom={1.5}
                 proOptions={PRO_OPTIONS}
               >
-                <Background gap={18} color="hsl(var(--border))" />
+                <Background
+                  variant={BackgroundVariant.Dots}
+                  gap={20}
+                  size={1}
+                  color="#e7e5e4"
+                />
+                <Controls
+                  className="workflow-controls"
+                  showInteractive={false}
+                />
               </ReactFlow>
             </div>
           </div>
 
-          {/* Specialist toggles for the selected point (works without clicking
-              the graph nodes precisely). */}
+          {/* Specialist toggles for the selected point (works without precise
+              node clicking). */}
           <div className="panel p-5">
             <div className="mb-3 flex items-center gap-2">
-              <Network className="h-4 w-4 text-muted-foreground" />
+              <Sparkles className="h-4 w-4 text-muted-foreground" />
               <h3 className="text-sm font-semibold tracking-tight">
                 Specialists at this decision point
               </h3>
@@ -552,27 +696,29 @@ export default function WorkflowPage() {
                       type="button"
                       onClick={() => toggleCap(s.capability)}
                       aria-pressed={active}
-                      className={[
+                      className={cn(
                         "flex items-start gap-3 rounded-lg border p-3 text-left transition-colors",
                         active
                           ? "border-primary/60 bg-primary/[0.04] ring-1 ring-primary/20"
-                          : "border-border bg-card opacity-70 hover:opacity-100",
-                      ].join(" ")}
+                          : "border-dashed border-border bg-card opacity-70 hover:opacity-100",
+                      )}
                     >
-                      <span
-                        className={[
-                          "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
-                          active
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border text-transparent",
-                        ].join(" ")}
-                        aria-hidden
-                      >
-                        <Check className="h-3 w-3" />
-                      </span>
+                      <MiniSwitch on={active} />
                       <span className="min-w-0">
-                        <span className="block font-mono text-xs font-semibold tracking-tight text-foreground">
-                          {prettify(s.capability)}
+                        <span className="flex items-center gap-1.5">
+                          <span className="font-mono text-xs font-semibold tracking-tight text-foreground">
+                            {prettify(s.capability)}
+                          </span>
+                          <span
+                            className={cn(
+                              "rounded-full px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide",
+                              active
+                                ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/25"
+                                : "bg-muted text-muted-foreground ring-1 ring-inset ring-border",
+                            )}
+                          >
+                            {active ? "On" : "Off"}
+                          </span>
                         </span>
                         <span className="mt-0.5 block text-xs text-muted-foreground">
                           {s.description}
@@ -584,7 +730,6 @@ export default function WorkflowPage() {
               </div>
             )}
 
-            {/* Always-on context: not toggleable, shown for completeness. */}
             {alwaysOnCaps.size > 0 ? (
               <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-border pt-4">
                 <span className="text-eyebrow">Always on</span>
@@ -609,18 +754,27 @@ export default function WorkflowPage() {
                     ? "Showing your saved workspace workflow."
                     : "Showing the base pack workflow."}
             </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                onClick={handleResetPoint}
-                disabled={
-                  saving ||
-                  !selectedDp ||
-                  !isOverridden(selectedDp.key, selectedDp.base_roster)
-                }
-              >
-                <RotateCcw className="mr-1.5 h-4 w-4" /> Reset to default
-              </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              {dirty || anyOverridden ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={handleResetAll}
+                    disabled={saving || !anyOverridden}
+                    title="Revert every decision point to the base pack"
+                  >
+                    <RefreshCw className="mr-1.5 h-4 w-4" /> Reset all
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleResetPoint}
+                    disabled={saving || !selectedOverridden}
+                    title="Revert this decision point to the base pack"
+                  >
+                    <RotateCcw className="mr-1.5 h-4 w-4" /> Reset to defaults
+                  </Button>
+                </>
+              ) : null}
               <Button onClick={handleSave} disabled={saving || !dirty}>
                 {savedAt && !dirty ? (
                   <Check className="mr-1.5 h-4 w-4" />
@@ -638,7 +792,7 @@ export default function WorkflowPage() {
 }
 
 // Deep-copy a rosters map so edits never mutate the loaded baseline.
-function structuredCloneRosters(
+function cloneRosters(
   src: Record<string, string[]>,
 ): Record<string, string[]> {
   const out: Record<string, string[]> = {};
