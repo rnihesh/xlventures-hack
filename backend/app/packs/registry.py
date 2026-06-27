@@ -165,3 +165,27 @@ TOOLS.register(
         binding={"node": "outcome_simulator"},
     )
 )
+
+# The agentic copilot's callable tool surface (app/chat/tools.py). Registered
+# here so the governance catalog and the Agents page reflect the FULL tool
+# architecture (every API capability is also an agent-callable tool), not just
+# the in-graph specialists above.
+_COPILOT_TOOLS: List[ToolSpec] = [
+    ToolSpec("list_accounts", "python", "List the org's accounts ranked by risk.", False, "low"),
+    ToolSpec("get_account", "python", "Fetch one account's 360 (signals, context, history).", False, "low"),
+    ToolSpec("list_domains", "python", "List available domain packs.", False, "low"),
+    ToolSpec("get_domain", "python", "Inspect a domain pack (process, journey, decision points).", False, "low"),
+    ToolSpec("run_nba", "python", "Run the full planner graph and return an explained recommendation.", True, "medium", {"graph": "planner"}),
+    ToolSpec("search_knowledge", "python", "Hybrid retrieval over the evidence corpus with citations.", False, "low"),
+    ToolSpec("evaluate_policy", "python", "Check a candidate action against the org's policy guardrails.", False, "low"),
+    ToolSpec("execute_action", "python", "Generate a concrete artifact (email, task, slack) from a recommendation.", True, "medium"),
+    ToolSpec("get_last_run", "python", "Return the org's most recent run and recommendation.", False, "low"),
+    ToolSpec("get_run", "python", "Return a specific run by id.", False, "low"),
+    ToolSpec("send_artifact", "python", "Deliver a recommendation by email or Slack to one or more recipients.", True, "high"),
+    ToolSpec("tag_run", "python", "Associate a run with an account or note.", True, "low"),
+    ToolSpec("ingest_interaction", "python", "Ingest an interaction (note, transcript, email) into retrievable evidence.", True, "medium"),
+    ToolSpec("get_learning", "python", "Read the org's learning loop (decisions, acceptance, outcomes).", False, "low"),
+    ToolSpec("get_eval", "python", "Read the org's evaluation outcomes.", False, "low"),
+]
+for _spec in _COPILOT_TOOLS:
+    TOOLS.register(_spec)

@@ -43,19 +43,67 @@ def _load_registries() -> Any:
         return None, None
 
 
+# Nodes that run in the graph on every decision but are not roster-selected
+# specialists (so they are not in the AgentCard registry). Surfaced here so the
+# Agents page reflects the WHOLE graph the judges watch run, not only the
+# planner-gated specialists. gap_analysis is a genuine reasoning agent; the rest
+# are orchestration / governance / memory nodes.
+_ALWAYS_ON_NODES: List[Dict[str, Any]] = [
+    {
+        "capability": "planner",
+        "description": "Reads the signals and account context, then selects which specialists run for this decision point.",
+        "output_keys": ["plan", "capabilities"],
+        "cost_tier": "strong",
+        "tags": ["orchestration", "always-on"],
+    },
+    {
+        "capability": "gap_analysis",
+        "description": "Names the information still missing to decide well, and can loop back to retrieval before the recommendation is formed.",
+        "output_keys": ["gaps", "missing_information"],
+        "cost_tier": "standard",
+        "tags": ["reasoning", "always-on"],
+    },
+    {
+        "capability": "policy_gate",
+        "description": "Checks every candidate action against the org's policy guardrails before a human ever sees it.",
+        "output_keys": ["policy"],
+        "cost_tier": "cheap",
+        "tags": ["governance", "always-on"],
+    },
+    {
+        "capability": "hitl_gate",
+        "description": "Routes high-risk or low-confidence actions to human approval instead of auto-approving.",
+        "output_keys": ["hitl"],
+        "cost_tier": "cheap",
+        "tags": ["governance", "always-on"],
+    },
+    {
+        "capability": "commit",
+        "description": "Writes the decision episode to memory so the learning loop improves future runs.",
+        "output_keys": ["episode_id"],
+        "cost_tier": "cheap",
+        "tags": ["memory", "always-on"],
+    },
+]
+
+
 @router.get("/agents")
 async def get_agents() -> List[Dict[str, Any]]:
-    """Return the agent registry as serializable cards.
+    """Return the agent registry plus always-on graph nodes as serializable cards.
 
     Each card exposes name (capability), description, the state ``output_keys``
-    the specialist produces, its ``cost_tier``, and ``tags``: everything the
-    planner needs to route work, minus the node callable.
+    the node produces, its ``cost_tier``, and ``tags``: everything the planner
+    needs to route work, minus the node callable.
     """
 
     agents, _ = _load_registries()
-    if agents is None:
-        return []
-    cards = agents.public_cards()
+    cards = agents.public_cards() if agents is not None else []
+    registered = {card.get("capability") for card in cards}
+    # Append the always-on graph nodes the roster never gates, skipping any that
+    # happen to also be registered specialists.
+    for node in _ALWAYS_ON_NODES:
+        if node["capability"] not in registered:
+            cards.append(dict(node))
     # Expose ``name`` as an alias of ``capability`` so the UI can key on a
     # stable label without assuming the registry's internal field name.
     for card in cards:
