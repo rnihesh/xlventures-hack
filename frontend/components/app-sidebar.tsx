@@ -7,13 +7,16 @@ import {
   Aperture,
   LayoutDashboard,
   Inbox,
-  MessageSquare,
+  Bot,
   Play,
   Building2,
+  Contact2,
   Upload,
   GraduationCap,
   FlaskConical,
+  Workflow,
   Boxes,
+  SlidersHorizontal,
   Settings,
   Moon,
   Sun,
@@ -176,69 +179,112 @@ interface NavItem {
   match?: (path: string) => boolean;
 }
 
-const PRIMARY: NavItem[] = [
-  {
-    label: "Overview",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-    match: (p) => p === "/dashboard",
-  },
-  {
-    label: "Inbox",
-    href: "/inbox",
-    icon: Inbox,
-    match: (p) => p.startsWith("/inbox"),
-  },
-  {
-    label: "Chat",
-    href: "/chat",
-    icon: MessageSquare,
-    match: (p) => p.startsWith("/chat"),
-  },
-  {
-    label: "Run",
-    href: "/run",
-    icon: Play,
-    match: (p) => p.startsWith("/run"),
-  },
-  {
-    label: "Accounts",
-    href: "/accounts",
-    icon: Building2,
-    match: (p) => p.startsWith("/accounts"),
-  },
-  {
-    label: "Ingest",
-    href: "/ingest",
-    icon: Upload,
-    match: (p) => p.startsWith("/ingest"),
-  },
-];
+interface NavSection {
+  label: string;
+  items: NavItem[];
+}
 
-const INTELLIGENCE: NavItem[] = [
+// Grouped so the nav reads top to bottom as the way the platform is used:
+// first the decision surfaces you work day to day, then the platform you
+// configure, then the insight loops, then the system settings.
+const SECTIONS: NavSection[] = [
   {
-    label: "Learning",
-    href: "/learning",
-    icon: GraduationCap,
-    match: (p) => p.startsWith("/learning"),
+    label: "Decide",
+    items: [
+      {
+        label: "Overview",
+        href: "/dashboard",
+        icon: LayoutDashboard,
+        match: (p) => p === "/dashboard",
+      },
+      {
+        label: "Inbox",
+        href: "/inbox",
+        icon: Inbox,
+        match: (p) => p.startsWith("/inbox"),
+      },
+      {
+        label: "Run",
+        href: "/run",
+        icon: Play,
+        match: (p) => p.startsWith("/run"),
+      },
+      {
+        label: "Accounts",
+        href: "/accounts",
+        icon: Building2,
+        match: (p) => p.startsWith("/accounts"),
+      },
+      {
+        label: "Contacts",
+        href: "/contacts",
+        icon: Contact2,
+        match: (p) => p.startsWith("/contacts"),
+      },
+    ],
   },
   {
-    label: "Eval",
-    href: "/eval",
-    icon: FlaskConical,
-    match: (p) => p.startsWith("/eval"),
+    label: "Platform",
+    items: [
+      {
+        label: "Copilot",
+        href: "/chat",
+        icon: Bot,
+        match: (p) => p.startsWith("/chat"),
+      },
+      {
+        label: "Agents",
+        href: "/agents",
+        icon: Workflow,
+        match: (p) => p.startsWith("/agents"),
+      },
+      {
+        label: "Domains",
+        href: "/domains",
+        icon: Boxes,
+        match: (p) => p.startsWith("/domains"),
+      },
+      {
+        label: "Rules",
+        href: "/rules",
+        icon: SlidersHorizontal,
+        match: (p) => p.startsWith("/rules"),
+      },
+      {
+        label: "Ingest",
+        href: "/ingest",
+        icon: Upload,
+        match: (p) => p.startsWith("/ingest"),
+      },
+    ],
   },
   {
-    label: "Domains",
-    href: "/domains",
-    icon: Boxes,
-    match: (p) => p.startsWith("/domains"),
+    label: "Insight",
+    items: [
+      {
+        label: "Learning",
+        href: "/learning",
+        icon: GraduationCap,
+        match: (p) => p.startsWith("/learning"),
+      },
+      {
+        label: "Eval",
+        href: "/eval",
+        icon: FlaskConical,
+        match: (p) => p.startsWith("/eval"),
+      },
+    ],
   },
   {
-    label: "Settings",
-    href: "/settings",
-    icon: Settings,
-    match: (p) => p.startsWith("/settings"),
+    label: "System",
+    items: [
+      {
+        label: "Settings",
+        href: "/settings",
+        icon: Settings,
+        match: (p) => p.startsWith("/settings"),
+      },
+    ],
   },
 ];
 
@@ -375,18 +421,14 @@ export function AppSidebar() {
       </div>
 
       <nav className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 py-5 scroll-thin">
-        <div className="flex flex-col gap-1">
-          {!collapsed && (
-            <div className="px-3 pb-1 text-eyebrow">Workspace</div>
-          )}
-          {renderSection(PRIMARY)}
-        </div>
-        <div className="flex flex-col gap-1">
-          {!collapsed && (
-            <div className="px-3 pb-1 text-eyebrow">Intelligence</div>
-          )}
-          {renderSection(INTELLIGENCE)}
-        </div>
+        {SECTIONS.map((section) => (
+          <div key={section.label} className="flex flex-col gap-1">
+            {!collapsed && (
+              <div className="px-3 pb-1 text-eyebrow">{section.label}</div>
+            )}
+            {renderSection(section.items)}
+          </div>
+        ))}
       </nav>
 
       <div className="space-y-3 border-t border-border p-3">

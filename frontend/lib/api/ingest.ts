@@ -25,11 +25,21 @@ export interface IngestRequest {
   domain?: string;
 }
 
+// A deterministically extracted candidate signal (offline, no LLM): a sentence
+// that mentions churn / renewal / usage / sentiment, tagged with its category.
+export interface ExtractedSignal {
+  category: string;
+  label: string;
+  keyword: string;
+  text: string;
+}
+
 export interface IngestResponse {
   ok: boolean;
   chunks_written: number;
   ids: string[];
   doc_id: string;
+  id: string;
   account_id: string | null;
   source_type: string;
   title: string;
@@ -37,6 +47,10 @@ export interface IngestResponse {
   embed_method: string;
   persisted: string;
   detail: string;
+  extracted_signals: ExtractedSignal[];
+  chars: number;
+  duplicate?: boolean;
+  ts?: number;
 }
 
 export interface WebIngestRequest {
@@ -57,6 +71,65 @@ export const DEFAULT_SOURCES: IngestSource[] = [
   { key: "document", label: "Document", description: "A general document, brief, or knowledge article." },
   { key: "web", label: "Web result", description: "Snippet captured from a live web search." },
 ];
+
+// Realistic example text per source type, so a user can try the experience in
+// one click. Keyed by source key; falls back to EXAMPLE_FALLBACK.
+export const EXAMPLE_FALLBACK =
+  "QBR with the champion. Adoption of the analytics module stalled, two power users left, and they are evaluating a competitor before renewal. The economic buyer is concerned about pricing.";
+
+export const SOURCE_EXAMPLES: Record<string, string> = {
+  meeting_notes:
+    "QBR with Zephyr Dynamics. Adoption of the analytics module stalled after the Q1 reorg, and two power users left. The champion is happy with support but the economic buyer is concerned about pricing ahead of the May renewal. They mentioned evaluating a competitor.",
+  call_transcript:
+    "CSM: How has the rollout gone since launch?\nCustomer: Honestly, usage has dropped. Two of our admins left and onboarding the new team stalled. We are frustrated and are looking at alternatives before the renewal in March.",
+  email:
+    "Subject: Renewal and open issues\n\nHi team, ahead of our renewal we wanted to flag that adoption has been lower than expected and we have an open support ticket about slow dashboards. Leadership is asking about ROI. Can we discuss pricing options?",
+  support_ticket:
+    "Ticket #4821 (high priority): Dashboards time out for users on the Growth plan. Customer reports this has happened three times this week and is frustrated. Renewal is in 30 days and they are escalating.",
+  crm_record:
+    "Account: Zephyr Dynamics. Stage: At risk. ARR: 84000. Health: 41. Renewal: 2026-05-15. Last touch: champion flagged stalled adoption and a competitor evaluation. Owner: Priya.",
+  chat_message:
+    "[Slack #cs-zephyr] Champion just pinged: their VP is questioning the spend and usage is down this quarter. They want a business review before they commit to renewal. Flagging churn risk.",
+  document:
+    "Internal brief: Zephyr Dynamics expansion blocked by low adoption. Two power users left; onboarding for the replacement admins has not started. Competitor evaluation underway. Renewal at risk in May.",
+  web: "",
+};
+
+export function exampleForSource(key: string): string {
+  const ex = SOURCE_EXAMPLES[key];
+  return ex !== undefined && ex !== "" ? ex : EXAMPLE_FALLBACK;
+}
+
+export interface RecentIngest {
+  id: string;
+  title: string;
+  source_type: string;
+  account_id: string | null;
+  chars: number;
+  chunks_written: number;
+  persisted: string;
+  extracted_signals: ExtractedSignal[];
+  ts?: number;
+}
+
+/** The org's recently ingested interactions, most recent first. */
+export async function getRecentIngests(
+  signal?: AbortSignal,
+): Promise<RecentIngest[]> {
+  try {
+    const res = await fetch(`${API_BASE}/ingest/recent`, {
+      headers: authHeaders({ Accept: "application/json" }),
+      credentials: "include",
+      cache: "no-store",
+      signal,
+    });
+    if (!res.ok) throw new Error(`GET /ingest/recent failed (${res.status})`);
+    const data = (await res.json()) as { items?: RecentIngest[] };
+    return Array.isArray(data.items) ? data.items : [];
+  } catch {
+    return [];
+  }
+}
 
 export async function getIngestSources(
   signal?: AbortSignal,
@@ -119,12 +192,15 @@ export async function ingestWeb(
         chunks_written: 0,
         ids: [],
         doc_id: "",
+        id: "",
         account_id: payload.account_id ?? null,
         source_type: "web",
         title: payload.title ?? "",
         domain: payload.domain ?? "customer_success",
         embed_method: "none",
         persisted: "none",
+        extracted_signals: [],
+        chars: 0,
         detail: `Web search failed (${res.status})`,
       };
     }
@@ -135,12 +211,15 @@ export async function ingestWeb(
       chunks_written: 0,
       ids: [],
       doc_id: "",
+      id: "",
       account_id: payload.account_id ?? null,
       source_type: "web",
       title: payload.title ?? "",
       domain: payload.domain ?? "customer_success",
       embed_method: "none",
       persisted: "none",
+      extracted_signals: [],
+      chars: 0,
       detail: "Web search unavailable (offline).",
     };
   }
