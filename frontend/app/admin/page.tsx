@@ -242,7 +242,7 @@ function TableShell({
 }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-border bg-card">
-      <table className="w-full border-collapse text-sm">
+      <table className="w-full min-w-[720px] border-collapse text-sm">
         <thead>
           <tr className="border-b border-border bg-muted/40 text-left">{head}</tr>
         </thead>

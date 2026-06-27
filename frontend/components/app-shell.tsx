@@ -5,9 +5,9 @@
 // the session resolves we show a quiet loader, and an unauthenticated visitor
 // is redirected to /login before any app data renders.
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Aperture } from "lucide-react";
+import { Aperture, Menu } from "lucide-react";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { useAuth } from "@/lib/auth-context";
@@ -41,6 +41,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   const publicRoute = isPublic(pathname);
 
+  // Off-canvas mobile nav. Closes whenever the route changes so a tap that
+  // navigates also dismisses the drawer.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
+
   useEffect(() => {
     if (!loading && !user && !publicRoute) {
       router.replace("/login");
@@ -59,9 +66,30 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <AppSidebar />
+      <AppSidebar
+        mobileOpen={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+      />
       <div className="flex min-h-screen flex-1 flex-col transition-[padding] duration-300 ease-out md:pl-[var(--sidebar-w,16rem)]">
-        <main className="flex-1">{children}</main>
+        {/* Mobile top bar: the only nav affordance below md, where the sidebar
+            is hidden off-canvas. Sticky so it stays reachable while scrolling. */}
+        <div className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur md:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Open menu"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <span className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[#D97757] text-white">
+              <Aperture className="h-4 w-4" />
+            </span>
+            Aperture
+          </span>
+        </div>
+        <main className="min-w-0 flex-1">{children}</main>
       </div>
     </div>
   );

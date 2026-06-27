@@ -302,16 +302,19 @@ function NavLink({
   item,
   active,
   collapsed,
+  onNavigate,
 }: {
   item: NavItem;
   active: boolean;
   collapsed: boolean;
+  onNavigate?: () => void;
 }) {
   const Icon = item.icon;
   return (
     <Press asChild>
       <Link
         href={item.href}
+        onClick={onNavigate}
         aria-current={active ? "page" : undefined}
         // When collapsed the icon is the only affordance, so the native title
         // tooltip names the destination on hover.
@@ -347,7 +350,14 @@ function NavLink({
   );
 }
 
-export function AppSidebar() {
+export function AppSidebar({
+  mobileOpen = false,
+  onClose,
+}: {
+  // Below md the sidebar is an off-canvas drawer driven by the app shell.
+  mobileOpen?: boolean;
+  onClose?: () => void;
+} = {}) {
   const pathname = usePathname() || "/";
   const { user } = useAuth();
   // Start expanded; the stored preference is restored on mount.
@@ -395,18 +405,31 @@ export function AppSidebar() {
           item={item}
           active={active}
           collapsed={collapsed}
+          onNavigate={onClose}
         />
       );
     });
 
   return (
-    <aside
-      style={{
-        ...ACCENT_VARS,
-        width: collapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED,
-      }}
-      className="fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-border bg-[hsl(var(--sidebar))] transition-[width] duration-300 ease-out md:flex"
-    >
+    <>
+      {/* Scrim behind the mobile drawer; tap to dismiss. Hidden at md+. */}
+      {mobileOpen ? (
+        <div
+          className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm md:hidden"
+          onClick={onClose}
+          aria-hidden
+        />
+      ) : null}
+      <aside
+        style={{
+          ...ACCENT_VARS,
+          width: collapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED,
+        }}
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-[hsl(var(--sidebar))] transition-transform duration-300 ease-out md:z-30 md:translate-x-0 md:transition-[width]",
+          mobileOpen ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
       <div
         className={cn(
           "flex h-20 items-center border-b border-border",
@@ -444,11 +467,12 @@ export function AppSidebar() {
         ))}
       </nav>
 
-      <div className="space-y-3 border-t border-border p-3">
-        <ThemeToggle collapsed={collapsed} />
-        <UserWidget collapsed={collapsed} />
-      </div>
-    </aside>
+        <div className="space-y-3 border-t border-border p-3">
+          <ThemeToggle collapsed={collapsed} />
+          <UserWidget collapsed={collapsed} />
+        </div>
+      </aside>
+    </>
   );
 }
 

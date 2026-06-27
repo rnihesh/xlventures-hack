@@ -93,7 +93,7 @@ function ToolsTable({ tools }: { tools: ToolSpec[] }) {
   return (
     <div className="panel overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[600px] text-sm">
           <thead>
             <tr className="border-b border-border text-left text-eyebrow">
               <th className="px-4 py-3 font-medium">Tool</th>

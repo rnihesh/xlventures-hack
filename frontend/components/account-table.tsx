@@ -201,11 +201,11 @@ export function AccountTable({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-xl border border-border bg-card",
+        "overflow-x-auto rounded-xl border border-border bg-card",
         className,
       )}
     >
-      <table className="w-full border-collapse text-sm">
+      <table className="w-full min-w-[640px] border-collapse text-sm">
         <thead>
           <tr className="border-b border-border bg-muted/40 text-left">
             {COLUMNS.map((col) => (
