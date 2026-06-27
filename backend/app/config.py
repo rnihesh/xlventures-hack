@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     # bootable offline; override via JWT_SECRET in any real deployment.
     jwt_secret: str = _DEFAULT_JWT_SECRET
     # Public base URL of the frontend, used to build email verification links.
-    app_base_url: str = "http://localhost:3000"
+    app_base_url: str = "http://localhost:3200"
 
     # --- AWS / SES (email, all optional) ------------------------------------
     aws_region: str = "us-east-1"
@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     # consent flow degrades to a graceful "not configured" status.
     google_client_id: str | None = None
     google_client_secret: str | None = None
-    google_redirect_uri: str = "http://localhost:3000/api/auth/callback/google"
+    google_redirect_uri: str = "http://localhost:3200/api/auth/callback/google"
 
     # --- LangSmith / tracing (all optional) ----------------------------------
     langsmith_api_key: str | None = None
@@ -70,8 +70,8 @@ class Settings(BaseSettings):
     langsmith_endpoint: str | None = None
 
     # --- CORS ----------------------------------------------------------------
-    # Comma-separated list in env (e.g. "http://localhost:3000,http://localhost:3001").
-    cors_origins: str = "http://localhost:3000"
+    # Comma-separated list in env (e.g. "http://localhost:3200,http://localhost:3001").
+    cors_origins: str = "http://localhost:3200"
 
     @field_validator("jwt_secret", mode="before")
     @classmethod

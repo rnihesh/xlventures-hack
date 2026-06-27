@@ -1,10 +1,10 @@
-"""Deterministic DEMO MODE support.
+"""Deterministic fallback model for keyless environments (CI / tests).
 
-This module exists so live demos never flake: it provides a fully offline,
-reproducible fake chat model plus small helpers for stable ids and timestamps.
-Nothing here touches the network, and every output is a pure function of its
-input, so a run with ``DEMO_MODE`` enabled always produces the same on-topic
-text for the planner, recommender, drafter, and critic prompts.
+There is no DEMO_MODE toggle. A deployed app has an OpenAI key and always uses
+the real model. This module only provides a fully offline, reproducible chat
+model used when NO key is configured, so the test suite (which blanks the key)
+runs without touching the network or spending tokens. It is never reachable in a
+keyed deployment.
 
 The fake model is LangChain compatible: it subclasses ``BaseChatModel`` and
 returns an ``AIMessage`` from ``invoke`` just like ``ChatOpenAI`` would. Callers
@@ -13,7 +13,6 @@ read ``result.content`` and never know the difference.
 
 from __future__ import annotations
 
-import os
 import re
 import uuid
 from typing import Any, List, Optional
@@ -35,26 +34,16 @@ DEMO_EPOCH = "2026-01-01T00:00:00+00:00"
 # A stable namespace so ``stable_uuid`` is reproducible across processes.
 _DEMO_NAMESPACE = uuid.UUID("0d15ea5e-0000-4000-8000-000000000000")
 
-# Values that count as "truthy" for the DEMO_MODE environment variable.
-_TRUTHY = {"1", "true", "yes", "on", "y", "t"}
-
-
-def _env_demo_flag() -> bool:
-    """True when the ``DEMO_MODE`` environment variable is set to a truthy value."""
-
-    return os.environ.get("DEMO_MODE", "").strip().lower() in _TRUTHY
-
-
 def demo_mode_enabled() -> bool:
-    """Return whether deterministic demo mode should be active.
+    """True only when there is NO configured OpenAI API key.
 
-    Demo mode is on when ``DEMO_MODE`` is truthy OR when there is no configured
-    OpenAI API key. The second clause means running offline is automatically
-    deterministic: with no key there is nothing real to call, so the canned model
-    keeps the engine fully functional instead of failing on the network.
+    There is no DEMO_MODE toggle. A deployed app always has a key, so it always
+    uses the real OpenAI model. The deterministic model below is used ONLY in
+    keyless environments (CI / the test suite, which blanks the key) so tests run
+    offline without spending tokens. It is never reachable in a keyed deployment.
     """
 
-    return _env_demo_flag() or not bool(settings.openai_api_key)
+    return not bool(settings.openai_api_key)
 
 
 def stable_uuid(seed: str) -> str:

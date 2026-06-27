@@ -27,9 +27,10 @@ import argparse
 import asyncio
 import os
 
-# Force deterministic, offline demo mode BEFORE anything imports the LLM or the
-# graph, so the whole pipeline is reproducible and never touches the network.
-os.environ.setdefault("DEMO_MODE", "1")
+# Seeding script: run fully offline (deterministic, no network, no token spend)
+# by blanking the OpenAI key before anything imports the LLM or the graph. With
+# no key the engine uses its deterministic fallback model.
+os.environ["OPENAI_API_KEY"] = ""
 
 from typing import Any, Dict, List, Optional, Tuple
 

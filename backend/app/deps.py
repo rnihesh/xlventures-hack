@@ -147,7 +147,7 @@ def get_llm(model: str | None = None, **kwargs: Any) -> Any:
     from app.demo import demo_mode_enabled, get_demo_llm
 
     if demo_mode_enabled():
-        logger.info("DEMO_MODE active: using deterministic offline chat model.")
+        logger.info("No OpenAI key configured: using the deterministic offline model.")
         return get_demo_llm(model=model or settings.openai_model, **kwargs)
 
     # A request timeout plus bounded retries keep live runs from hanging: without
