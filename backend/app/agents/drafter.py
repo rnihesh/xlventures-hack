@@ -35,7 +35,7 @@ def _llm_draft(state: Dict[str, Any], action: Dict[str, Any]) -> str | None:
     if llm is None:
         return None
 
-    account_id = state.get("account_id", "the account")
+    account_id = state.get("account_name") or state.get("account_id", "the account")
     risk = (state.get("risk_opportunity") or {}).get("summary", "")
     prompt = (
         "You are a Customer Success Manager. Draft a concise, warm outreach email "
@@ -54,7 +54,7 @@ def _llm_draft(state: Dict[str, Any], action: Dict[str, Any]) -> str | None:
 
 
 def _template_draft(state: Dict[str, Any], action: Dict[str, Any]) -> str:
-    account_id = state.get("account_id", "your team")
+    account_id = state.get("account_name") or state.get("account_id", "your team")
     title = action.get("title", "the recommended next step")
     return (
         "Hi there,\n\n"

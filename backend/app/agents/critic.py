@@ -187,20 +187,26 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
     information_gaps = _information_gaps(recommendation, report)
     reflection = _reflection(recommendation, report, information_gaps)
 
-    # Recalibrate confidence in two stages: an unfaithful rationale loses
-    # credibility outright, then the self-consistency pass scales what remains
-    # (thin evidence and open gaps pull it down, up to a 30% reduction).
+    # SINGLE calibration path. The explain step set a PRIOR (an evidence and
+    # action signal, labelled method="evidence_prior"); the critic is the sole
+    # owner of the FINAL confidence and the method of record. We take the prior
+    # once, then apply two penalties in one pass: an unfaithful rationale loses
+    # credibility outright, and the self-consistency reflection scales what
+    # remains (thin evidence and open gaps pull it down, up to a 30% reduction).
+    # No value is calibrated twice and there is exactly one method string.
     confidence = recommendation.get("confidence") or {}
-    score = float(confidence.get("score", 0.7))
+    prior = float(confidence.get("prior", confidence.get("score", 0.7)))
+    score = prior
     if not report["faithful"]:
         score = score * 0.7
     consistency = float(reflection["consistency"])
     score = round(score * (1.0 - 0.3 * (1.0 - consistency)), 3)
     score = max(0.05, min(0.97, score))
     label = "high" if score >= 0.75 else "medium" if score >= 0.5 else "low"
+    confidence["prior"] = round(prior, 3)
     confidence["score"] = score
     confidence["label"] = label
-    confidence["method"] = "self_consistency+verbalized+critic_reflection"
+    confidence["method"] = "critic_reflection"
     confidence["consistency"] = consistency
     recommendation["confidence"] = confidence
 

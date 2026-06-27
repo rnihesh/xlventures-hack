@@ -25,15 +25,25 @@ class RunState(TypedDict, total=False):
 
     # --- request envelope ---
     run_id: str
+    org_id: str
     domain: str
     account_id: str
     signal: Signal
+    # A/B memory toggle: when true, the play recommender skips learned-preference
+    # re-ranking and uses raw priors only (read by another slice's experiment).
+    disable_memory: bool
 
     # --- planning ---
-    plan: List[str]
+    # Structured, first-class plan: {decision_point, roster, skipped, rationale,
+    # source}. The planner selects + orders the specialist roster (LLM-driven
+    # online, deterministic offline) and execution is driven from it.
+    plan: Dict[str, Any]
     capabilities: List[str]
     decision_point: str
     domain_pack_key: str
+    plan_rationale: str
+    routing: Dict[str, Any]
+    route: List[str]
 
     # --- blackboard (specialist outputs) ---
     evidence: List[Dict[str, Any]]
@@ -44,6 +54,17 @@ class RunState(TypedDict, total=False):
     draft: Dict[str, Any]
     preferences: Dict[str, Any]
     similar_episodes: List[Dict[str, Any]]
+
+    # --- missing-information analysis (PDF step 3) ---
+    missing_information: List[Dict[str, Any]]
+    information_gaps: List[str]
+
+    # --- control-loop bookkeeping (clarify + replan) ---
+    needs_clarification: bool
+    clarify_iterations: int
+    replan_iterations: int
+    replan_target: str
+    gap_queries: List[str]
 
     # --- outputs ---
     recommendation: Optional[Dict[str, Any]]

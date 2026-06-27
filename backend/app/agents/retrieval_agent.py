@@ -79,16 +79,28 @@ def _llm_subqueries(state: Dict[str, Any]) -> List[str]:
 
 
 def _plan_queries(state: Dict[str, Any], pack: Any) -> List[str]:
-    """Assemble the ordered, de-duplicated query plan (base query first)."""
+    """Assemble the ordered, de-duplicated query plan (base query first).
+
+    When the clarify loop has populated ``gap_queries`` (a re-retrieve driven by
+    the gap-analysis node), those gap-targeted queries are prepended so the
+    second retrieval pass focuses on the missing facts, and the fan-out cap is
+    widened to fit them.
+    """
+
+    gap_queries = [str(q) for q in (state.get("gap_queries") or []) if q]
 
     queries: List[str] = [_base_query(state)]
+    # Gap-targeted queries lead on a clarify re-retrieve so they are not capped out.
+    queries.extend(gap_queries)
 
     expansion = _llm_subqueries(state)
     if not expansion:
         expansion = _deterministic_subqueries(state, pack)
     queries.extend(expansion)
 
-    # De-duplicate while preserving order and capping the total fan-out.
+    # De-duplicate while preserving order and capping the total fan-out. The cap
+    # grows by the number of gap queries so a clarify pass never drops them.
+    cap = _MAX_SUBQUERIES + 1 + len(gap_queries)
     seen: set[str] = set()
     plan: List[str] = []
     for q in queries:
@@ -98,16 +110,20 @@ def _plan_queries(state: Dict[str, Any], pack: Any) -> List[str]:
             continue
         seen.add(key)
         plan.append(norm)
-        if len(plan) >= _MAX_SUBQUERIES + 1:
+        if len(plan) >= cap:
             break
     return plan
 
 
-async def _search(retriever: Any, query: str, account_id: str, k: int) -> List[Dict[str, Any]]:
+async def _search(
+    retriever: Any, query: str, account_id: str, k: int, org_id: str = "org_demo"
+) -> List[Dict[str, Any]]:
     """Run one retriever search and normalize results to dicts. Never raises."""
 
     try:
-        results = await retriever.search(query, account_id=account_id, k=k)
+        results = await retriever.search(
+            query, account_id=account_id, k=k, org_id=org_id
+        )
     except TypeError:
         # Tolerate a retriever whose signature omits the keyword.
         try:
@@ -127,7 +143,11 @@ async def _search(retriever: Any, query: str, account_id: str, k: int) -> List[D
 
 
 async def _multi_retrieve(
-    account_id: str, queries: List[str], k: int, domain: str
+    account_id: str,
+    queries: List[str],
+    k: int,
+    domain: str,
+    org_id: str = "org_demo",
 ) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
     """Retrieve for each query, then merge and de-duplicate by source document.
 
@@ -143,7 +163,7 @@ async def _multi_retrieve(
     best: Dict[str, Dict[str, Any]] = {}
     hits: Dict[str, int] = {}
     for query in queries:
-        results = await _search(retriever, query, account_id, k)
+        results = await _search(retriever, query, account_id, k, org_id)
         hits[query] = len(results)
         for item in results:
             source_id = item.get("source_id") or item.get("snippet", "")
@@ -179,6 +199,10 @@ async def _multi_retrieve(
 async def node(state: Dict[str, Any]) -> Dict[str, Any]:
     account_id = state.get("account_id", "unknown-account")
     domain = state.get("domain", "customer_success")
+    # Scope retrieval to the run's owning org so a tenant only grounds on its own
+    # ingested evidence (plus shared seed knowledge). Falls back to the demo org
+    # for paths that do not set it (eval fallback, single-tenant offline).
+    org_id = state.get("org_id") or "org_demo"
 
     try:
         pack = load_pack(domain)
@@ -187,7 +211,9 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
 
     queries = await asyncio.to_thread(_plan_queries, state, pack)
 
-    evidence, hits = await _multi_retrieve(account_id, queries, k=_KEEP, domain=domain)
+    evidence, hits = await _multi_retrieve(
+        account_id, queries, k=_KEEP, domain=domain, org_id=org_id
+    )
     evidence = evidence[:_KEEP]
     source = "retriever"
     if not evidence:

@@ -139,7 +139,17 @@ def _chosen_action(state: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _calibrated_confidence(state: Dict[str, Any], action: Dict[str, Any]) -> Dict[str, Any]:
-    """Compute an honest, non-constant confidence from the run state."""
+    """Compute the confidence PRIOR from the run state.
+
+    Single calibration path (one method of record): this function only produces
+    the PRIOR, an evidence-and-action signal that seeds confidence. The CRITIC
+    owns the FINAL value and the method string (see app/agents/critic.py): it
+    reads ``prior`` here, applies faithfulness and self-consistency, and writes
+    the authoritative ``score`` + ``method``. ``score`` is set equal to the prior
+    so the object is valid if the critic never runs (offline fallback), but the
+    ``method`` is labelled ``evidence_prior`` to make clear it is an INPUT, not
+    the final calibration of record.
+    """
 
     evidence = state.get("evidence") or []
     risks = state.get("risks") or {}
@@ -151,9 +161,9 @@ def _calibrated_confidence(state: Dict[str, Any], action: Dict[str, Any]) -> Dic
     base += float(action.get("preference_boost", 0.0)) * 0.5  # learned signal
     if contradicting:
         base -= 0.1
-    score = round(max(0.05, min(0.95, base)), 3)
-    label = "high" if score >= 0.75 else "medium" if score >= 0.5 else "low"
-    return {"score": score, "method": "self_consistency+verbalized", "label": label}
+    prior = round(max(0.05, min(0.95, base)), 3)
+    label = "high" if prior >= 0.75 else "medium" if prior >= 0.5 else "low"
+    return {"score": prior, "prior": prior, "method": "evidence_prior", "label": label}
 
 
 # Candidate information gaps. Each entry is a fact that, if known, would change
@@ -300,6 +310,8 @@ def build_recommendation(state: Dict[str, Any], llm: Any) -> Dict[str, Any]:
 
     run_id = state.get("run_id", "")
     account_id = state.get("account_id", "unknown-account")
+    # Display name for prose (the id is kept for technical evidence source ids).
+    account_label = state.get("account_name") or account_id
     domain = state.get("domain", "customer_success")
     signal = state.get("signal") or {}
     signal_content = signal.get("content", "Churn risk signal detected.")
@@ -318,12 +330,12 @@ def build_recommendation(state: Dict[str, Any], llm: Any) -> Dict[str, Any]:
     }
 
     rationale = _verbalized_rationale(
-        llm, account_id, action_block["title"], signal_content, evidence
+        llm, account_label, action_block["title"], signal_content, evidence
     )
     if rationale is None:
         rationale = (
             f"{action_block['title']} directly addresses the strongest signals on "
-            f"account {account_id}: {evidence[0]['claim'] if evidence else 'declining engagement'} "
+            f"{account_label}: {evidence[0]['claim'] if evidence else 'declining engagement'} "
             "It re-anchors value with the decision makers before the situation "
             "compounds, and it is the eligible play with the highest expected impact."
         )

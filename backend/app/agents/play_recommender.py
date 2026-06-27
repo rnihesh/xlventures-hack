@@ -21,8 +21,15 @@ from app.packs.loader import load_pack
 from app.packs.schema import Action, DomainPack
 from app.packs.registry import register_agent
 
-# Which actions are eligible per decision point. Kept as a small mapping so the
-# pack stays declarative; unknown decision points fall back to all actions.
+# Eligibility and action economics (base value, effort) are now PACK
+# CONFIGURATION: ``actions[*].eligible_points``, ``actions[*].base_value`` and
+# ``actions[*].effort`` in the domain YAML. The maps below are retained only as a
+# SAFE FALLBACK for packs (or actions) that do not declare them, so nothing
+# breaks when a pack omits the economics.
+#
+# Which actions are eligible per decision point, used only when no pack action
+# declares ``eligible_points`` for the point. Unknown points fall back to all
+# actions.
 _ELIGIBLE_BY_POINT: Dict[str, List[str]] = {
     "onboarding_stall": ["assign_onboarding_taskforce", "launch_adoption_campaign", "monitor_no_action"],
     "low_adoption": ["launch_adoption_campaign", "schedule_executive_business_review", "monitor_no_action"],
@@ -100,10 +107,9 @@ def _bucket(value: float) -> str:
     return "low"
 
 
-def _effort_impact(action_key: str, score: float) -> Dict[str, Any]:
+def _effort_impact(action_key: str, score: float, effort: float) -> Dict[str, Any]:
     """Return an effort vs impact read for a candidate: labels plus a note."""
 
-    effort = _EFFORT.get(action_key, 0.5)
     effort_label = _bucket(effort)
     impact_label = _bucket(score)
     # Payoff ratio: impact earned per unit of effort. Above 1 reads as efficient.
@@ -128,6 +134,17 @@ def _effort_impact(action_key: str, score: float) -> Dict[str, Any]:
 
 
 def _eligible_actions(pack: DomainPack, decision_point: str) -> List[Action]:
+    """Resolve eligible actions for a decision point, config first.
+
+    Prefers the pack's declared eligibility (``actions[*].eligible_points``).
+    Falls back to the built-in ``_ELIGIBLE_BY_POINT`` map, then to all actions,
+    so a pack that does not declare eligibility still produces candidates.
+    """
+
+    from_pack = pack.actions_for_point(decision_point)
+    if from_pack:
+        return from_pack
+
     keys = _ELIGIBLE_BY_POINT.get(decision_point)
     if not keys:
         return list(pack.actions)
@@ -137,6 +154,22 @@ def _eligible_actions(pack: DomainPack, decision_point: str) -> List[Action]:
         if action is not None:
             out.append(action)
     return out or list(pack.actions)
+
+
+def _base_value_for(action: Action) -> float:
+    """Expected-value prior for an action: pack value first, then code default."""
+
+    if action.base_value is not None:
+        return float(action.base_value)
+    return _BASE_VALUE.get(action.key, 0.5)
+
+
+def _effort_for(action: Action) -> float:
+    """Execution effort for an action: pack effort first, then code default."""
+
+    if action.effort is not None:
+        return float(action.effort)
+    return _EFFORT.get(action.key, 0.5)
 
 
 def _preference_boost(preferences: Dict[str, Any], action_key: str) -> float:
@@ -285,28 +318,39 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
     pack = load_pack(domain)
     eligible = _eligible_actions(pack, decision_point)
 
+    # A/B memory toggle: when disabled, the recommender uses raw priors only and
+    # skips all learned-preference re-ranking (and the memory round-trip).
+    disable_memory = bool(state.get("disable_memory"))
+
     # Pull learned signals from memory (graceful if the slice is absent).
     preferences: Dict[str, Any] = {}
     episodes: List[Dict[str, Any]] = []
-    memory = await safe_get_memory()
     situation = f"{decision_point}: {(state.get('signal') or {}).get('content', '')}".strip()
+    memory = None if disable_memory else await safe_get_memory()
     if memory is not None:
         try:
             preferences = await memory.get_preferences(domain) or {}
         except Exception:  # noqa: BLE001
             preferences = {}
         try:
-            episodes = await memory.recall_similar(account_id, situation, k=3) or []
+            episodes = (
+                await memory.recall_similar(
+                    account_id, situation, k=3, org_id=state.get("org_id")
+                )
+                or []
+            )
         except Exception:  # noqa: BLE001
             episodes = []
 
     candidates: List[Dict[str, Any]] = []
     for action in eligible:
-        base = _BASE_VALUE.get(action.key, 0.5)
+        base = _base_value_for(action)
+        effort = _effort_for(action)
         # Higher risk increases the value of decisive plays, lowers monitoring.
         risk_term = (risk_score - 0.5) * (0.4 if action.key != "monitor_no_action" else -0.4)
-        pref = _preference_boost(preferences, action.key)
-        epi = _episode_boost(episodes, action.key)
+        # With memory disabled both boosts are zero, so the ranking is raw priors.
+        pref = 0.0 if disable_memory else _preference_boost(preferences, action.key)
+        epi = 0.0 if disable_memory else _episode_boost(episodes, action.key)
         score = max(0.02, min(0.99, round(base + risk_term + pref + epi, 3)))
         candidate = {
             "key": action.key,
@@ -319,7 +363,7 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
             "preference_boost": round(pref, 3),
             "episode_boost": round(epi, 3),
         }
-        candidate.update(_effort_impact(action.key, score))
+        candidate.update(_effort_impact(action.key, score, effort))
         candidates.append(candidate)
 
     # Primary sort by expected value. Ties are broken by learned memory (a play
@@ -360,7 +404,11 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
                 "role": "play_recommender",
                 "content": (
                     f"Ranked {len(candidates)} eligible plays"
-                    + (" using learned memory." if learned else ".")
+                    + (
+                        " using raw priors (memory disabled)."
+                        if disable_memory
+                        else (" using learned memory." if learned else ".")
+                    )
                     + (
                         f" Considered {len(alternatives)} top alternatives."
                         if alternatives
@@ -391,6 +439,7 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
                         for a in alternatives
                     ],
                     "used_memory": learned,
+                    "memory_disabled": disable_memory,
                     "similar_episodes": len(episodes),
                 },
             )
