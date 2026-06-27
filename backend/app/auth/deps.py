@@ -20,6 +20,8 @@ from app.repositories import users as users_repo
 def _public_user(user: dict[str, Any]) -> dict[str, Any]:
     """Strip secret fields from a user row before returning it to callers."""
 
+    from app.config import settings
+
     return {
         "id": user["id"],
         "email": user["email"],
@@ -27,6 +29,7 @@ def _public_user(user: dict[str, Any]) -> dict[str, Any]:
         "role": user.get("role", "member"),
         "org_id": user["org_id"],
         "email_verified": bool(user.get("email_verified")),
+        "is_admin": settings.is_admin(user.get("email")),
     }
 
 

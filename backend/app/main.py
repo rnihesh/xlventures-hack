@@ -100,6 +100,7 @@ def create_app() -> FastAPI:
     # Import routers lazily here to avoid import cycles with app.deps/app.config.
     from app.api import (
         accounts,
+        admin,
         agents,
         auth,
         contacts,
@@ -123,6 +124,7 @@ def create_app() -> FastAPI:
     app.include_router(contacts.router)
     app.include_router(rules.router)
     app.include_router(agents.router)
+    app.include_router(admin.router)
 
     # Generic agentic chatbot over the whole platform (offline-safe).
     from app.api import chat

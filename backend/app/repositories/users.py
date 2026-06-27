@@ -303,6 +303,24 @@ async def set_verified(user_id: str) -> None:
     )
 
 
+async def touch_last_login(user_id: str) -> None:
+    """Record the user's most recent login time (best effort, never raises)."""
+
+    pool = await get_pool()
+    if pool is None:
+        _seed_memory()
+        user = _USERS.get(user_id)
+        if user:
+            user["last_login_at"] = _now()
+        return
+    try:
+        await pool.execute(
+            "UPDATE users SET last_login_at = now() WHERE id = $1", user_id
+        )
+    except Exception:  # noqa: BLE001 - column may be pre-migration; non-fatal
+        pass
+
+
 def _row_to_user(row: Any) -> dict[str, Any]:
     """Convert an asyncpg Record into a plain user dict."""
 

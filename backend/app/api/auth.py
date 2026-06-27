@@ -187,6 +187,7 @@ async def login(payload: LoginRequest, response: Response) -> dict:
     org = await users_repo.get_org(user["org_id"])
     token = create_session_token(user["id"], user["org_id"])
     _set_session_cookie(response, token)
+    await users_repo.touch_last_login(user["id"])
     return {"user": _public_user(user), "org": org}
 
 
@@ -319,4 +320,5 @@ async def google_exchange(
     org = await users_repo.get_org(user["org_id"])
     token = create_session_token(user["id"], user["org_id"])
     _set_session_cookie(response, token)
+    await users_repo.touch_last_login(user["id"])
     return {"user": _public_user(user), "org": org}

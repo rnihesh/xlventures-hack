@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     jwt_secret: str = _DEFAULT_JWT_SECRET
     # Public base URL of the frontend, used to build email verification links.
     app_base_url: str = "http://localhost:3200"
+    # Comma-separated emails that may access the admin panel (case-insensitive).
+    admin_emails: str = ""
 
     # --- AWS / SES (email, all optional) ------------------------------------
     aws_region: str = "us-east-1"
@@ -102,6 +104,15 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]:
         """Parse the comma-separated CORS origins into a clean list."""
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def admin_email_set(self) -> set[str]:
+        """Lower-cased set of admin emails parsed from ``admin_emails``."""
+        return {e.strip().lower() for e in self.admin_emails.split(",") if e.strip()}
+
+    def is_admin(self, email: str | None) -> bool:
+        """True when ``email`` is in the admin allowlist."""
+        return bool(email) and email.strip().lower() in self.admin_email_set
 
 
 # Module-level singleton imported throughout the application.
