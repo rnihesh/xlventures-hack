@@ -12,21 +12,20 @@ import { NextRequest, NextResponse } from "next/server";
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8200";
 
-// The public origin of THIS app. Behind a reverse proxy the server binds to
-// 0.0.0.0:3200, so req.url would redirect the browser to 0.0.0.0. Build the
-// origin from the forwarded host/proto (nginx sets them), falling back to the
-// configured site URL, then req.url for local dev.
-function publicOrigin(req: NextRequest): string {
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-  const proto =
-    req.headers.get("x-forwarded-proto") ||
-    new URL(req.url).protocol.replace(":", "");
-  if (host) return `${proto}://${host}`;
-  return process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin;
+// Public origin of THIS app, PINNED to a server-side configured value. Behind a
+// reverse proxy the server binds to 0.0.0.0:3200, so req.url would redirect to
+// 0.0.0.0. We must NOT derive it from request headers (Host / X-Forwarded-Host
+// are client-controllable -> open redirect / OAuth phishing). NEXT_PUBLIC_SITE_URL
+// is baked at build time (prod: https://aperture.niheshr.com). req.nextUrl.origin
+// is only the local-dev fallback when SITE_URL is unset.
+function appOrigin(req: NextRequest): string {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || req.nextUrl.origin
+  );
 }
 
 function loginError(req: NextRequest, reason: string): NextResponse {
-  const url = new URL("/login", publicOrigin(req));
+  const url = new URL("/login", appOrigin(req));
   url.searchParams.set("error", reason);
   return NextResponse.redirect(url);
 }
@@ -59,7 +58,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
 
     const redirectRes = NextResponse.redirect(
-      new URL("/dashboard", publicOrigin(req)),
+      new URL("/dashboard", appOrigin(req)),
     );
     // Relay the backend's session cookie to the browser so the user is signed in.
     const setCookie = res.headers.get("set-cookie");
