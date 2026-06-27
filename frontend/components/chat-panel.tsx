@@ -76,6 +76,11 @@ export function ChatPanel({ initialTurns, onTurnsChange }: ChatPanelProps) {
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  // Land on the chat with the input focused so the user can type immediately.
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
+
   // Mutate the trailing assistant turn in place (token append, tool trace, etc).
   const updateAssistant = useCallback(
     (mut: (turn: ChatTurn) => ChatTurn) => {
@@ -227,9 +232,9 @@ export function ChatPanel({ initialTurns, onTurnsChange }: ChatPanelProps) {
       {/* Transcript */}
       <div
         ref={scrollRef}
-        className="scroll-thin flex-1 overflow-y-auto px-4 py-6 md:px-6"
+        className="scroll-thin flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 md:px-6"
       >
-        <div className="mx-auto w-full max-w-3xl">
+        <div className="mx-auto w-full min-w-0 max-w-3xl overflow-x-hidden">
           {empty ? (
             <EmptyState onPick={(s) => void send(s)} disabled={busy} />
           ) : (
