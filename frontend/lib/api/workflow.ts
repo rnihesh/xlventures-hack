@@ -11,11 +11,20 @@
 import { API_BASE, ApiError } from "@/lib/api";
 import { authHeaders } from "@/lib/auth";
 
-// A selectable specialist candidate, in run order.
+// A specialist candidate, in run order, with its catalog and usage metadata.
 export interface WorkflowSpecialist {
   capability: string;
   description: string;
   always_on: boolean;
+  // State keys the specialist produces.
+  output_keys: string[];
+  // Model cost tier: cheap | standard | strong.
+  cost_tier: string;
+  tags: string[];
+  // Governance-tagged tools the specialist may call.
+  tools: string[];
+  // Decision point keys whose effective roster includes this specialist.
+  used_in: string[];
 }
 
 // A decision point the planner routes through, with its effective roster.
@@ -84,4 +93,41 @@ export async function putWorkflow(
     throw new ApiError(`PUT /workflow/${domain} failed (${res.status})`, res.status);
   }
   return (await res.json()) as WorkflowView;
+}
+
+// The assistant's response: a natural-language reply, the per-decision-point
+// rosters it changed (keyed by decision point), and the full updated view it
+// already persisted on the backend (so the page applies it as authoritative).
+export interface WorkflowAssistantResponse {
+  reply: string;
+  changes: WorkflowRosters;
+  view: WorkflowView;
+}
+
+/**
+ * Send a natural-language instruction to the workflow assistant. The backend
+ * reads the current workflow, applies the instruction, persists it, and returns
+ * the updated view plus the decision points it changed. Errors surface to the
+ * caller so the chat can show an honest failure rather than a silent no-op.
+ */
+export async function postWorkflowAssistant(
+  domain: string,
+  message: string,
+): Promise<WorkflowAssistantResponse> {
+  const res = await fetch(
+    `${API_BASE}/workflow/${encodeURIComponent(domain)}/assistant`,
+    {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      credentials: "include",
+      body: JSON.stringify({ message }),
+    },
+  );
+  if (!res.ok) {
+    throw new ApiError(
+      `POST /workflow/${domain}/assistant failed (${res.status})`,
+      res.status,
+    );
+  }
+  return (await res.json()) as WorkflowAssistantResponse;
 }
