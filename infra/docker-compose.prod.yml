@@ -9,7 +9,7 @@
 
 services:
   db:
-    image: pgvector/pgvector:pg17
+    image: pgvector/pgvector:pg18
     environment:
       POSTGRES_USER: nba
       POSTGRES_PASSWORD: nba
@@ -19,7 +19,7 @@ services:
     expose:
       - "5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U nba -d nba"]
       interval: 5s
