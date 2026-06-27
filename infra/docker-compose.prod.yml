@@ -1,0 +1,55 @@
+# Production stack: pulls prebuilt images from GHCR (no build on the droplet).
+# The droplet only needs this file plus a .env next to it (env_file: ./.env).
+# Images are published by CI to ghcr.io/rnihesh/aperture-{api,web}.
+#
+# Run on the droplet (from the directory holding this file + .env):
+#   docker compose -f docker-compose.prod.yml --env-file .env pull
+#   docker compose -f docker-compose.prod.yml --env-file .env up -d
+#   docker compose -f docker-compose.prod.yml --env-file .env exec -T api uv run alembic upgrade head
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: nba
+      POSTGRES_PASSWORD: nba
+      POSTGRES_DB: nba
+    # No host port: reached internally as db:5432, so it never clashes with a
+    # Postgres already on the host's 5432.
+    expose:
+      - "5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nba -d nba"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  api:
+    image: ${API_IMAGE:-ghcr.io/rnihesh/aperture-api:latest}
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - path: ./.env
+        required: false
+    # Force the bundled DB regardless of any DATABASE_URL in .env.
+    environment:
+      DATABASE_URL: postgresql://nba:nba@db:5432/nba
+    ports:
+      - "127.0.0.1:8200:8200"
+    restart: unless-stopped
+
+  web:
+    image: ${WEB_IMAGE:-ghcr.io/rnihesh/aperture-web:latest}
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:3200:3200"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
