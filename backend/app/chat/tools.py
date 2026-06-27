@@ -184,8 +184,14 @@ async def run_nba(
     from app.api.runs import _RUNS
     from app.deps import get_checkpointer
     from app.graph.planner import build_graph
-    from app.packs.loader import reset_pack_org, set_pack_org
+    from app.packs.loader import (
+        reset_pack_org,
+        reset_roster_overrides,
+        set_pack_org,
+        set_roster_overrides,
+    )
     from app.repositories import org_packs as org_packs_repo
+    from app.repositories import pack_overrides as overrides_repo
 
     org_id = current_org_id()
     resolved = await _resolve_org_account(org_id, account_id)
@@ -235,12 +241,22 @@ async def run_nba(
     except Exception:  # noqa: BLE001 - hydration is best effort
         pass
 
+    # Honor the org's Workflow Studio roster overrides for this run.
+    roster_overrides: Dict[str, Any] = {}
+    try:
+        blob = await overrides_repo.get_overrides(org_id, domain)
+        roster_overrides = (blob or {}).get("rosters") or {}
+    except Exception:  # noqa: BLE001 - overrides are best effort
+        pass
+
     checkpointer = await get_checkpointer()
     graph = build_graph(checkpointer)
     token = set_pack_org(org_id)
+    roster_token = set_roster_overrides(roster_overrides)
     try:
         final = await graph.ainvoke(initial_state, config=config)
     finally:
+        reset_roster_overrides(roster_token)
         reset_pack_org(token)
 
     recommendation = final.get("recommendation")

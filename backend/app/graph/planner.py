@@ -394,12 +394,26 @@ async def planner_node(state: RunState) -> Dict[str, Any]:
 
     decision_point = _classify_decision_point(pack, signal)
 
-    # The roster IS the plan: online the LLM picks/orders it from the pack's
-    # candidate roster; offline/DEMO or on failure a deterministic selection is
-    # used. Execution below is driven by this roster (via ``capabilities``).
-    capabilities, plan_rationale, skipped, plan_source = await _select_roster(
-        pack, decision_point, signal
-    )
+    # Org-configured roster (Workflow Studio): when the org has pinned which
+    # specialists run for this decision point, honor it verbatim and skip the
+    # LLM/deterministic selection. Absent an override, behavior is unchanged.
+    from app.packs.loader import roster_override_for
+
+    override = roster_override_for(decision_point)
+    if override:
+        capabilities = _runnable(override)
+        plan_rationale = "Roster configured for this org in Workflow Studio."
+        skipped = [
+            c for c in _SEQUENCE if c not in capabilities and c in _PIPELINE and AGENTS.has(c)
+        ]
+        plan_source = "org-config"
+    else:
+        # The roster IS the plan: online the LLM picks/orders it from the pack's
+        # candidate roster; offline/DEMO or on failure a deterministic selection
+        # is used. Execution below is driven by this roster (via ``capabilities``).
+        capabilities, plan_rationale, skipped, plan_source = await _select_roster(
+            pack, decision_point, signal
+        )
 
     dp = pack.decision_points.get(decision_point)
     dp_label = dp.label if dp else decision_point

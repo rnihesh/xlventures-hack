@@ -68,6 +68,37 @@ def reset_pack_org(token) -> None:
         pass
 
 
+# Per-org decision-point roster overrides (Workflow Studio edits), bound for the
+# duration of a run so the SYNCHRONOUS planner can honor them without a DB call.
+# Shape: {decision_point_key: [capability, ...]}. The empty default leaves every
+# existing run unchanged (the planner selects the roster as before).
+_current_roster_overrides: ContextVar[Dict[str, List[str]]] = ContextVar(
+    "current_roster_overrides", default={}
+)
+
+
+def set_roster_overrides(rosters: Optional[Dict[str, List[str]]]):
+    """Bind the org's per-decision-point roster overrides for this run."""
+
+    return _current_roster_overrides.set(dict(rosters or {}))
+
+
+def reset_roster_overrides(token) -> None:
+    """Undo a previous :func:`set_roster_overrides`."""
+
+    try:
+        _current_roster_overrides.reset(token)
+    except (ValueError, LookupError):  # pragma: no cover - defensive only
+        pass
+
+
+def roster_override_for(decision_point: str) -> Optional[List[str]]:
+    """Return the org's configured roster for a decision point, or None."""
+
+    caps = (_current_roster_overrides.get() or {}).get(decision_point)
+    return [str(c) for c in caps] if caps else None
+
+
 def register_org_pack(org_id: str, domain: str, parsed: Dict[str, Any]) -> None:
     """Register a validated, org-uploaded pack so runs and lookups resolve it."""
 

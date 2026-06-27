@@ -247,18 +247,34 @@ async def stream_run(
     # domain pack, never another tenant's. Hydration repopulates the loader
     # registry from durable storage for a fresh process. Done outside the
     # generator so a binding failure cannot break the SSE stream.
-    from app.packs.loader import reset_pack_org, set_pack_org
+    from app.packs.loader import (
+        reset_pack_org,
+        reset_roster_overrides,
+        set_pack_org,
+        set_roster_overrides,
+    )
     from app.repositories import org_packs as org_packs_repo
+    from app.repositories import pack_overrides as overrides_repo
 
     try:
         await org_packs_repo.hydrate_loader(org_id)
     except Exception:  # noqa: BLE001 - hydration is best effort
         logger.warning("org pack hydration failed for org %s", org_id)
 
+    # Pre-fetch the org's Workflow Studio roster overrides so the synchronous
+    # planner can honor them (it cannot await a DB call mid-graph).
+    roster_overrides: Dict[str, Any] = {}
+    try:
+        blob = await overrides_repo.get_overrides(org_id, run["domain"])
+        roster_overrides = (blob or {}).get("rosters") or {}
+    except Exception:  # noqa: BLE001 - overrides are best effort
+        pass
+
     async def event_generator() -> AsyncIterator[Dict[str, str]]:
         seq = 0
         run["status"] = "running"
         pack_token = set_pack_org(org_id)
+        roster_token = set_roster_overrides(roster_overrides)
 
         yield _envelope(
             run_id,
@@ -369,6 +385,7 @@ async def stream_run(
             )
         finally:
             await flush_sink(usage_token, org_id)
+            reset_roster_overrides(roster_token)
             reset_pack_org(pack_token)
 
     return EventSourceResponse(event_generator())

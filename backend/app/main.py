@@ -111,6 +111,7 @@ def create_app() -> FastAPI:
         rules,
         runs,
         whatif,
+        workflow,
     )
 
     app.include_router(health.router)
@@ -125,6 +126,7 @@ def create_app() -> FastAPI:
     app.include_router(rules.router)
     app.include_router(agents.router)
     app.include_router(admin.router)
+    app.include_router(workflow.router)
 
     # Generic agentic chatbot over the whole platform (offline-safe).
     from app.api import chat
