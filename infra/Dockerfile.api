@@ -1,30 +1,32 @@
-FROM python:3.12-slim
+# Multi-stage build: compile deps in a builder with toolchain, ship a slim
+# runtime without build-essential. Build context is ./backend.
 
+FROM python:3.12-slim AS builder
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
-
 WORKDIR /app
-
-# Install system build dependencies (asyncpg builds, healthcheck curl).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential curl \
+    && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
-
-# Bring in the uv binary from the official image (pinned for reproducible builds).
 COPY --from=ghcr.io/astral-sh/uv:0.11.17 /uv /uvx /bin/
-
-# Install dependencies first (cached layer) using the lockfile. Build context is
-# ./backend, so pyproject.toml, uv.lock, and the README it references are present.
+# Dependency layer (cached): pyproject.toml, uv.lock, and the README it references.
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-install-project --no-dev
-
-# Copy the rest of the source and install the project itself.
 COPY . /app
 RUN uv sync --frozen --no-dev
 
+# Runtime: slim, no build toolchain. Carries the prebuilt .venv + uv (for migrations).
+FROM python:3.12-slim AS runtime
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/app/.venv/bin:$PATH"
+WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=ghcr.io/astral-sh/uv:0.11.17 /uv /uvx /bin/
+COPY --from=builder /app /app
 EXPOSE 8200
-
-# Run inside the uv-managed environment.
 CMD ["uv", "run", "--no-dev", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8200"]
