@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MessageSquare, Plus, Trash2 } from "lucide-react";
+import { Bot, Plus, Trash2 } from "lucide-react";
 
 import { ChatPanel, type ChatTurn } from "@/components/chat-panel";
 import {
@@ -23,6 +23,11 @@ export default function ChatPage() {
   // Tracks the turns we handed to the panel so the panel's initial echo does
   // not trigger a redundant save.
   const loadedRef = useRef<string>("[]");
+  // Debounce timer + the pending save so per-token (mid-stream) changes coalesce
+  // into one write, and a fast navigate-away flushes the latest turns instead of
+  // losing them.
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaveRef = useRef<(() => void) | null>(null);
 
   // Load the conversation list on mount; start a fresh chat if there are none.
   useEffect(() => {
@@ -73,7 +78,16 @@ export default function ChatPage() {
       loadedRef.current = serialized;
       if (turns.length === 0) return;
       const title = titleFor(turns);
-      void upsertSession(activeId, title, turns);
+      // Debounce the durable write: coalesce mid-stream changes, but always save
+      // within ~600ms of the last change. The latest save is held so unmount can
+      // flush it (navigate-away never loses turns).
+      const save = () => {
+        pendingSaveRef.current = null;
+        void upsertSession(activeId, title, turns);
+      };
+      pendingSaveRef.current = save;
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(save, 600);
       setSessions((prev) => {
         const now = new Date().toISOString();
         const without = prev.filter((s) => s.id !== activeId);
@@ -81,6 +95,16 @@ export default function ChatPage() {
       });
     },
     [activeId],
+  );
+
+  // Flush any pending save when the page unmounts so a fast navigate-away still
+  // persists the latest turns.
+  useEffect(
+    () => () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      pendingSaveRef.current?.();
+    },
+    [],
   );
 
   const startNewChat = useCallback(() => {
@@ -121,12 +145,14 @@ export default function ChatPage() {
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
-            <MessageSquare className="h-5 w-5" />
+            <Bot className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-sm font-medium text-muted-foreground">Chat</h1>
+            <h1 className="text-sm font-medium text-muted-foreground">
+              Copilot
+            </h1>
             <p className="text-lg font-semibold tracking-tight">
-              Ask the platform anything
+              Operate the agents in plain language
             </p>
           </div>
         </div>

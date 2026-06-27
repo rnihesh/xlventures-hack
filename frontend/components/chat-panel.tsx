@@ -7,7 +7,7 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
-import { ArrowUp, Square } from "lucide-react";
+import { Aperture, ArrowUp, Square } from "lucide-react";
 
 import { ChatMessage } from "@/components/chat-message";
 import { Press } from "@/components/ui/press";
@@ -24,13 +24,16 @@ import type { ChatMessage as ChatMessageType, ChatToolCall } from "@/lib/types";
 export interface ChatTurn extends ChatMessageType {
   toolCalls?: ChatToolCall[];
   streaming?: boolean;
+  // Optional reasoning text the stream may surface (rendered as "Thoughts").
+  // Absent today; carried through so the UI lights up if a slice streams it.
+  thoughts?: string;
 }
 
 const SUGGESTIONS = [
-  "Show the riskiest accounts",
-  "Run an NBA for the top at-risk account",
-  "What can this platform do?",
-  "Ingest this meeting note: champion is leaving, renewal at risk in 30 days.",
+  "Run an NBA for Northwind and email the play to its contact",
+  "Why did the planner skip the simulator on this run?",
+  "Compare with-memory vs without-memory for ACC-1001",
+  "Show the riskiest accounts, then open a run on the top one",
 ];
 
 // Wire turns carry only the frozen-contract fields.
@@ -52,13 +55,14 @@ export function ChatPanel({ initialTurns, onTurnsChange }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // Lift settled turns up to the parent (which owns the session list) so the
-  // conversation is saved. Skip while streaming so we only store settled turns.
+  // Lift turns up to the parent (which owns the session list + persistence) on
+  // every change, including mid-stream, so the conversation is saved even if the
+  // user navigates away before a turn settles. The parent debounces the actual
+  // write, so this does not spam the API per token.
   useEffect(() => {
-    if (busy) return;
     onTurnsChange?.(turns);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turns, busy]);
+  }, [turns]);
 
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -101,6 +105,18 @@ export function ChatPanel({ initialTurns, onTurnsChange }: ChatPanelProps) {
               { tool: evt.tool, args: evt.args },
             ],
           }));
+          break;
+        case "thinking":
+          // Additive reasoning pulse: accumulate distinct lines into the turn's
+          // "Thoughts" block. Defensive: ignore an empty or repeated pulse so the
+          // block stays clean and an older event with no text is a no-op.
+          updateAssistant((t) => {
+            const line = (evt.text ?? "").trim();
+            if (line.length === 0) return t;
+            const prev = t.thoughts ?? "";
+            if (prev === line || prev.endsWith(`\n${line}`)) return t;
+            return { ...t, thoughts: prev ? `${prev}\n${line}` : line };
+          });
           break;
         case "tool.result":
           updateAssistant((t) => {
@@ -225,6 +241,7 @@ export function ChatPanel({ initialTurns, onTurnsChange }: ChatPanelProps) {
                   content={turn.content}
                   toolCalls={turn.toolCalls}
                   streaming={turn.streaming}
+                  thoughts={turn.thoughts}
                 />
               ))}
             </div>
@@ -256,7 +273,7 @@ export function ChatPanel({ initialTurns, onTurnsChange }: ChatPanelProps) {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
               rows={1}
-              placeholder="Ask the platform to do anything..."
+              placeholder="Tell the agent what to do (run an NBA, email a contact, explain a run)..."
               className="max-h-40 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:outline-none"
             />
             {busy ? (
@@ -286,8 +303,8 @@ export function ChatPanel({ initialTurns, onTurnsChange }: ChatPanelProps) {
             )}
           </div>
           <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            The agent calls real platform tools. Enter to send, Shift plus Enter
-            for a new line.
+            The agent invokes real platform tools, gated by human approval.
+            Enter to send, Shift plus Enter for a new line.
           </p>
         </div>
       </div>
@@ -308,17 +325,22 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center pt-10 text-center md:pt-20">
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-white shadow-sm">
-        <span className="text-lg font-semibold">A</span>
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-white shadow-sm ring-1 ring-primary/30">
+        <Aperture className="h-6 w-6" aria-hidden />
       </div>
       <h2 className="mt-5 text-xl font-semibold tracking-tight">
-        What can I help you decide?
+        Operate the platform in plain language
       </h2>
       <p className="mt-2 max-w-md text-sm text-muted-foreground">
-        Ask in plain language. The agent retrieves evidence, scores next best
-        actions, and shows every tool it calls along the way.
+        This is the agentic console, not a chatbot. It drives the same agents
+        and tools the platform runs on: it can launch NBAs, tag runs, email a
+        contact, query accounts, and explain planner decisions, calling each
+        real tool live.
       </p>
-      <div className="mt-8 grid w-full max-w-2xl gap-2 sm:grid-cols-2">
+      <div className="mt-8 w-full max-w-2xl text-left text-eyebrow">
+        Try an agentic task
+      </div>
+      <div className="mt-2 grid w-full max-w-2xl gap-2 sm:grid-cols-2">
         {SUGGESTIONS.map((s) => (
           <Press
             key={s}

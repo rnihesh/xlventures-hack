@@ -1,66 +1,69 @@
 "use client";
 
-import { Check, Loader2, Sparkles, User, Wrench } from "lucide-react";
+import { useState } from "react";
+import { Aperture, ChevronRight, Sparkles, User } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Markdown } from "@/components/markdown";
+import { ChatToolTimeline } from "@/components/tool-call-panel";
 import type { ChatRole, ChatToolCall } from "@/lib/types";
 
-// A compact one-line summary for a tool call. Falls back to a stringified
-// preview of the arguments when the backend has not (yet) returned a summary.
-function toolSummaryText(call: ChatToolCall): string {
-  if (call.summary && call.summary.trim().length > 0) return call.summary;
-  if (call.args && Object.keys(call.args).length > 0) {
-    const preview = Object.entries(call.args)
-      .slice(0, 3)
-      .map(([k, v]) => `${k}: ${formatArgValue(v)}`)
-      .join(", ");
-    return preview;
-  }
-  return "Running...";
-}
-
-function formatArgValue(v: unknown): string {
-  if (typeof v === "string") return v.length > 40 ? `${v.slice(0, 40)}...` : v;
-  if (typeof v === "number" || typeof v === "boolean") return String(v);
-  return Array.isArray(v) ? `[${v.length}]` : "...";
-}
-
-// One tool call rendered as a restrained chip: an accent marker, the tool name
-// in Geist Mono, and a one-line result summary.
-function ToolChip({ call, pending }: { call: ChatToolCall; pending: boolean }) {
+// The on-brand assistant mark: an aperture glyph on a Claude-orange tile. Used
+// for every assistant turn so the agent reads as a first-class platform actor.
+export function AssistantAvatar({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex items-center gap-2.5 rounded-lg border bg-card/70 px-2.5 py-2 transition-colors",
-        pending ? "border-primary/40" : "border-border",
+        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-sm ring-1 ring-primary/30",
+        className,
       )}
     >
-      {/* Tool icon in an accent-tinted tile */}
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-        <Wrench className="h-3.5 w-3.5" aria-hidden />
+      <Aperture className="h-4 w-4" aria-hidden />
+    </div>
+  );
+}
+
+// Animated "Thinking..." cue shown while the assistant is reasoning before or
+// between tool calls (no tokens and no tool actively running yet).
+function ThinkingIndicator() {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/70 px-2.5 py-1 text-[12px] text-muted-foreground">
+      <span className="inline-flex items-center gap-1">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary [animation-delay:150ms]" />
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary [animation-delay:300ms]" />
       </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <span className="truncate font-mono text-[12px] font-semibold text-foreground">
-            {call.tool}
-          </span>
-          <span className="rounded bg-secondary px-1 py-px text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-            tool
-          </span>
-        </div>
-        <p className="mt-0.5 truncate text-[12px] leading-snug text-muted-foreground">
-          {toolSummaryText(call)}
+      Thinking...
+    </div>
+  );
+}
+
+// Optional reasoning text the stream may surface, rendered as a subtle,
+// collapsible "Thoughts" block. Degrades to nothing when no text is present.
+function ThoughtsBlock({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-lg border border-dashed border-border bg-muted/30">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <Sparkles className="h-3 w-3 text-primary/70" aria-hidden />
+        Thoughts
+        <ChevronRight
+          className={cn(
+            "ml-auto h-3.5 w-3.5 transition-transform",
+            open && "rotate-90",
+          )}
+          aria-hidden
+        />
+      </button>
+      {open && (
+        <p className="whitespace-pre-wrap break-words px-2.5 pb-2 text-[11px] leading-relaxed text-muted-foreground">
+          {text}
         </p>
-      </div>
-      {/* Status: spinner while in flight, accent check when settled */}
-      <span className="shrink-0">
-        {pending ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" aria-hidden />
-        ) : (
-          <Check className="h-3.5 w-3.5 text-primary" aria-hidden />
-        )}
-      </span>
+      )}
     </div>
   );
 }
@@ -72,6 +75,9 @@ export interface ChatMessageProps {
   // True while the assistant turn is still streaming, so we can show a caret
   // and mark the latest tool call as in-flight.
   streaming?: boolean;
+  // Optional reasoning text the stream may surface. Absent today; read so the
+  // UI lights up automatically if a future slice streams it.
+  thoughts?: string;
 }
 
 export function ChatMessage({
@@ -79,10 +85,15 @@ export function ChatMessage({
   content,
   toolCalls,
   streaming = false,
+  thoughts,
 }: ChatMessageProps) {
   const isUser = role === "user";
   const calls = toolCalls ?? [];
-  const showCaret = streaming && content.length === 0 && calls.length === 0;
+  const lastCall = calls[calls.length - 1];
+  const toolRunning =
+    streaming && lastCall !== undefined && lastCall.summary === undefined;
+  // Reasoning beat: streaming, nothing rendered yet, and no tool is mid-flight.
+  const showThinking = streaming && content.length === 0 && !toolRunning;
 
   if (isUser) {
     return (
@@ -102,36 +113,21 @@ export function ChatMessage({
   return (
     <div className="flex animate-rise justify-start">
       <div className="flex max-w-[85%] items-start gap-3">
-        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-sm">
-          <Sparkles className="h-3.5 w-3.5" aria-hidden />
-        </div>
+        <AssistantAvatar className="mt-0.5" />
         <div className="min-w-0 flex-1 space-y-2">
-          {calls.length > 0 && (
-            <div className="space-y-1.5">
-              {calls.map((call, i) => (
-                <ToolChip
-                  key={`${call.tool}-${i}`}
-                  call={call}
-                  pending={streaming && i === calls.length - 1 && !call.summary}
-                />
-              ))}
-            </div>
+          {thoughts && thoughts.trim().length > 0 && (
+            <ThoughtsBlock text={thoughts} />
           )}
-          {(content.length > 0 || showCaret) && (
+          {calls.length > 0 && (
+            <ChatToolTimeline calls={calls} streaming={streaming} />
+          )}
+          {showThinking && <ThinkingIndicator />}
+          {content.length > 0 && (
             <div className="rounded-2xl rounded-tl-sm border border-border bg-card px-4 py-2.5 text-sm leading-relaxed text-card-foreground">
-              {content.length > 0 && <Markdown content={content} />}
-              <p className="whitespace-pre-wrap break-words">
-                {streaming && content.length > 0 && (
-                  <span className="ml-0.5 inline-block h-4 w-[2px] -translate-y-px animate-pulse bg-primary align-middle" />
-                )}
-                {showCaret && (
-                  <span className="inline-flex items-center gap-1 text-muted-foreground">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary [animation-delay:150ms]" />
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary [animation-delay:300ms]" />
-                  </span>
-                )}
-              </p>
+              <Markdown content={content} />
+              {streaming && (
+                <span className="ml-0.5 inline-block h-4 w-[2px] -translate-y-px animate-pulse bg-primary align-middle" />
+              )}
             </div>
           )}
         </div>

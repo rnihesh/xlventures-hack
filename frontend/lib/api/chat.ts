@@ -20,6 +20,7 @@ export type ChatStreamEvent =
   | { type: "token"; content: string }
   | { type: "tool.called"; tool: string; args?: Record<string, unknown> }
   | { type: "tool.result"; tool: string; summary?: string }
+  | { type: "thinking"; text?: string }
   | { type: "final"; content?: string; tool_calls?: ChatToolCall[] }
   | { type: "error"; message: string };
 
@@ -142,6 +143,16 @@ function normalize(raw: unknown): ChatStreamEvent | null {
         summary: asString(
           pick(top, data, ["summary", "result", "output", "content"]),
         ),
+      };
+    }
+    case "thinking":
+    case "reasoning": {
+      // Additive event: a reasoning / status pulse the agent may emit before or
+      // between tool calls. Read the text permissively; it is optional so an
+      // older or empty event never breaks the stream.
+      return {
+        type: "thinking",
+        text: asString(pick(top, data, ["text", "content", "summary"])),
       };
     }
     case "final":

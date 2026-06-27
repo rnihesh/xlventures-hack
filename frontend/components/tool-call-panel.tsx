@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronRight, Wrench } from "lucide-react";
+import { Check, ChevronRight, Wrench } from "lucide-react";
 
 import {
   Card,
@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { AgentEvent } from "@/lib/useAgentStream";
+import type { ChatToolCall } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Event folding: pair node.started / node.finished into a tool invocation.
@@ -345,6 +346,309 @@ export function ToolCallPanel({ events, className }: ToolCallPanelProps) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ===========================================================================
+// Chat tool timeline
+//
+// The copilot chat surfaces the tools the agent calls inline in an assistant
+// turn. This renders that sequence as a single connected vertical thread (a
+// thin rail links each tool's status dot to the next), where each card is
+// clickable to reveal the exact INPUT (args) and OUTPUT (result) it ran with.
+//
+// Reads ChatToolCall defensively: `args` is the tool input, `summary` is the
+// result. A call with no `summary` while the turn is still streaming is treated
+// as in flight (animated). Once the turn settles, the whole group collapses to
+// a compact "Used N tools" row the user can re-expand.
+// ===========================================================================
+
+function isJsonLike(value: string): boolean {
+  const t = value.trim();
+  return (
+    (t.startsWith("{") && t.endsWith("}")) ||
+    (t.startsWith("[") && t.endsWith("]"))
+  );
+}
+
+// Pretty print a result string: parse-and-reformat when it looks like JSON,
+// otherwise return it as-is so plain summaries stay readable.
+function prettyResult(value: string): string {
+  if (isJsonLike(value)) {
+    try {
+      return JSON.stringify(JSON.parse(value), null, 2);
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
+
+// Flatten args into readable key/value rows. Object/array values are
+// pretty-printed JSON; scalars render inline.
+function argRows(
+  args?: Record<string, unknown>,
+): { key: string; value: string }[] {
+  if (!args) return [];
+  return Object.entries(args).map(([key, v]) => ({
+    key,
+    value:
+      typeof v === "string"
+        ? v
+        : typeof v === "number" || typeof v === "boolean" || v === null
+          ? String(v)
+          : JSON.stringify(v, null, 2),
+  }));
+}
+
+// Collapsed one-line preview of what a tool did (or is doing).
+function chatSummaryLine(call: ChatToolCall, running: boolean): string {
+  if (call.summary && call.summary.trim().length > 0) return call.summary;
+  if (running) return "Working...";
+  const rows = argRows(call.args).slice(0, 3);
+  if (rows.length > 0) {
+    return rows
+      .map((r) => `${r.key}: ${r.value.replace(/\s+/g, " ").slice(0, 40)}`)
+      .join(", ");
+  }
+  return "No result reported";
+}
+
+// Three small dots that pulse in sequence: the universal "working" cue.
+function RunningDots({ className }: { className?: string }) {
+  return (
+    <span className={cn("inline-flex items-center gap-1", className)}>
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary [animation-delay:150ms]" />
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary [animation-delay:300ms]" />
+    </span>
+  );
+}
+
+interface ChatToolCardProps {
+  call: ChatToolCall;
+  index: number;
+  running: boolean;
+  isLast: boolean;
+}
+
+function ChatToolCard({ call, index, running, isLast }: ChatToolCardProps) {
+  const [open, setOpen] = useState(false);
+  const rows = argRows(call.args);
+  const hasInput = rows.length > 0;
+  const hasOutput = !!call.summary && call.summary.trim().length > 0;
+
+  return (
+    <li className="relative flex gap-3">
+      {/* Connector rail: a status dot sitting on a thin vertical line that
+          links this card to the next, so the calls read as one linked flow. */}
+      <div className="relative flex w-4 shrink-0 flex-col items-center">
+        <span className="relative mt-3 flex h-2.5 w-2.5 items-center justify-center">
+          {running && (
+            <span className="absolute inset-0 animate-ping rounded-full bg-primary/40" />
+          )}
+          <span
+            className={cn(
+              "relative h-2.5 w-2.5 rounded-full ring-2 ring-card",
+              running ? "bg-primary" : "bg-primary/70",
+            )}
+          />
+        </span>
+        {!isLast && <span className="w-px flex-1 bg-border" />}
+      </div>
+
+      <div className={cn("min-w-0 flex-1", isLast ? "pb-0" : "pb-2")}>
+        <div className="overflow-hidden rounded-lg border border-border bg-card/70">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition-colors hover:bg-muted/40"
+          >
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <Wrench className="h-3.5 w-3.5" aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1.5">
+                <span className="truncate font-mono text-[12px] font-semibold text-foreground">
+                  {call.tool}
+                </span>
+                <span className="text-[10px] tabular text-muted-foreground/50">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+              </span>
+              <span className="mt-0.5 block truncate text-[11px] leading-snug text-muted-foreground">
+                {chatSummaryLine(call, running)}
+              </span>
+            </span>
+            <span
+              className={cn(
+                "flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                running
+                  ? "bg-primary/10 text-primary"
+                  : "bg-secondary text-muted-foreground",
+              )}
+            >
+              {running ? (
+                <>
+                  <RunningDots />
+                  <span>Running</span>
+                </>
+              ) : (
+                <>
+                  <Check className="h-3 w-3 text-primary" aria-hidden />
+                  <span>Done</span>
+                </>
+              )}
+            </span>
+            <ChevronRight
+              className={cn(
+                "h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform",
+                open && "rotate-90",
+              )}
+              aria-hidden
+            />
+          </button>
+
+          {open && (
+            <div className="space-y-2.5 border-t border-border bg-muted/30 px-2.5 py-2.5">
+              <div>
+                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                  Input
+                </div>
+                {hasInput ? (
+                  <dl className="mt-1 space-y-1">
+                    {rows.map((r) => (
+                      <div
+                        key={r.key}
+                        className="grid grid-cols-[minmax(0,7rem)_1fr] gap-2"
+                      >
+                        <dt className="truncate font-mono text-[11px] text-muted-foreground">
+                          {r.key}
+                        </dt>
+                        <dd className="min-w-0">
+                          {r.value.includes("\n") ? (
+                            <pre className="overflow-auto rounded bg-background p-1.5 font-mono text-[11px] leading-relaxed text-foreground ring-1 ring-inset ring-border">
+                              {r.value}
+                            </pre>
+                          ) : (
+                            <span className="break-words font-mono text-[11px] text-foreground">
+                              {r.value}
+                            </span>
+                          )}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : (
+                  <p className="mt-1 text-[11px] italic text-muted-foreground">
+                    No arguments
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                  Output
+                </div>
+                {hasOutput ? (
+                  isJsonLike(call.summary!) ? (
+                    <pre className="mt-1 max-h-56 overflow-auto rounded bg-background p-1.5 font-mono text-[11px] leading-relaxed text-foreground ring-1 ring-inset ring-border">
+                      {prettyResult(call.summary!)}
+                    </pre>
+                  ) : (
+                    <p className="mt-1 break-words text-[11px] leading-relaxed text-primary">
+                      {call.summary}
+                    </p>
+                  )
+                ) : running ? (
+                  <p className="mt-1 inline-flex items-center gap-1.5 text-[11px] italic text-muted-foreground">
+                    <RunningDots />
+                    waiting for result
+                  </p>
+                ) : (
+                  <p className="mt-1 text-[11px] italic text-muted-foreground">
+                    No result reported
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+export interface ChatToolTimelineProps {
+  calls: ChatToolCall[];
+  // True while the assistant turn is still streaming. A call with no result
+  // during streaming is in flight; once the turn settles all calls read as done.
+  streaming: boolean;
+  className?: string;
+}
+
+export function ChatToolTimeline({
+  calls,
+  streaming,
+  className,
+}: ChatToolTimelineProps) {
+  // When the turn has settled, default to a collapsed summary row; the user can
+  // click to re-open the full thread. While streaming we always show the thread.
+  const [open, setOpen] = useState(false);
+
+  if (calls.length === 0) return null;
+
+  const runningIndex = streaming
+    ? calls.findIndex((c) => c.summary === undefined)
+    : -1;
+  const groupComplete = !streaming;
+  const expanded = !groupComplete || open;
+
+  const thread = (
+    <ol className="relative">
+      {calls.map((call, i) => (
+        <ChatToolCard
+          key={`${call.tool}-${i}`}
+          call={call}
+          index={i}
+          running={streaming && i === runningIndex}
+          isLast={i === calls.length - 1}
+        />
+      ))}
+    </ol>
+  );
+
+  if (!groupComplete) {
+    return <div className={className}>{thread}</div>;
+  }
+
+  // Settled: compact summary row that toggles the full thread.
+  return (
+    <div className={cn("rounded-lg", className)}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 rounded-lg border border-border bg-card/70 px-2.5 py-1.5 text-left transition-colors hover:bg-muted/40"
+      >
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <Wrench className="h-3 w-3" aria-hidden />
+        </span>
+        <span className="flex-1 text-[12px] font-medium text-foreground">
+          Used {calls.length} tool{calls.length === 1 ? "" : "s"}
+        </span>
+        <span className="text-[11px] text-muted-foreground">
+          {expanded ? "Hide" : "Show"}
+        </span>
+        <ChevronRight
+          className={cn(
+            "h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform",
+            expanded && "rotate-90",
+          )}
+          aria-hidden
+        />
+      </button>
+      {expanded && <div className="mt-2">{thread}</div>}
+    </div>
   );
 }
 

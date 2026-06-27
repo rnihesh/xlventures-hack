@@ -70,6 +70,8 @@ export async function upsertSession(
       headers: authHeaders({ "Content-Type": "application/json" }),
       credentials: "include",
       body: JSON.stringify({ title, turns }),
+      // Survive a navigate-away / tab close so a flush-on-unmount save lands.
+      keepalive: true,
     });
   } catch {
     // best effort: a failed save should not break the chat UI
