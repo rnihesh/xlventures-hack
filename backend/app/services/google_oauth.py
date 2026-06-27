@@ -86,7 +86,14 @@ def _fetch_email(access_token: str) -> Optional[str]:
             timeout=10.0,
         )
         if resp.status_code < 400:
-            return resp.json().get("email")
+            data = resp.json()
+            # Only trust the email when Google reports it verified. An unverified
+            # Google email must never resolve an account, else an attacker who
+            # added a victim's address to their own Google account (without
+            # verifying it) could sign in as the victim.
+            if data.get("verified_email") is True:
+                return data.get("email")
+            logger.info("Google email present but not verified; rejecting")
     except Exception as exc:  # noqa: BLE001 - email is best-effort metadata
         logger.info("Could not fetch Google userinfo (%s)", exc)
     return None

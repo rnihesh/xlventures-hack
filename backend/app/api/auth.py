@@ -14,6 +14,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, EmailStr, Field
 
 from app.auth.deps import get_current_user
@@ -115,7 +116,10 @@ async def signup(payload: SignupRequest) -> dict:
     )
 
     link = f"{settings.app_base_url.rstrip('/')}/verify?token={token}"
-    result = send_verification(payload.email, link)
+    # send_verification is a synchronous boto3/SES call; offload it so the
+    # signup request never blocks the event loop on the SES round-trip (the
+    # offline / no-creds path returns before any network).
+    result = await run_in_threadpool(send_verification, payload.email, link)
 
     is_dev = settings.app_env.lower() not in {"production", "prod", "staging"}
     auto_verified = False
@@ -283,7 +287,9 @@ async def google_exchange(
         raise HTTPException(status_code=400, detail="invalid_state")
     _GOOGLE_STATES.discard(body.state)
 
-    result = google_oauth.exchange_code(body.code)
+    # exchange_code performs synchronous httpx calls to Google; offload it so
+    # the token exchange never blocks the event loop.
+    result = await run_in_threadpool(google_oauth.exchange_code, body.code)
     if not result.get("ok"):
         raise HTTPException(status_code=400, detail=result.get("reason", "google_error"))
     email = (result.get("tokens") or {}).get("email")
