@@ -1,5 +1,6 @@
 # Multi-stage build: compile deps in a builder with toolchain, ship a slim
-# runtime without build-essential. Build context is ./backend.
+# runtime without build-essential. Build context is the REPO ROOT so the domain
+# packs (repo-root domain_packs/, data not code) can be baked into the image.
 
 FROM python:3.12-slim AS builder
 ENV PYTHONUNBUFFERED=1 \
@@ -11,22 +12,27 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=ghcr.io/astral-sh/uv:0.11.17 /uv /uvx /bin/
-# Dependency layer (cached): pyproject.toml, uv.lock, and the README it references.
-COPY pyproject.toml uv.lock README.md ./
+# Dependency layer (cached): manifests live under backend/.
+COPY backend/pyproject.toml backend/uv.lock backend/README.md ./
 RUN uv sync --frozen --no-install-project --no-dev
-COPY . /app
+COPY backend/ /app
 RUN uv sync --frozen --no-dev
 
-# Runtime: slim, no build toolchain. Carries the prebuilt .venv + uv (for migrations).
+# Runtime: slim, no build toolchain. Carries the prebuilt .venv, uv (for
+# migrations), the app, and the domain packs.
 FROM python:3.12-slim AS runtime
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH="/app/.venv/bin:$PATH"
+    PATH="/app/.venv/bin:$PATH" \
+    DOMAIN_PACKS_DIR="/app/domain_packs"
 WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=ghcr.io/astral-sh/uv:0.11.17 /uv /uvx /bin/
 COPY --from=builder /app /app
+# Domain packs are data, kept at the repo root; bake them so the planner loads
+# the full packs (not the minimal fallback) in the container.
+COPY domain_packs /app/domain_packs
 EXPOSE 8200
 CMD ["uv", "run", "--no-dev", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8200"]

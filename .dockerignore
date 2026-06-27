@@ -1,0 +1,32 @@
+# Root build context for the API image (infra/Dockerfile.api builds from here).
+# Keep backend/ and domain_packs/; drop everything heavy or irrelevant.
+
+.git
+.github
+.claude
+docs
+
+# Frontend is built by its own image; never needed in the API context.
+frontend
+
+# Python virtualenvs and caches (uv.lock IS needed and must NOT be ignored).
+**/.venv
+venv
+**/__pycache__
+**/*.py[cod]
+**/*.egg-info
+.pytest_cache
+.ruff_cache
+.mypy_cache
+
+# Runtime artifacts and local env / secrets.
+backend/app/eval/_last_run.json
+**/.env
+**/.env.*
+!**/.env.example
+
+# OS / editor noise.
+**/.DS_Store
+.idea
+.vscode
+*.log
