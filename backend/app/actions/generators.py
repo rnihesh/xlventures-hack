@@ -86,15 +86,23 @@ def _confidence_label(rec: Dict[str, Any]) -> str:
     return ""
 
 
+def _looks_like_id(value: str) -> bool:
+    """True for internal ids like ACC-2de8ab that must never reach a customer."""
+    v = (value or "").strip()
+    return bool(re.match(r"^[A-Z]{2,5}-[0-9a-zA-Z]{4,}$", v))
+
+
 def _account_name(account: Dict[str, Any]) -> str:
     if not isinstance(account, dict):
-        return "the account"
+        return "your team"
     profile = account.get("profile")
     if isinstance(profile, dict) and profile.get("name"):
         return str(profile["name"]).strip()
-    return str(
-        account.get("name") or account.get("account_id") or "the account"
-    ).strip()
+    name = str(account.get("name") or "").strip()
+    # Never expose an internal account id (ACC-...) in customer-facing copy.
+    if name and not _looks_like_id(name):
+        return name
+    return "your team"
 
 
 def _account_owner(account: Dict[str, Any]) -> str:
@@ -212,7 +220,7 @@ def _template_email(rec: Dict[str, Any], account: Dict[str, Any]) -> Dict[str, s
     )
 
     body = (
-        f"Hi {name} team,\n\n"
+        f"Hi {name},\n\n"
         f"{context_line.strip()}. I would like to propose that we "
         f"{title[0].lower() + title[1:]} so we can realign on your goals and lock in "
         f"the outcomes you signed up for.{impact_line}\n\n"

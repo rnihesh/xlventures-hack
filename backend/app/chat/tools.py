@@ -195,6 +195,21 @@ async def run_nba(
             "account_id": account_id,
         }
     account_id = resolved
+
+    # Resolve the account's display name so the drafter/recommendation refer to
+    # it by NAME (e.g. "Halcyon Fitness"), never the internal id (ACC-...).
+    account_ctx: Dict[str, Any] = {}
+    account_name = account_id
+    try:
+        from app.api.accounts import _org_account
+
+        acct = await _org_account(org_id, account_id)
+        if isinstance(acct, dict) and not acct.get("error"):
+            account_ctx = acct
+            account_name = acct.get("name") or account_name
+    except Exception:  # noqa: BLE001 - name is best effort
+        pass
+
     run_id = str(uuid.uuid4())
     signal = {"type": "", "content": signal_text}
     initial_state: Dict[str, Any] = {
@@ -202,6 +217,8 @@ async def run_nba(
         "org_id": org_id,
         "domain": domain,
         "account_id": account_id,
+        "account_name": account_name,
+        "account": account_ctx,
         "signal": signal,
         "plan": [],
         "capabilities": [],

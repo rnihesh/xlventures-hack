@@ -250,6 +250,18 @@ async def execute(
     rec, account_id = _resolve_recommendation(body, org_id)
     account = _lookup_account(account_id)
 
+    # Enrich with the caller's real org account so customer-facing copy uses the
+    # account NAME (e.g. "Halcyon Fitness"), never the internal id. The seed
+    # _lookup_account above does not know an org's own accounts.
+    try:
+        from app.api.accounts import _org_account
+
+        org_acct = await _org_account(org_id, account_id) if account_id else None
+        if org_acct:
+            account = {**(account or {}), **org_acct}
+    except Exception:  # noqa: BLE001 - name enrichment is best effort
+        pass
+
     try:
         artifact = generate_artifact(body.artifact_type, rec, account)
     except ValueError as exc:
