@@ -16,9 +16,13 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+import logging
+
 from app.api._org import current_org
 from app.packs.loader import load_pack, reset_pack_org, set_pack_org
 from app.repositories import pack_overrides as overrides_repo
+
+logger = logging.getLogger("app.api.workflow")
 
 router = APIRouter(prefix="/workflow", tags=["workflow"])
 
@@ -160,12 +164,13 @@ def _validate_changes(
     return clean
 
 
-def _llm_plan(message: str, view: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+async def _llm_plan(message: str, view: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Ask the model to turn a free-text instruction into roster changes."""
     from app.demo import demo_mode_enabled
 
     if demo_mode_enabled():
         return None
+    from app.config import settings
     from app.deps import get_llm
 
     selectable = _selectable_caps(view)
@@ -188,13 +193,18 @@ def _llm_plan(message: str, view: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     try:
         import json
 
-        resp = get_llm(model="gpt-4.1", temperature=0).invoke(prompt)
+        # Use the org's configured model (the one chat/runs use) and the async
+        # path so the async usage callback does not error a sync .invoke. No
+        # extra callbacks here: a config edit need not record usage.
+        llm = get_llm(model=settings.openai_model, temperature=0, callbacks=[])
+        resp = await llm.ainvoke(prompt)
         text = getattr(resp, "content", "") or ""
         start, end = text.find("{"), text.rfind("}")
         if start == -1 or end == -1:
             return None
         return json.loads(text[start : end + 1])
-    except Exception:  # noqa: BLE001 - fall back to deterministic parsing
+    except Exception as exc:  # noqa: BLE001 - fall back to deterministic parsing
+        logger.warning("workflow assistant LLM failed, using fallback: %s", exc)
         return None
 
 
@@ -212,30 +222,48 @@ def _deterministic_plan(message: str, view: Dict[str, Any]) -> Dict[str, Any]:
                 found.append(cap)
         return found
 
-    # Resolve target decision point(s).
+    # Resolve target decision point(s) from the original message.
     targets = [dp["key"] for dp in view["decision_points"] if dp["key"] in msg or dp["label"].lower() in msg]
+
+    # Strip decision-point names before matching COMMAND keywords so a label word
+    # (e.g. "drop" in "health drop") cannot be mistaken for the "drop" command.
+    kw = msg
+    for dp in view["decision_points"]:
+        for token in (dp["label"].lower(), dp["key"], dp["key"].replace("_", " ")):
+            kw = kw.replace(token, " ")
+
     rosters = {dp["key"]: list(dp["roster"]) for dp in view["decision_points"]}
+    seq = view["sequence"]
     changes: Dict[str, List[str]] = {}
     mentioned = caps_in(msg)
     scope = targets or [dp["key"] for dp in view["decision_points"]]
+    wants_all = bool(re.search(r"\b(all|everything|every)\b", kw))
 
-    if re.search(r"\b(remove|drop|exclude|without|disable)\b", msg) and mentioned:
-        for k in scope:
-            changes[k] = [c for c in rosters[k] if c not in mentioned]
-    elif re.search(r"\b(add|include|enable|also run)\b", msg) and mentioned:
-        for k in scope:
-            current = set(rosters[k]) | set(mentioned)
-            changes[k] = [c for c in view["sequence"] if c in current and c in selectable]
-    elif re.search(r"\bonly\b", msg) and mentioned:
-        for k in scope:
-            changes[k] = [c for c in view["sequence"] if c in mentioned]
-    elif re.search(r"\breset\b", msg):
+    remove_kw = bool(re.search(r"\b(remove|drop|exclude|without|disable|turn off|turn of)\b", kw))
+    add_kw = bool(re.search(r"\b(add|include|enable|activate|also run)\b", kw))
+    only_kw = bool(re.search(r"\bonly\b", kw))
+    reset_kw = bool(re.search(r"\b(reset|default|revert|restore)\b", kw))
+
+    if reset_kw:
         for k in scope:
             base = next(dp["base_roster"] for dp in view["decision_points"] if dp["key"] == k)
             changes[k] = [c for c in base if c in selectable]
+    elif remove_kw and (mentioned or wants_all):
+        rem = set(mentioned) if mentioned else set(selectable)  # "remove all" empties it
+        for k in scope:
+            changes[k] = [c for c in rosters[k] if c not in rem]
+    elif add_kw and (mentioned or wants_all):
+        add = set(mentioned) if mentioned else set(selectable)  # "add all"
+        for k in scope:
+            current = set(rosters[k]) | add
+            changes[k] = [c for c in seq if c in current and c in selectable]
+    elif only_kw and mentioned:
+        for k in scope:
+            changes[k] = [c for c in seq if c in set(mentioned)]
     reply = (
         "Updated the roster." if changes else
-        "Tell me what to change, for example 'remove the outcome simulator from renewal risk'."
+        "Tell me what to change, for example 'remove the outcome simulator from renewal risk', "
+        "'add all to health drop', or 'reset all to defaults'."
     )
     return {"changes": changes, "reply": reply}
 
@@ -251,7 +279,7 @@ async def workflow_assistant(
     specialists, persists, and returns the updated view plus a short reply.
     """
     view = await _view(org_id, domain)
-    plan = _llm_plan(body.message, view) or _deterministic_plan(body.message, view)
+    plan = await _llm_plan(body.message, view) or _deterministic_plan(body.message, view)
     changes = _validate_changes(plan.get("changes") or {}, view)
     reply = str(plan.get("reply") or "").strip() or "Done."
 
