@@ -4,11 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
+  Activity,
   ArrowLeft,
   Building2,
   CalendarClock,
+  ChevronRight,
   CircleUser,
   FileText,
+  FlaskConical,
+  GitBranch,
+  History,
   Info,
   Layers,
   Minus,
@@ -23,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ErrorState } from "@/components/ui/states";
 import {
   riskVariant,
@@ -32,11 +38,13 @@ import {
   riskMeaning,
 } from "@/components/account-table";
 import { WhatIfPanel } from "@/components/whatif-panel";
+import { AccountTimelineSection } from "@/components/account-timeline";
 import { cn } from "@/lib/utils";
 import { signalInfo, SIGNAL_SECTION_HELP } from "@/lib/signal-info";
 import { getAccount } from "@/lib/api";
 import type {
   AccountDetail,
+  AccountDocument,
   AccountSignal,
   Evidence,
   Recommendation,
@@ -229,23 +237,59 @@ function prettySourceType(t?: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function DocumentsSection({ evidence }: { evidence: Evidence[] }) {
+// A source document the org actually has on this account: an uploaded or pasted
+// interaction (crm-notes, transcript, email) or, for the Demo org, a seed doc.
+function DocumentRow({ doc }: { doc: AccountDocument }) {
+  return (
+    <li className="flex gap-3 rounded-lg border border-border bg-card p-4">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
+        <FileText className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-foreground">
+          {doc.title ?? "Interaction"}
+        </p>
+        {doc.excerpt && (
+          <p className="mt-1 whitespace-pre-wrap border-l-2 border-border pl-2.5 text-xs italic text-muted-foreground">
+            {doc.excerpt}
+          </p>
+        )}
+        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+          <Badge variant="muted">{prettySourceType(doc.source_type)}</Badge>
+          {doc.ts && <span className="tabular">{fmtDate(doc.ts)}</span>}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function DocumentsSection({
+  documents,
+  evidence,
+}: {
+  documents: AccountDocument[];
+  evidence: Evidence[];
+}) {
+  const total = documents.length + evidence.length;
   return (
     <section className="panel p-5">
       <SectionHeader
         title="Documents and evidence"
         hint={SIGNAL_SECTION_HELP.documents}
-        count={evidence.length}
+        count={total}
       />
-      {evidence.length === 0 ? (
+      {total === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
           No source documents have been linked to this account yet.
         </p>
       ) : (
         <ul className="space-y-3">
+          {documents.map((doc) => (
+            <DocumentRow key={doc.id} doc={doc} />
+          ))}
           {evidence.map((ev, i) => (
             <li
-              key={i}
+              key={`ev-${i}`}
               className="flex gap-3 rounded-lg border border-border bg-card p-4"
             >
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
@@ -307,6 +351,7 @@ function statusVariant(
 }
 
 function HistorySection({ history }: { history: Recommendation[] }) {
+  const [open, setOpen] = useState<number | null>(null);
   return (
     <section className="panel p-5">
       <SectionHeader
@@ -320,37 +365,80 @@ function HistorySection({ history }: { history: Recommendation[] }) {
         </p>
       ) : (
         <ul className="space-y-3">
-          {history.map((rec) => (
-            <li
-              key={rec.id}
-              className="rounded-lg border border-border bg-card p-4"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium">{rec.action.title}</div>
-                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                    {rec.rationale}
-                  </p>
+          {history.map((rec, idx) => {
+            const isOpen = open === idx;
+            const pct = Math.round((rec.confidence?.score ?? 0) * 100);
+            return (
+              <li
+                key={rec.id ?? `rec-${idx}`}
+                className="overflow-hidden rounded-lg border border-border bg-card"
+              >
+                <button
+                  type="button"
+                  onClick={() => setOpen(isOpen ? null : idx)}
+                  aria-expanded={isOpen}
+                  className="flex w-full items-start justify-between gap-3 p-4 text-left transition-colors hover:bg-accent/40"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 text-sm font-medium">
+                      <ChevronRight
+                        className={cn(
+                          "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                          isOpen && "rotate-90",
+                        )}
+                      />
+                      {rec.action.title}
+                    </div>
+                    <p
+                      className={cn(
+                        "mt-1 text-xs text-muted-foreground",
+                        !isOpen && "line-clamp-2",
+                      )}
+                    >
+                      {rec.rationale}
+                    </p>
+                  </div>
+                  <Badge variant={statusVariant(rec.status)}>
+                    {statusLabel(rec.status)}
+                  </Badge>
+                </button>
+
+                {isOpen ? (
+                  <div className="space-y-2 border-t border-border bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+                    {rec.action.description ? (
+                      <div>
+                        <span className="font-medium text-foreground">
+                          What it is:{" "}
+                        </span>
+                        {rec.action.description}
+                      </div>
+                    ) : null}
+                    <div>
+                      <span className="font-medium text-foreground">
+                        Confidence:{" "}
+                      </span>
+                      {pct}%
+                      {rec.confidence?.label ? ` (${rec.confidence.label})` : ""}
+                      {rec.confidence?.method ? ` · ${rec.confidence.method}` : ""}
+                    </div>
+                    {rec.expected_impact ? (
+                      <div>
+                        <span className="font-medium text-foreground">
+                          Expected impact:{" "}
+                        </span>
+                        {rec.expected_impact.kpi} {rec.expected_impact.estimate}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
+                  <span>{fmtDate(rec.created_at)}</span>
+                  <span className="tabular">Confidence {pct}%</span>
                 </div>
-                <Badge variant={statusVariant(rec.status)}>
-                  {statusLabel(rec.status)}
-                </Badge>
-              </div>
-              <Separator className="my-3" />
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-                <span>{fmtDate(rec.created_at)}</span>
-                <span className="tabular">
-                  Confidence {Math.round((rec.confidence?.score ?? 0) * 100)}%
-                </span>
-                {rec.expected_impact && (
-                  <span>
-                    Expected: {rec.expected_impact.kpi}{" "}
-                    {rec.expected_impact.estimate}
-                  </span>
-                )}
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
@@ -376,6 +464,15 @@ function ProfileStat({
         <div className="truncate text-sm font-medium">{value}</div>
       </div>
     </div>
+  );
+}
+
+// Small count pill shown on a tab trigger when the section has a known count.
+function TabCount({ value }: { value: number }) {
+  return (
+    <span className="ml-1.5 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] tabular text-muted-foreground">
+      {value}
+    </span>
   );
 }
 
@@ -440,6 +537,7 @@ export default function AccountDetailPage() {
   const p = detail.profile;
   const health = p.health_score ?? 0;
   const evidence = collectEvidence(detail);
+  const docCount = (detail.documents?.length ?? 0) + evidence.length;
   const runHref = `/run?${new URLSearchParams({
     account_id: p.account_id,
     domain: p.domain ?? "customer_success",
@@ -580,30 +678,79 @@ export default function AccountDetailPage() {
           )}
         </aside>
 
-        <div className="space-y-6">
-          <SignalsSection signals={detail.signals} />
-          <DocumentsSection evidence={evidence} />
-          <HistorySection history={detail.history} />
-        </div>
-      </div>
+        {/* Right side: every detail view is a tab so the page stays scannable.
+            The account profile (left) stays visible across all tabs. */}
+        <div className="min-w-0">
+          <Tabs defaultValue="signals">
+            <TabsList className="h-auto flex-wrap justify-start">
+              <TabsTrigger value="signals">
+                <Activity className="mr-1.5 h-4 w-4" aria-hidden />
+                Signals
+                <TabCount value={detail.signals.length} />
+              </TabsTrigger>
+              <TabsTrigger value="documents">
+                <FileText className="mr-1.5 h-4 w-4" aria-hidden />
+                Documents &amp; context
+                <TabCount value={docCount} />
+              </TabsTrigger>
+              <TabsTrigger value="history">
+                <History className="mr-1.5 h-4 w-4" aria-hidden />
+                Past runs
+                <TabCount value={detail.history.length} />
+              </TabsTrigger>
+              <TabsTrigger value="timeline">
+                <GitBranch className="mr-1.5 h-4 w-4" aria-hidden />
+                Timeline
+              </TabsTrigger>
+              <TabsTrigger value="whatif">
+                <FlaskConical className="mr-1.5 h-4 w-4" aria-hidden />
+                What-if
+              </TabsTrigger>
+            </TabsList>
 
-      {/* What-if simulator, clearly framed so it is not mysterious. */}
-      <div className="mt-6">
-        <div className="mb-3">
-          <h2 className="text-lg font-semibold tracking-tight">
-            Try a different scenario
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Adjust the inputs below (usage, NPS, contract size) to preview how the
-            recommended action and its confidence would change. Nothing here is
-            saved or sent: it is a sandbox for exploring options.
-          </p>
+            <TabsContent value="signals">
+              <SignalsSection signals={detail.signals} />
+            </TabsContent>
+
+            <TabsContent value="documents">
+              <DocumentsSection
+                documents={detail.documents ?? []}
+                evidence={evidence}
+              />
+            </TabsContent>
+
+            <TabsContent value="history">
+              <HistorySection history={detail.history} />
+            </TabsContent>
+
+            {/* Audit trail: the full workflow + memory loop for this account.
+                Use the route id (stable from first paint) so we never fetch a
+                placeholder id. */}
+            <TabsContent value="timeline">
+              <AccountTimelineSection accountId={id || p.account_id} />
+            </TabsContent>
+
+            {/* What-if simulator, clearly framed so it is not mysterious. */}
+            <TabsContent value="whatif">
+              <div className="mb-3">
+                <h2 className="text-lg font-semibold tracking-tight">
+                  Try a different scenario
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                  Adjust the inputs below (usage, NPS, contract size) to preview
+                  how the recommended action and its confidence would change.
+                  Nothing here is saved or sent: it is a sandbox for exploring
+                  options.
+                </p>
+              </div>
+              <WhatIfPanel
+                domain={p.domain ?? "customer_success"}
+                accountId={p.account_id}
+                baseline={detail.current}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
-        <WhatIfPanel
-          domain={p.domain ?? "customer_success"}
-          accountId={p.account_id}
-          baseline={detail.current}
-        />
       </div>
     </div>
   );

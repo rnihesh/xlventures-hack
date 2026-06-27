@@ -7,7 +7,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus, X } from "lucide-react";
+import { FileUp, Loader2, Plus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,21 @@ import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { getDomains } from "@/lib/api";
 import { createAccount, type AccountInput } from "@/lib/api/accounts-admin";
+import { ingestText } from "@/lib/api/ingest";
+
+// Tag an attached context file by its name so a batch (crm-notes, transcript,
+// email) is categorised sensibly. Falls back to a generic document.
+// Returns a recognized backend source-type key (see ingest SOURCE_TYPES) so the
+// 360 renders the right label instead of falling back to a generic "Document".
+function guessSource(name: string): string {
+  const n = name.toLowerCase();
+  if (/\.csv$|\.tsv$/.test(n)) return "crm_record";
+  if (/\.eml$/.test(n) || n.includes("email")) return "email";
+  if (n.includes("transcript") || n.includes("call")) return "call_transcript";
+  if (n.includes("crm") || n.includes("note")) return "crm_record";
+  if (n.includes("chat") || n.includes("slack")) return "chat_message";
+  return "document";
+}
 import type { Account, DomainSummary } from "@/lib/types";
 
 const RISK_LEVELS = ["critical", "high", "medium", "low"] as const;
@@ -83,6 +98,8 @@ export function AddAccountDialog({
   const [renewal, setRenewal] = React.useState("");
   const [signals, setSignals] = React.useState("");
   const [notes, setNotes] = React.useState("");
+  const [files, setFiles] = React.useState<File[]>([]);
+  const fileRef = React.useRef<HTMLInputElement>(null);
 
   // Load domains once when the dialog first opens, for the domain select.
   React.useEffect(() => {
@@ -121,6 +138,7 @@ export function AddAccountDialog({
     setRenewal("");
     setSignals("");
     setNotes("");
+    setFiles([]);
   }
 
   const domainOptions = React.useMemo(() => {
@@ -129,6 +147,15 @@ export function AddAccountDialog({
     }
     return FALLBACK_DOMAINS;
   }, [domains]);
+
+  function addFiles(list: FileList | null) {
+    const incoming = Array.from(list ?? []);
+    if (!incoming.length) return;
+    setFiles((prev) => {
+      const seen = new Set(prev.map((f) => `${f.name}:${f.size}`));
+      return [...prev, ...incoming.filter((f) => !seen.has(`${f.name}:${f.size}`))];
+    });
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -158,9 +185,29 @@ export function AddAccountDialog({
     setSubmitting(true);
     try {
       const account = await createAccount(payload);
+      // Attach any dropped/picked context files as evidence for this account.
+      let ingested = 0;
+      for (const f of files) {
+        try {
+          const content = (await f.text()).trim();
+          if (!content) continue;
+          await ingestText({
+            text: content,
+            source_type: guessSource(f.name),
+            title: f.name.replace(/\.[^.]+$/, ""),
+            account_id: account.account_id,
+            domain,
+          });
+          ingested += 1;
+        } catch {
+          /* best effort: account is created either way */
+        }
+      }
       toast(`Added ${account.name}`, {
         variant: "success",
-        description: "The account is now in your inbox.",
+        description: ingested
+          ? `${ingested} context file${ingested === 1 ? "" : "s"} attached as evidence.`
+          : "The account is now in your inbox.",
       });
       reset();
       onOpenChange(false);
@@ -357,6 +404,70 @@ export function AddAccountDialog({
               placeholder="Last QBR was cancelled. Champion flagged budget pressure for next renewal."
               rows={4}
             />
+          </Field>
+
+          <Field
+            label="Attach context files"
+            htmlFor="acc-files"
+            hint="Drop or pick files (CRM notes, transcript, email). The type is detected automatically and each is ingested as evidence for this account."
+          >
+            <div
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                addFiles(e.dataTransfer.files);
+              }}
+              onClick={() => fileRef.current?.click()}
+              className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 px-4 py-6 text-center transition-colors hover:border-primary/50 hover:bg-muted/50"
+            >
+              <FileUp className="h-5 w-5 text-muted-foreground" aria-hidden />
+              <p className="mt-2 text-sm text-foreground">
+                Drop files here or click to browse
+              </p>
+              <p className="text-xs text-muted-foreground">
+                .txt .md .csv .eml .json, multiple allowed
+              </p>
+              <input
+                id="acc-files"
+                ref={fileRef}
+                type="file"
+                multiple
+                accept=".txt,.md,.csv,.tsv,.eml,.json,.log,text/*"
+                className="hidden"
+                onChange={(e) => {
+                  addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+            </div>
+            {files.length > 0 ? (
+              <ul className="mt-2 space-y-1">
+                {files.map((f, i) => (
+                  <li
+                    key={`${f.name}-${i}`}
+                    className="flex items-center justify-between rounded-md bg-muted/40 px-2.5 py-1.5 text-xs"
+                  >
+                    <span className="truncate">
+                      {f.name}{" "}
+                      <span className="text-muted-foreground">
+                        ({guessSource(f.name).replace(/_/g, " ")})
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFiles((p) => p.filter((_, idx) => idx !== i));
+                      }}
+                      className="ml-2 shrink-0 text-muted-foreground hover:text-foreground"
+                      aria-label={`Remove ${f.name}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </Field>
 
           </div>

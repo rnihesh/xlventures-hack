@@ -9,10 +9,51 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Account, RiskLevel } from "@/lib/types";
 
-type SortKey = "name" | "health_score" | "risk_level" | "arr";
+type SortKey = "name" | "domain" | "health_score" | "risk_level" | "arr";
 type SortDir = "asc" | "desc";
 
 const RISK_ORDER: Record<string, number> = { high: 3, medium: 2, low: 1 };
+
+// The risk queue and portfolio mix domain packs (customer success, collections,
+// SaaS sales). A short, human label keeps the mix legible without leaking the
+// raw pack key into the UI.
+const DOMAIN_LABELS: Record<string, string> = {
+  customer_success: "Customer Success",
+  collections: "Collections",
+  saas_sales: "SaaS Sales",
+};
+
+export function domainLabel(domain: string): string {
+  const key = String(domain ?? "").toLowerCase();
+  if (DOMAIN_LABELS[key]) return DOMAIN_LABELS[key];
+  if (!key) return "General";
+  return key
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+// Subtle grayscale chip naming the domain pack an account belongs to. Kept
+// neutral (no accent hue) so it labels without competing with risk signals.
+export function DomainBadge({
+  domain,
+  className,
+}: {
+  domain: string;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center rounded-md border border-border bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground",
+        className,
+      )}
+    >
+      {domainLabel(domain)}
+    </span>
+  );
+}
 
 export function riskVariant(
   risk: RiskLevel,
@@ -44,6 +85,8 @@ export function healthLabel(score: number): string {
 // A friendly one-liner describing what a risk level means for the account.
 export function riskMeaning(risk: RiskLevel): string {
   switch (String(risk).toLowerCase()) {
+    case "critical":
+      return "Severe churn risk; immediate intervention needed.";
     case "high":
       return "Likely to churn or cut back without action soon.";
     case "medium":
@@ -92,6 +135,7 @@ interface ColumnDef {
 
 const COLUMNS: ColumnDef[] = [
   { key: "name", label: "Account" },
+  { key: "domain", label: "Domain" },
   { key: "health_score", label: "Health score" },
   { key: "risk_level", label: "Churn risk" },
   { key: "arr", label: "Revenue (ARR)", align: "right" },
@@ -125,6 +169,9 @@ export function AccountTable({
         case "name":
           cmp = a.name.localeCompare(b.name);
           break;
+        case "domain":
+          cmp = domainLabel(a.domain).localeCompare(domainLabel(b.domain));
+          break;
         case "health_score":
           cmp = a.health_score - b.health_score;
           break;
@@ -147,7 +194,7 @@ export function AccountTable({
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
-      setSortDir(key === "name" ? "asc" : "desc");
+      setSortDir(key === "name" || key === "domain" ? "asc" : "desc");
     }
   };
 
@@ -210,6 +257,9 @@ export function AccountTable({
                 </Link>
               </td>
               <td className="px-4 py-3">
+                <DomainBadge domain={account.domain} />
+              </td>
+              <td className="px-4 py-3">
                 <HealthBar score={account.health_score} />
               </td>
               <td className="px-4 py-3">
@@ -233,7 +283,7 @@ export function AccountTable({
           ))}
           {sorted.length === 0 && (
             <tr>
-              <td colSpan={5} className="px-4 py-12 text-center">
+              <td colSpan={6} className="px-4 py-12 text-center">
                 <p className="text-sm font-medium text-foreground">
                   No accounts yet
                 </p>

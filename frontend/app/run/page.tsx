@@ -16,6 +16,7 @@ import { PolicyPanel } from "@/components/policy-panel";
 import { ExecutePanel } from "@/components/execute-panel";
 import { RunTrace } from "@/components/run-trace";
 import { ToolCallPanel } from "@/components/tool-call-panel";
+import { RecentRuns } from "@/components/recent-runs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -100,6 +101,10 @@ function RunWorkspace() {
   const [signalText, setSignalText] = useState(EXAMPLES[0]);
   const [leftTab, setLeftTab] = useState("trace");
 
+  // Bumps when a run finishes so the Recent runs panel refetches and the
+  // just-completed run shows up at the top.
+  const [runsRefreshKey, setRunsRefreshKey] = useState(0);
+
   const [domains, setDomains] = useState<DomainSummary[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   // When the accounts endpoint cannot be reached we fall back to a free-text
@@ -180,6 +185,14 @@ function RunWorkspace() {
     setSignalText(selectedAccount.last_signal);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccount?.account_id]);
+
+  // When a run reaches a terminal state, refresh the Recent runs list so the
+  // newly stored run appears without a manual reload.
+  useEffect(() => {
+    if (status === "finished") {
+      setRunsRefreshKey((k) => k + 1);
+    }
+  }, [status]);
 
   const busy = status === "starting" || status === "streaming";
   const idle = status === "idle" && events.length === 0 && !recommendation;
@@ -409,6 +422,10 @@ function RunWorkspace() {
           )}
         </div>
       </div>
+
+      <section className="mt-6">
+        <RecentRuns refreshKey={runsRefreshKey} />
+      </section>
     </div>
   );
 }
