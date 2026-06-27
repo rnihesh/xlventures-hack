@@ -153,9 +153,18 @@ def get_llm(model: str | None = None, **kwargs: Any) -> Any:
     # A request timeout plus bounded retries keep live runs from hanging: without
     # them a slow or stuck OpenAI call would block the planner's first node for
     # minutes. Caller kwargs win, so an explicit timeout/max_retries is preserved.
+    # The usage callback records token spend per org (no-op unless a request has
+    # opened a usage sink), feeding the admin cost panel.
+    from app.usage import UsageCallback
+
+    defaults: dict[str, Any] = {
+        "timeout": 30.0,
+        "max_retries": 2,
+        "callbacks": [UsageCallback()],
+    }
     return ChatOpenAI(
         model=model or settings.openai_model,
         api_key=settings.openai_api_key or "sk-placeholder",
         base_url=settings.openai_base_url,
-        **{"timeout": 30.0, "max_retries": 2, **kwargs},
+        **{**defaults, **kwargs},
     )

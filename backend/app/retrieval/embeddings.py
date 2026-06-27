@@ -57,7 +57,14 @@ async def embed_texts(texts: list[str]):
                 f"{_OPENAI_URL}/embeddings", headers=headers, json=payload
             )
             resp.raise_for_status()
-            data = resp.json()["data"]
+            body = resp.json()
+            data = body["data"]
+        try:
+            from app.usage import record_embedding
+
+            record_embedding(_EMBED_MODEL, (body.get("usage") or {}).get("total_tokens", 0))
+        except Exception:  # noqa: BLE001 - accounting never breaks retrieval
+            pass
         ordered = sorted(data, key=lambda d: d["index"])
         matrix = np.asarray([row["embedding"] for row in ordered], dtype="float32")
         return matrix

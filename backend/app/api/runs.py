@@ -302,6 +302,9 @@ async def stream_run(
         }
         config = {"configurable": {"thread_id": run_id}}
 
+        from app.usage import flush_sink, open_sink
+
+        usage_token = open_sink()
         try:
             checkpointer = await get_checkpointer()
             graph = build_graph(checkpointer)
@@ -365,6 +368,7 @@ async def stream_run(
                 run_id, seq, "error", {"message": "internal error during run"}
             )
         finally:
+            await flush_sink(usage_token, org_id)
             reset_pack_org(pack_token)
 
     return EventSourceResponse(event_generator())

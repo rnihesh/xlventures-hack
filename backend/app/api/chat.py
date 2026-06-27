@@ -87,9 +87,12 @@ async def chat_stream(
     messages = [m.model_dump() for m in body.messages]
 
     async def event_generator() -> AsyncIterator[Dict[str, str]]:
+        from app.usage import flush_sink, open_sink
+
         seq = 0
         yield _envelope(seq, "chat.started", {"messages": len(messages)})
         seq += 1
+        usage_token = open_sink()
         try:
             # Pass the authenticated org so every tool runs under THIS tenant,
             # never a client-supplied or default org.
@@ -98,6 +101,8 @@ async def chat_stream(
                 seq += 1
         except Exception:  # noqa: BLE001 - keep the stream contract intact
             yield _envelope(seq, "error", {"message": "internal error during chat"})
+        finally:
+            await flush_sink(usage_token, org_id)
 
     return EventSourceResponse(event_generator())
 
@@ -106,8 +111,11 @@ async def chat_stream(
 async def chat(body: ChatIn, org_id: str = Depends(current_org)) -> ChatOut:
     """Run the agent to completion and return the final answer plus tool trace."""
 
+    from app.usage import record_usage
+
     messages = [m.model_dump() for m in body.messages]
-    result = await chat_agent.answer(messages, body.context, org_id=org_id)
+    async with record_usage(org_id):
+        result = await chat_agent.answer(messages, body.context, org_id=org_id)
     return ChatOut(answer=result["answer"], trace=result["trace"])
 
 
