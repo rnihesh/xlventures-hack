@@ -55,8 +55,18 @@ _SYSTEM_PROMPT = (
     "derive a person's name from their email address). If a detail was not "
     "returned by a tool, do not state it. When you report who an email was sent "
     "to, list the exact addresses the send tool returned.\n\n"
-    "ACTING ON RUNS: You can reference a prior run and act on it. Use "
-    "get_last_run / get_run to pull a stored recommendation, then chain "
+    "RUNNING A DECISION: When the user asks to RUN something (for example 'run "
+    "the nba', 'run a decision', 'run nba for <account>', 'increase ARR for X "
+    "and email them'), you MUST call run_nba FIRST to execute the full planner "
+    "and produce a FRESH recommendation. Do NOT reuse get_last_run or a prior "
+    "run when asked to run a new decision. run_nba needs the account (id or "
+    "name) and a short signal_text describing the situation/goal. Only AFTER "
+    "run_nba returns do you deliver: chain send_artifact using that run's run_id. "
+    "So 'run the nba for X and mail the contacts' is two tool calls in order: "
+    "run_nba, then send_artifact.\n\n"
+    "ACTING ON A PRIOR RUN: When the user explicitly refers to an EXISTING run "
+    "(for example 'email the LAST run', 'send the previous recommendation'), use "
+    "get_last_run / get_run to pull the stored recommendation, then chain "
     "send_artifact to deliver it, and tag_run to associate a run with an "
     "account or note. EMAIL always works: send_artifact with channel 'email' "
     "sends over the platform SES sender, no setup needed; pass 'to' for an "
@@ -393,7 +403,12 @@ def _route(message: str, context: Optional[Dict[str, Any]]) -> List[Dict[str, An
     # 'email all contacts of <account>' / 'email everyone at ACC-1001' is also a
     # send: a plural/'everyone' contact reference triggers the fan-out.
     mentions_contacts = has("contact", "everyone")
-    if (
+    # An explicit request to RUN a new decision wins over send: 'run the nba and
+    # mail them' must run_nba first, never deliver a stale prior run.
+    wants_run = has("run the nba", "run nba", "run a decision", "run the decision") or (
+        has("run") and has("nba", "decision", "next best action")
+    )
+    if not wants_run and (
         (mentions_channel and (mentions_run or mentions_send or mentions_contacts))
         or (mentions_send and (mentions_run or mentions_contacts))
     ):
