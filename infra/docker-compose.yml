@@ -5,8 +5,10 @@ services:
       POSTGRES_USER: nba
       POSTGRES_PASSWORD: nba
       POSTGRES_DB: nba
-    ports:
-      - "5432:5432"
+    # No host port: the API reaches it over the compose network as db:5432, so it
+    # never conflicts with a Postgres already running on the host's 5432.
+    expose:
+      - "5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -41,12 +43,14 @@ services:
       context: ../frontend
       dockerfile: ../infra/Dockerfile.web
       args:
-        # NEXT_PUBLIC_* values are inlined at build time, so pass it as a build arg.
-        NEXT_PUBLIC_API_URL: http://localhost:8200
+        # NEXT_PUBLIC_* values are inlined into the client bundle at build time,
+        # so they must be build args. They interpolate from the env file passed to
+        # `docker compose --env-file <...>` (defaults keep local dev working).
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8200}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3200}
+        NEXT_PUBLIC_APP_TOKEN: ${NEXT_PUBLIC_APP_TOKEN:-}
     depends_on:
       - api
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8200
     ports:
       - "3200:3200"
 

@@ -71,9 +71,9 @@ jobs:
           port: ${{ secrets.DROPLET_SSH_PORT || 22 }}
           script: |
             set -e
-            cd "${DEPLOY_DIR:-$HOME/xlventures-hack}"
+            cd "${DEPLOY_DIR:-$HOME/aperture}"
             git fetch --all
             git reset --hard origin/main
-            docker compose -f infra/docker-compose.yml up -d --build
-            docker compose -f infra/docker-compose.yml exec -T api uv run alembic upgrade head
+            docker compose --env-file .env -f infra/docker-compose.yml up -d --build
+            docker compose --env-file .env -f infra/docker-compose.yml exec -T api uv run alembic upgrade head
             docker image prune -f
