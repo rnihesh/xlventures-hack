@@ -14,24 +14,21 @@ Project 2 asks for an agentic decision engine. We built a domain-agnostic one. I
 
 ```mermaid
 flowchart TB
-  SIG["Signals + account context"] --> PLAN["Planner (dynamic strategy, picks specialists)"]
-  PLAN --> RISK["Risk analyst"]
-  PLAN --> DRAFT["Action drafter"]
-  PLAN --> RET["Retrieval (precedent + vectors)"]
-  PLAN --> EXP["Explanation + rationale"]
-  RISK --> POL["Policy / guardrails (hard limits, approval thresholds)"]
-  DRAFT --> POL
-  RET --> POL
-  EXP --> POL
-  POL --> REC["Recommendation: NBA + ranked alternatives + confidence + explanation"]
-  REC --> HITL{{"Human-in-the-loop approval (HITL interrupt)"}}
-  HITL -->|approve / edit| EXEC["One-click execute, outcome recorded"]
+  ING["Ingest interactions (notes, transcripts, emails, CRM)"] --> SIG["Typed signals + account context"]
+  SIG --> PLAN["planner (dynamic roster per signal)"]
+  PLAN --> SPEC["retrieval, risk_scorer, gap_analysis, play_recommender, outcome_simulator, drafter"]
+  SPEC --> CRIT["critic (clarify + replan loops)"]
+  CRIT --> POL["policy_gate (guardrails, approval thresholds)"]
+  POL --> HITL{{"hitl_gate: human approval (durable interrupt)"}}
+  HITL -->|approve / edit| COMMIT["commit (execute artifact, write episode)"]
   HITL -->|reject| LEARN
-  EXEC --> LEARN["Learning loop: distill decisions + outcomes into reusable lessons and priors"]
+  COMMIT --> LEARN["Learning loop: distill decisions + outcomes into reusable lessons and priors"]
   LEARN -. priors .-> PLAN
   classDef accent fill:#D97757,stroke:#C2613F,color:#ffffff
   class PLAN,HITL accent
 ```
+
+Node names above match the LangGraph nodes in `backend/app/graph/planner.py`. The planner picks a roster per signal, so not every specialist runs on every request; `gap_analysis` and `critic` always run.
 
 > Full diagrams (system, decision lifecycle, LangGraph orchestration, retrieval and learning loop) are in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
@@ -40,6 +37,38 @@ flowchart TB
 - **Retrieval:** precedent and policy context are pulled from a pgvector store (with a deterministic in-memory fallback offline) so recommendations cite similar past situations.
 - **Policy:** a guardrail layer evaluates each candidate against domain limits and approval thresholds before it is ever shown.
 - **Eval:** a golden-scenario harness scores recommendation quality across components and outcomes, so changes are measured, not guessed.
+
+## The 7-step workflow, mapped to the real nodes
+
+The end-to-end decision flow maps directly onto the LangGraph nodes in `backend/app/graph/planner.py` (and the ingest connector that feeds them). This is the platform, step by step:
+
+| # | Step | What happens | Where in code |
+| --- | --- | --- | --- |
+| 1 | Ingest interactions | Meeting notes, transcripts, emails, CRM updates, and conversations are chunked, embedded, and stored as citeable evidence | `POST /ingest` (`app/api/ingest.py`, `app/retrieval/connectors`) |
+| 2 | Gather org context | KB, playbooks, best practices, product docs, CRM, and customer history are made retrievable per org | `retrieval` node + pgvector store (`app/retrieval/`) |
+| 3 | Plan | The planner classifies the signal to a decision point and selects the specialist roster for this request | `planner` node |
+| 4 | Analyze opportunities, risks, and missing info | Evidence retrieval, risk scoring, and explicit gap analysis of what is still unknown | `retrieval`, `risk_scorer`, `gap_analysis` nodes |
+| 5 | Recommend the NBA | Plays are ranked, the outcome is simulated, the artifact is drafted, and the critic checks the result (replanning if needed) | `play_recommender`, `outcome_simulator`, `drafter`, `critic` nodes |
+| 6 | Explain with evidence and confidence, then gate | A structured recommendation (primary action, ranked alternatives, citations, confidence, simulated outcome) is checked against policy and routed for human approval | `policy_gate`, `hitl_gate` nodes (`app/explain/`, `app/policy/`) |
+| 7 | Commit and learn | On approval the action executes into an artifact, the decision becomes an episode, and the loop distills it into reusable lessons | `commit` node, `/execute`, `/learning` (`app/memory/`) |
+
+`gap_analysis` can loop back to `retrieval` when grounding is thin, and `critic` can trigger a bounded replan to `retrieval` or `play_recommender`, so the graph clarifies and self-corrects rather than running a fixed line.
+
+## Agent and tool registry
+
+Specialists are not hardcoded into the graph: they are registered capabilities resolved by name from the agent registry (`backend/app/packs/registry.py`), so the planner composes a roster and new agents slot in without rewriting orchestration.
+
+| Capability | Role | Always on |
+| --- | --- | --- |
+| `retrieval` | Hybrid vector plus lexical search over the org KB, returns ranked chunks with span citations | roster |
+| `risk_scorer` | Scores the threat or opportunity from signals and account state | roster |
+| `gap_analysis` | Flags missing information and can request more grounding | yes |
+| `play_recommender` | Ranks candidate plays from the domain pack against the situation | roster |
+| `outcome_simulator` | Projects the KPI impact of the leading play | roster |
+| `drafter` | Generates the concrete artifact (email, CRM task, Slack handoff) | roster |
+| `critic` | Validates the recommendation and triggers replan or clarify on failure | yes |
+
+The registry is browsable at runtime through `GET /agents` and `GET /tools`.
 
 ## Key features
 
@@ -50,6 +79,9 @@ flowchart TB
 - **Guardrails:** policy evaluation enforces hard limits and approval thresholds; risky actions require sign-off.
 - **One-click execution:** approve to execute, with the artifact (for example a drafted outreach) previewed before it goes out.
 - **Multi-domain packs:** swap the YAML Domain Pack to retarget the engine (Customer Success, SaaS Sales, Collections shipped) with no code changes.
+- **Multi-tenant by default:** every request resolves an org from an httpOnly `nba_session` cookie, and accounts, episodes, rules, and integrations are all scoped per tenant. Sign in with email and password or with Google.
+- **Configurable rules:** each org can tailor a pack's policy guardrails and action catalog from the UI (`/rules/{domain}`) as an additive override, with no fork of the base pack.
+- **Real integrations:** outbound connectors for AWS SES email, Slack (incoming webhook), plus Google sign-in, configured per org and all offline-safe (an unconfigured connector degrades to a no-op).
 
 ## Tech stack
 
@@ -60,6 +92,8 @@ flowchart TB
 | Data | Postgres 17 + pgvector (with offline deterministic fallback) |
 | LLM | OpenAI via langchain-openai (with offline deterministic fallback) |
 | Frontend | Next.js 15 (App Router), React 19, Tailwind, shadcn-style UI, lucide icons |
+| Auth | httpOnly `nba_session` JWT cookie, per-org isolation, optional Google sign-in |
+| Integrations | AWS SES email, Slack webhook, Google (all per-org, offline-safe) |
 | Contracts | Shared OpenAPI + JSON Schemas in `contracts/` |
 | Domain config | YAML Domain Packs in `domain_packs/` |
 | Infra | Docker Compose, Alembic migrations |
@@ -88,16 +122,16 @@ cp .env.example .env
 ### Quickstart (two terminals)
 
 ```bash
-# terminal 1: backend (loads ./.env, http://localhost:8000)
+# terminal 1: backend (loads ./.env, http://localhost:8200)
 make install        # cd backend && uv sync --extra dev
 make api            # live mode (uses OPENAI_API_KEY if set, else offline)
 #   or: make demo   # forced deterministic DEMO_MODE for recording the demo
 
-# terminal 2: frontend (http://localhost:3000)
+# terminal 2: frontend (http://localhost:3200)
 cd frontend && npm install && npm run dev
 ```
 
-Open http://localhost:3000. The backend env (including `DEMO_MODE`, `APP_TOKEN`, `DATABASE_URL`) is loaded from `./.env` via `uv run --env-file`. The frontend reads `NEXT_PUBLIC_API_URL` from `frontend/.env.local`.
+Open http://localhost:3200 and sign in with the seeded demo account (**demo@niheshr.com** / **demo1234**), or sign in with Google if it is configured. The backend env (including `DEMO_MODE`, `APP_TOKEN`, `DATABASE_URL`) is loaded from `./.env` via `uv run --env-file`. The frontend reads `NEXT_PUBLIC_API_URL` from `frontend/.env.local`.
 
 One-command alternative (Docker): `make dev` brings up Postgres + pgvector, the API, and the web app together, reading the same root `.env`.
 
@@ -108,12 +142,12 @@ The backend is a [uv](https://docs.astral.sh/uv/) project (dependencies pinned i
 ```bash
 cd backend
 uv sync                                  # create .venv and install from the lockfile
-uv run uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --port 8200
 ```
 
 `uv sync` installs runtime deps; add `--extra dev` for tests and tooling. Any `uv run <cmd>` executes inside the managed environment, so no manual venv activation is needed.
 
-The API serves on http://localhost:8000 (interactive docs at `/docs`).
+The API serves on http://localhost:8200 (interactive docs at `/docs`).
 
 ### Frontend (npm)
 
@@ -123,7 +157,7 @@ npm install
 npm run dev
 ```
 
-The UI serves on http://localhost:3000 and talks to the API at `NEXT_PUBLIC_API_URL`.
+The UI serves on http://localhost:3200 and talks to the API at `NEXT_PUBLIC_API_URL`.
 
 ### Docker Compose (one command)
 
@@ -170,6 +204,10 @@ The eval harness scores components and outcomes against `backend/app/eval/golden
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/health` | Liveness check |
+| POST | `/auth/login`, `/auth/signup`, `/auth/logout`, `/auth/me` | Session auth (issues the httpOnly `nba_session` cookie) |
+| GET | `/auth/google/start`, POST `/auth/google/exchange` | Optional Google sign-in flow |
+| POST | `/ingest` | Ingest an interaction (note, transcript, email, CRM) into the retrieval corpus |
+| GET | `/agents`, `/tools` | Browse the agent and tool registry |
 | POST | `/runs` | Start a decision run for an account or signal set |
 | GET | `/runs/{run_id}/stream` | Stream planner + agent steps and the final recommendation (SSE) |
 | POST | `/runs/{run_id}/hitl` | Approve or reject at the human-in-the-loop interrupt |
@@ -180,6 +218,9 @@ The eval harness scores components and outcomes against `backend/app/eval/golden
 | POST | `/whatif` | Counterfactual re-scoring of a recommendation |
 | GET | `/policy/{domain}` | Policy and guardrails for a domain |
 | POST | `/policy/evaluate` | Evaluate a candidate action against policy |
+| GET / PUT | `/rules/{domain}` | Read or save this org's policy and action overrides |
+| GET / PUT | `/integrations`, `/integrations/{kind}` | Manage per-org SES, Slack, and Google connectors |
+| GET | `/contacts` | List and manage org contacts |
 | POST | `/execute` | Execute an approved action |
 | GET | `/execute/{run_id}` | Execution status and artifact |
 | GET | `/learning` | Distilled lessons and learning state |
@@ -189,15 +230,25 @@ The eval harness scores components and outcomes against `backend/app/eval/golden
 
 The full contract lives in `contracts/openapi.json`, with recommendation and event shapes in `contracts/recommendation.schema.json` and `contracts/events.schema.json`.
 
+## Add a domain (no code)
+
+The engine is domain-agnostic: a domain is data, not code. To retarget the platform to a new vertical, drop a YAML file in `domain_packs/<your_domain>.yaml` and it loads automatically (validated against `backend/app/packs/schema.py`). A pack declares:
+
+- `personas`, `signals`, and `decision_points` (each with its trigger signals, primary KPI, and an optional specialist `roster` and `rationale` so the planner routes the way you intend).
+- `actions` and `playbooks` (the candidate plays the recommender ranks), `kpis`, and `retrieval_sources` (the knowledge scope).
+- `policy` guardrails (the rules the `policy_gate` enforces) and optional narrative `business_process`, `customer_journey`, and `success_metrics` that make the domain legible without changing engine behavior.
+
+Three packs ship today (`customer_success`, `saas_sales`, `collections`) as working references. The same graph, retrieval, policy, and explanation all retarget with zero code changes. For lighter tweaks, an org can override an existing pack's rules and action catalog at runtime from the UI via `PUT /rules/{domain}` without touching the base file.
+
 ## Demo walkthrough
 
 A tight 5-minute story, fully offline and deterministic. One command boots the API with `DEMO_MODE=1`:
 
 ```bash
-make demo      # backend on http://localhost:8000 (deterministic, no API keys)
+make demo      # backend on http://localhost:8200 (deterministic, no API keys)
 ```
 
-Then in another terminal start the UI (`cd frontend && npm install && npm run dev`, http://localhost:3000). Every API call below also lives as a ready-to-run example in `scripts/requests.http` (VS Code REST Client, JetBrains, or curl).
+Then in another terminal start the UI (`cd frontend && npm install && npm run dev`, http://localhost:3200). Every API call below also lives as a ready-to-run example in `scripts/requests.http` (VS Code REST Client, JetBrains, or curl).
 
 1. **Open the inbox.** The accounts list surfaces an at-risk account: Northwind Logistics (`ACC-1001`), health 42, usage down 38 percent after an integration broke and the champion left.
 2. **Run the engine.** Kick off a run on that account and watch the trace stream: the planner picks specialists, risk analysis scores the threat, the drafter proposes an action, retrieval cites a similar past account.

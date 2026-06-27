@@ -34,7 +34,7 @@ services:
     environment:
       DATABASE_URL: postgresql://nba:nba@db:5432/nba
     ports:
-      - "8000:8000"
+      - "8200:8200"
 
   web:
     build:
@@ -42,13 +42,13 @@ services:
       dockerfile: ../infra/Dockerfile.web
       args:
         # NEXT_PUBLIC_* values are inlined at build time, so pass it as a build arg.
-        NEXT_PUBLIC_API_URL: http://localhost:8000
+        NEXT_PUBLIC_API_URL: http://localhost:8200
     depends_on:
       - api
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_API_URL: http://localhost:8200
     ports:
-      - "3000:3000"
+      - "3200:3200"
 
 volumes:
   pgdata:
