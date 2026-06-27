@@ -23,6 +23,7 @@ export interface AuthUser {
   role?: string;
   org_id: string;
   email_verified?: boolean;
+  is_admin?: boolean;
 }
 
 export interface AuthOrg {

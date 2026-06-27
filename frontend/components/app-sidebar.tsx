@@ -18,6 +18,7 @@ import {
   Boxes,
   SlidersHorizontal,
   Settings,
+  ShieldCheck,
   Moon,
   Sun,
   LogOut,
@@ -177,6 +178,8 @@ interface NavItem {
   href: string;
   icon: LucideIcon;
   match?: (path: string) => boolean;
+  // When true the item only renders for admins (user.is_admin).
+  adminOnly?: boolean;
 }
 
 interface NavSection {
@@ -284,6 +287,13 @@ const SECTIONS: NavSection[] = [
         icon: Settings,
         match: (p) => p.startsWith("/settings"),
       },
+      {
+        label: "Admin",
+        href: "/admin",
+        icon: ShieldCheck,
+        match: (p) => p.startsWith("/admin"),
+        adminOnly: true,
+      },
     ],
   },
 ];
@@ -339,6 +349,7 @@ function NavLink({
 
 export function AppSidebar() {
   const pathname = usePathname() || "/";
+  const { user } = useAuth();
   // Start expanded; the stored preference is restored on mount.
   const [collapsed, setCollapsed] = useState(false);
 
@@ -372,7 +383,9 @@ export function AppSidebar() {
   };
 
   const renderSection = (items: NavItem[]) =>
-    items.map((item) => {
+    items
+      .filter((item) => !item.adminOnly || user?.is_admin)
+      .map((item) => {
       const active = item.match
         ? item.match(pathname)
         : pathname.startsWith(item.href);
