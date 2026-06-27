@@ -29,6 +29,29 @@ class WorkflowIn(BaseModel):
     rosters: Dict[str, List[str]] = Field(default_factory=dict)
 
 
+# Tools the planner specialists call in-graph, mapped to their node. Augments the
+# registry bindings (which only tag a few) so each node shows real tool usage.
+_NODE_TOOLS: Dict[str, List[str]] = {
+    "retrieval": ["hybrid_search", "search_knowledge"],
+    "risk_scorer": ["kpi_simulate"],
+    "play_recommender": ["recall_similar"],
+    "outcome_simulator": ["kpi_simulate"],
+    "drafter": ["draft_email"],
+    "critic": ["evaluate_policy"],
+}
+
+
+def _tools_for(capability: str) -> List[str]:
+    """Tools associated with a specialist (registry bindings plus the map above)."""
+    from app.packs.registry import TOOLS
+
+    tools = set(_NODE_TOOLS.get(capability, []))
+    for spec in TOOLS.specs():
+        if (spec.binding or {}).get("node") == capability:
+            tools.add(spec.name)
+    return sorted(tools)
+
+
 def _specialists() -> List[Dict[str, Any]]:
     """The selectable specialist roster the planner draws from, in run order."""
     from app.graph.planner import _ALWAYS_ON, _PIPELINE, _SEQUENCE
@@ -38,10 +61,15 @@ def _specialists() -> List[Dict[str, Any]]:
     for cap in _SEQUENCE:
         if cap in _PIPELINE and AGENTS.has(cap):
             card = AGENTS.find(cap)
+            pub = card.public() if card else {}
             out.append(
                 {
                     "capability": cap,
-                    "description": card.description if card else "",
+                    "description": pub.get("description", ""),
+                    "output_keys": pub.get("output_keys", []),
+                    "cost_tier": pub.get("cost_tier", "standard"),
+                    "tags": pub.get("tags", []),
+                    "tools": _tools_for(cap),
                     "always_on": cap in _ALWAYS_ON,
                 }
             )
@@ -81,12 +109,20 @@ async def _view(org_id: str, domain: str) -> Dict[str, Any]:
             }
         )
 
+    # Annotate each specialist with the decision points whose effective roster
+    # includes it, so the UI can show "where is this used".
+    specialists = _specialists()
+    for spec in specialists:
+        spec["used_in"] = [
+            dp["key"] for dp in decision_points if spec["capability"] in dp["roster"]
+        ]
+
     return {
         "domain": domain,
         "domain_name": getattr(pack, "name", domain),
         "sequence": list(_SEQUENCE),
         "always_on": sorted(_ALWAYS_ON),
-        "specialists": _specialists(),
+        "specialists": specialists,
         "decision_points": decision_points,
         "has_override": bool(roster_ovr),
     }
@@ -98,6 +134,144 @@ async def get_workflow(
 ) -> Dict[str, Any]:
     """Return the orchestration graph and each decision point's effective roster."""
     return await _view(org_id, domain)
+
+
+class AssistantIn(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+
+
+def _selectable_caps(view: Dict[str, Any]) -> List[str]:
+    return [s["capability"] for s in view["specialists"] if not s["always_on"]]
+
+
+def _validate_changes(
+    changes: Dict[str, Any], view: Dict[str, Any]
+) -> Dict[str, List[str]]:
+    """Keep only known decision points and selectable capabilities, in run order."""
+    selectable = _selectable_caps(view)
+    seq = view["sequence"]
+    dp_keys = {dp["key"] for dp in view["decision_points"]}
+    clean: Dict[str, List[str]] = {}
+    for key, caps in (changes or {}).items():
+        if key not in dp_keys or not isinstance(caps, list):
+            continue
+        chosen = {str(c) for c in caps if str(c) in selectable}
+        clean[key] = [c for c in seq if c in chosen]
+    return clean
+
+
+def _llm_plan(message: str, view: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Ask the model to turn a free-text instruction into roster changes."""
+    from app.demo import demo_mode_enabled
+
+    if demo_mode_enabled():
+        return None
+    from app.deps import get_llm
+
+    selectable = _selectable_caps(view)
+    rosters = {
+        dp["key"]: [c for c in dp["roster"] if c in selectable]
+        for dp in view["decision_points"]
+    }
+    prompt = (
+        "You configure an agentic decision workflow. Output STRICT JSON only.\n"
+        f"Selectable specialists (you may only use these): {selectable}\n"
+        "Always-on specialists gap_analysis and critic ALWAYS run and are never listed.\n"
+        f"Decision points and their current selectable roster: {rosters}\n\n"
+        f'User instruction: "{message}"\n\n'
+        "Return JSON: {\"changes\": {\"<decision_point>\": [\"capability\", ...]}, "
+        '"reply": "<one short sentence describing what you changed>"}. '
+        "Each changed decision point maps to the FULL new selectable roster (not a diff). "
+        "Only include decision points you are changing. If the instruction is unclear or "
+        "off-topic, return {\"changes\": {}, \"reply\": \"...\"} explaining what you need."
+    )
+    try:
+        import json
+
+        resp = get_llm(model="gpt-4.1", temperature=0).invoke(prompt)
+        text = getattr(resp, "content", "") or ""
+        start, end = text.find("{"), text.rfind("}")
+        if start == -1 or end == -1:
+            return None
+        return json.loads(text[start : end + 1])
+    except Exception:  # noqa: BLE001 - fall back to deterministic parsing
+        return None
+
+
+def _deterministic_plan(message: str, view: Dict[str, Any]) -> Dict[str, Any]:
+    """Offline fallback: parse a few simple commands against the current rosters."""
+    import re
+
+    selectable = _selectable_caps(view)
+    msg = message.lower()
+    # Resolve a capability mentioned in the text (by key or a loose word match).
+    def caps_in(text: str) -> List[str]:
+        found = []
+        for cap in selectable:
+            if cap in text or cap.replace("_", " ") in text:
+                found.append(cap)
+        return found
+
+    # Resolve target decision point(s).
+    targets = [dp["key"] for dp in view["decision_points"] if dp["key"] in msg or dp["label"].lower() in msg]
+    rosters = {dp["key"]: list(dp["roster"]) for dp in view["decision_points"]}
+    changes: Dict[str, List[str]] = {}
+    mentioned = caps_in(msg)
+    scope = targets or [dp["key"] for dp in view["decision_points"]]
+
+    if re.search(r"\b(remove|drop|exclude|without|disable)\b", msg) and mentioned:
+        for k in scope:
+            changes[k] = [c for c in rosters[k] if c not in mentioned]
+    elif re.search(r"\b(add|include|enable|also run)\b", msg) and mentioned:
+        for k in scope:
+            current = set(rosters[k]) | set(mentioned)
+            changes[k] = [c for c in view["sequence"] if c in current and c in selectable]
+    elif re.search(r"\bonly\b", msg) and mentioned:
+        for k in scope:
+            changes[k] = [c for c in view["sequence"] if c in mentioned]
+    elif re.search(r"\breset\b", msg):
+        for k in scope:
+            base = next(dp["base_roster"] for dp in view["decision_points"] if dp["key"] == k)
+            changes[k] = [c for c in base if c in selectable]
+    reply = (
+        "Updated the roster." if changes else
+        "Tell me what to change, for example 'remove the outcome simulator from renewal risk'."
+    )
+    return {"changes": changes, "reply": reply}
+
+
+@router.post("/{domain}/assistant")
+async def workflow_assistant(
+    domain: str, body: AssistantIn, org_id: str = Depends(current_org)
+) -> Dict[str, Any]:
+    """Edit the workflow from a natural-language instruction (context aware).
+
+    Reads the org's current effective workflow, asks the model (or an offline
+    parser) for the new rosters, validates them against the selectable
+    specialists, persists, and returns the updated view plus a short reply.
+    """
+    view = await _view(org_id, domain)
+    plan = _llm_plan(body.message, view) or _deterministic_plan(body.message, view)
+    changes = _validate_changes(plan.get("changes") or {}, view)
+    reply = str(plan.get("reply") or "").strip() or "Done."
+
+    if changes:
+        blob: Dict[str, Any] = await overrides_repo.get_overrides(org_id, domain) or {}
+        rosters = dict((blob or {}).get("rosters") or {})
+        rosters.update(changes)
+        # Drop entries that now equal the base roster so the override stays minimal.
+        base_by_key = {dp["key"]: dp["base_roster"] for dp in view["decision_points"]}
+        rosters = {k: v for k, v in rosters.items() if v != base_by_key.get(k)}
+        if rosters:
+            blob["rosters"] = rosters
+        else:
+            blob.pop("rosters", None)
+        if blob:
+            await overrides_repo.upsert(org_id, domain, blob)
+        else:
+            await overrides_repo.delete(org_id, domain)
+
+    return {"reply": reply, "changes": changes, "view": await _view(org_id, domain)}
 
 
 @router.put("/{domain}")
