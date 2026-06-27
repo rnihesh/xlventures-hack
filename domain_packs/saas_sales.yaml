@@ -4,6 +4,49 @@
 
 domain: saas_sales
 display_name: "SaaS Sales Pipeline"
+tagline: "Turn pipeline signals into the next best action that keeps qualified deals moving toward closed won."
+
+# How the sales function operates: the repeatable motion an AE runs to advance a
+# qualified opportunity from open to signed.
+business_process:
+  - key: qualify
+    name: "Qualify"
+    description: "Confirm fit, budget, authority, and need before investing cycles in the opportunity."
+    goal: "Only genuinely winnable deals enter active pipeline."
+  - key: advance
+    name: "Advance"
+    description: "Run the sales motion stage by stage: discovery, evaluation, business case, and proposal."
+    goal: "Each deal moves forward with a clear, mutually agreed next step."
+  - key: manage_risk
+    name: "Manage deal risk"
+    description: "Watch for stalls, silence, and single-threaded deals, and intervene before they slip."
+    goal: "Stalled or at-risk deals are re-engaged before the forecast misses."
+  - key: close
+    name: "Close"
+    description: "Package pricing and terms, secure approvals, and drive to signature."
+    goal: "Qualified deals close on time at target value."
+
+# The buyer journey an opportunity travels through from first qualification to a
+# signed contract.
+customer_journey:
+  - key: qualification
+    name: "Qualification"
+    description: "The opportunity is scoped against fit, budget, authority, and need."
+    goal: "Establish a real, funded problem worth solving."
+    risks:
+      - "Weak qualification inflates the pipeline with deals that never close."
+  - key: evaluation
+    name: "Evaluation"
+    description: "The buyer compares options, runs proofs of value, and builds the internal case."
+    goal: "Become the preferred solution with a quantified business case."
+    risks:
+      - "Deal stalls in stage with no buyer engagement."
+  - key: decision
+    name: "Decision and close"
+    description: "Pricing, terms, and approvals are negotiated toward signature."
+    goal: "Convert intent into a signed contract at target terms."
+    risks:
+      - "Late discounting or stalled approvals erode value and velocity."
 
 personas:
   - key: ae
@@ -33,25 +76,37 @@ decision_points:
   deal_stall:
     label: "Deal stall"
     description: "An open opportunity has stalled in its current stage."
+    when: "Fires during evaluation when a deal sits past its expected stage duration and buyer engagement has gone quiet."
     trigger_signals: [stage_stall, no_recent_activity]
     primary_kpi: win_rate
     default_persona: ae
+    roster: [retrieval, risk_scorer, play_recommender, outcome_simulator, drafter]
+    rationale: "Deal stall: ground the blocker, rank re-engagement plays, project velocity, and draft the outreach."
   closing_signal:
     label: "Closing signal"
     description: "A qualified opportunity shows readiness to close."
+    when: "Fires at the decision stage when a qualified buyer confirms intent or budget and is ready to move to terms."
     trigger_signals: [buying_intent]
     primary_kpi: pipeline_velocity
     default_persona: ae
+    roster: [retrieval, risk_scorer, play_recommender, outcome_simulator, drafter]
+    rationale: "Closing opportunity: rank plays, project velocity, and draft the proposal outreach."
 
 actions:
   - key: re_engage_buyer
     title: "Re-engage the buyer"
     description: "Send a value-based outreach to revive a stalled conversation."
     eligibility: "Use when activity has lapsed but the deal is not lost."
+    base_value: 0.67
+    effort: 0.35
+    eligible_points: [deal_stall]
   - key: send_proposal
     title: "Send a closing proposal"
     description: "Package pricing and terms to move toward signature."
     eligibility: "Use when buying intent and budget are confirmed."
+    base_value: 0.73
+    effort: 0.5
+    eligible_points: [closing_signal]
 
 playbooks:
   - key: unstick_deal
@@ -72,6 +127,24 @@ kpis:
     description: "Rate at which qualified pipeline converts to revenue."
     unit: currency_per_day
     target: "trend up"
+
+# Business-legible success metrics for the sales motion.
+success_metrics:
+  - key: win_rate
+    name: "Win Rate"
+    definition: "Share of qualified opportunities that close won."
+    target: ">= 25%"
+    benchmark: "20-30% is typical for mid-market B2B SaaS new business."
+  - key: pipeline_velocity
+    name: "Pipeline Velocity"
+    definition: "Rate at which qualified pipeline converts to revenue, a function of deal count, value, win rate, and cycle time."
+    target: "Trending up"
+    benchmark: "Rising velocity signals a healthier, faster-converting pipeline."
+  - key: sales_cycle
+    name: "Sales Cycle Length"
+    definition: "Average days from qualified opportunity to closed won."
+    target: "Trending down"
+    benchmark: "Shorter cycles compound into more capacity and forecast accuracy."
 
 retrieval_sources:
   - key: crm_records

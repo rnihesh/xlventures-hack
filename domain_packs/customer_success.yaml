@@ -5,6 +5,72 @@
 
 domain: customer_success
 display_name: "Customer Success and Churn Prevention"
+tagline: "Turn account signals into the next best action that protects recurring revenue and drives every customer to realized value."
+
+# How the Customer Success function operates: the repeatable motion a CS team
+# runs across its book of business. The platform plugs into the sense -> triage
+# -> decide loop, turning raw signals into an explainable, approved next action.
+business_process:
+  - key: segment_and_onboard
+    name: "Segment and onboard"
+    description: "Tier the book of business by value and risk, assign owners, and kick off onboarding with a success plan."
+    goal: "Every account has an owner, a success plan, and a path to first value."
+  - key: monitor_health
+    name: "Monitor account health"
+    description: "Continuously sense usage, sentiment, support, billing, and engagement signals to keep a live health read on each account."
+    goal: "Risks and opportunities are surfaced early, before they reach the renewal."
+  - key: triage_and_prioritize
+    name: "Triage and prioritize"
+    description: "Classify each account into a decision point and rank by revenue at risk, expansion upside, and likelihood to move."
+    goal: "Scarce CS attention is spent where it changes the outcome."
+  - key: decide_and_act
+    name: "Decide and act"
+    description: "Select the next best action grounded in evidence and playbooks, get human approval, and execute the play."
+    goal: "Each account gets the right intervention with a clear, auditable rationale."
+  - key: measure_and_learn
+    name: "Measure and learn"
+    description: "Track the KPI impact and account response, then feed outcomes back to sharpen scoring and play selection."
+    goal: "The system compounds: every decision improves the next recommendation."
+
+# The customer lifecycle the CS function shepherds an account through. Each stage
+# has its own goal and its own failure modes, which is why the decision points
+# below fire at different moments of the journey.
+customer_journey:
+  - key: onboarding
+    name: "Onboarding"
+    description: "From signed contract through kickoff to the first realized value milestone."
+    goal: "Reach first value fast and complete activation milestones on schedule."
+    risks:
+      - "Stalled activation and slipping milestones."
+      - "Slow time to value erodes early confidence."
+  - key: adoption
+    name: "Adoption"
+    description: "The account broadens and deepens use of the high-value features that drive outcomes."
+    goal: "Grow breadth and depth of usage and lift the health score."
+    risks:
+      - "Narrow or declining feature adoption."
+      - "Logins and active users trending down."
+  - key: value_realization
+    name: "Value realization"
+    description: "Demonstrated ROI through QBRs and outcome reviews; the account becomes a reference and advocate."
+    goal: "Prove and document outcomes against the original success criteria."
+    risks:
+      - "Missed QBRs and no shared view of value."
+      - "Champion or sponsor departure leaves value unspoken."
+  - key: renewal
+    name: "Renewal"
+    description: "Secure the commitment to continue at target terms ahead of the renewal date."
+    goal: "Renew on time at or above plan with no surprise risk."
+    risks:
+      - "Renewal approaches with declining health or sentiment."
+      - "Billing disputes or budget pressure threaten the contract."
+  - key: expansion
+    name: "Expansion"
+    description: "Grow seats, products, or tiers where value is proven and intent or capacity exists."
+    goal: "Convert demonstrated value into expansion that lifts net revenue retention."
+    risks:
+      - "Expansion pushed before value is proven, straining the relationship."
+      - "Seat or capacity limits hit without a sized offer ready."
 
 personas:
   - key: csm
@@ -79,81 +145,129 @@ decision_points:
   onboarding_stall:
     label: "Onboarding stall"
     description: "A new account has not completed activation milestones within the expected window."
+    when: "Fires during onboarding when activation milestones slip past due, logins lag, or the kickoff cadence breaks down."
     trigger_signals: [onboarding_milestone_late, login_decline, qbr_missed]
     primary_kpi: time_to_value
     default_persona: onboarding_specialist
+    roster: [retrieval, risk_scorer, play_recommender, outcome_simulator, drafter]
+    rationale: "Onboarding stall: ground the activation gap, rank unblocking plays, simulate time-to-value, and draft the outreach."
   low_adoption:
     label: "Low adoption"
     description: "Activated account is using a narrow slice of value, putting renewal at risk."
+    when: "Fires in the adoption stage when usage narrows, key features are abandoned, or active logins decline."
     trigger_signals: [usage_drop, feature_abandonment, login_decline]
     primary_kpi: health_score
     default_persona: csm
+    roster: [retrieval, risk_scorer, play_recommender, outcome_simulator, drafter]
+    rationale: "Low adoption: rank enablement plays, project the health-score lift, and draft the campaign outreach."
   health_drop:
     label: "Health score drop"
     description: "Composite health score has declined materially over the trailing period."
+    when: "Fires any time after activation when the composite health score falls materially, driven by usage, sentiment, support, or survey signals."
     trigger_signals: [usage_drop, negative_sentiment, support_ticket_spike, nps_detractor]
     primary_kpi: health_score
     default_persona: csm
+    roster: [retrieval, risk_scorer, play_recommender, outcome_simulator, drafter]
+    rationale: "Health drop: score the decline, rank corrective plays, simulate recovery, and draft the response."
   renewal_risk:
     label: "Renewal risk"
     description: "Renewal is approaching with signals that predict non-renewal or downgrade."
+    when: "Fires as the renewal window opens and at-risk signals (declining usage, lost champion, detractor scores, billing disputes) coincide."
     trigger_signals: [renewal_window_open, usage_drop, champion_departure, nps_detractor, invoice_dispute]
     primary_kpi: GRR
     default_persona: cs_leader
+    roster: [retrieval, risk_scorer, play_recommender, outcome_simulator, drafter]
+    rationale: "Renewal risk: ground the risk, rank save plays, simulate retention impact, and draft the renewal motion."
   expansion_signal:
     label: "Expansion signal"
     description: "A healthy account shows intent or capacity to grow spend."
+    when: "Fires when a healthy account expresses buying intent or approaches a seat or capacity limit."
     trigger_signals: [expansion_intent, seat_growth]
     primary_kpi: NRR
     default_persona: account_executive
+    roster: [retrieval, risk_scorer, play_recommender, outcome_simulator, drafter]
+    rationale: "Expansion opportunity: rank plays, simulate the upside, and draft outreach to act on it."
   escalation:
     label: "Escalation"
     description: "An urgent issue threatens the relationship and needs immediate cross-functional response."
+    when: "Fires at any lifecycle stage when an acute issue (support spike, sharp negative sentiment, sponsor loss, billing dispute) demands immediate cross-functional response."
     trigger_signals: [support_ticket_spike, negative_sentiment, champion_departure, invoice_dispute]
     primary_kpi: churn_rate
     default_persona: cs_leader
+    roster: [retrieval, risk_scorer, play_recommender, drafter]
+    rationale: "Escalation: move fast to a grounded, drafted response and skip slower KPI simulation."
 
 actions:
   - key: schedule_executive_business_review
     title: "Schedule an executive business review"
     description: "Book a strategic review with the buying committee to realign on outcomes and value."
     eligibility: "Use when champion is engaged and renewal is more than 30 days out."
+    base_value: 0.74
+    effort: 0.55
+    eligible_points: [low_adoption, health_drop, renewal_risk]
   - key: launch_adoption_campaign
     title: "Launch a targeted adoption campaign"
     description: "Deliver in-app guidance and enablement on the underused high-value features."
     eligibility: "Use when feature adoption is stalled but sentiment is neutral or positive."
+    base_value: 0.66
+    effort: 0.45
+    eligible_points: [onboarding_stall, low_adoption, health_drop]
   - key: assign_onboarding_taskforce
     title: "Assign an onboarding taskforce"
     description: "Bring in an onboarding specialist and solutions engineer to unblock activation."
     eligibility: "Use when onboarding milestones are past due within the first 90 days."
+    base_value: 0.7
+    effort: 0.7
+    eligible_points: [onboarding_stall]
   - key: open_executive_escalation
     title: "Open an executive escalation"
     description: "Engage CS leadership and product to triage and commit to a remediation plan."
     eligibility: "Use when support spikes coincide with negative sentiment or sponsor loss."
+    base_value: 0.72
+    effort: 0.75
+    eligible_points: [health_drop, escalation]
   - key: identify_new_champion
     title: "Identify and develop a new champion"
     description: "Map stakeholders and cultivate a replacement champion after a departure."
     eligibility: "Use when the prior champion or sponsor has left the account."
+    base_value: 0.58
+    effort: 0.6
+    eligible_points: [renewal_risk, escalation]
   - key: propose_expansion_offer
     title: "Propose an expansion offer"
     description: "Package an upsell or cross-sell aligned to demonstrated value and intent."
     eligibility: "Use only when health is good and expansion intent or seat growth is present."
+    base_value: 0.71
+    effort: 0.6
+    eligible_points: [expansion_signal]
   - key: initiate_renewal_motion
     title: "Initiate the renewal motion early"
     description: "Start the renewal conversation with a value recap and multi-year options."
     eligibility: "Use when the renewal window is open and health is stable or improving."
+    base_value: 0.68
+    effort: 0.4
+    eligible_points: [renewal_risk, expansion_signal]
   - key: offer_save_concession
     title: "Offer a retention concession"
     description: "Present a scoped discount, credit, or flexible term to retain an at-risk account."
     eligibility: "Use only for renewal risk after value realignment has been attempted."
+    base_value: 0.6
+    effort: 0.65
+    eligible_points: [renewal_risk]
   - key: resolve_billing_dispute
     title: "Resolve the billing dispute"
     description: "Coordinate finance and CS to clear the dispute and confirm corrected terms."
     eligibility: "Use when an invoice dispute or late payment is the primary blocker."
+    base_value: 0.64
+    effort: 0.55
+    eligible_points: [escalation]
   - key: monitor_no_action
     title: "Monitor and hold"
     description: "Keep the account on a watch list with thresholds for re-evaluation."
     eligibility: "Use when signals are weak or contradicting and intervention risk is high."
+    base_value: 0.3
+    effort: 0.1
+    eligible_points: [onboarding_stall, low_adoption]
 
 playbooks:
   - key: save_at_risk_renewal
@@ -217,6 +331,41 @@ kpis:
     description: "Days from kickoff to first realized value milestone."
     unit: days
     target: "<= 30"
+
+# Business-legible success metrics: how this domain defines winning. These are
+# the numbers the next best actions are meant to move, with a target (the goal)
+# and a benchmark (a typical B2B SaaS reference point) for context.
+success_metrics:
+  - key: NRR
+    name: "Net Revenue Retention (NRR)"
+    definition: "Recurring revenue retained plus expansion, net of churn and contraction, across the existing customer base."
+    target: ">= 110%"
+    benchmark: "Best-in-class B2B SaaS runs 120%+; below 100% means the base is shrinking."
+  - key: GRR
+    name: "Gross Revenue Retention (GRR)"
+    definition: "Recurring revenue retained excluding any expansion: the pure measure of churn and downgrade."
+    target: ">= 90%"
+    benchmark: "Healthy B2B SaaS is 90%+; enterprise often reaches 95%+."
+  - key: churn_rate
+    name: "Logo and Revenue Churn"
+    definition: "Share of accounts or recurring revenue lost in the period."
+    target: "<= 8% annual"
+    benchmark: "Low single digits for enterprise; double digits signals a retention problem."
+  - key: health_score
+    name: "Customer Health Score"
+    definition: "Composite index of usage, sentiment, support, and engagement that predicts renewal likelihood."
+    target: ">= 70 / 100"
+    benchmark: "Accounts below 50 churn at multiples of the portfolio average."
+  - key: time_to_value
+    name: "Time to Value"
+    definition: "Days from kickoff to the first realized value milestone."
+    target: "<= 30 days"
+    benchmark: "Faster time to value correlates strongly with first-year retention."
+  - key: adoption_rate
+    name: "Feature Adoption Rate"
+    definition: "Share of licensed, high-value features actively used by the account."
+    target: ">= 60%"
+    benchmark: "Breadth of adoption is the leading indicator of expansion readiness."
 
 retrieval_sources:
   - key: crm_notes

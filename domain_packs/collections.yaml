@@ -8,6 +8,63 @@
 
 domain: collections
 display_name: "Accounts Receivable and Collections"
+tagline: "Turn aging and payment signals into the next best action that recovers cash while staying compliant and preserving the relationship."
+
+# How the collections function operates: the dunning-and-recovery motion a team
+# runs across a queue of past-due invoices, escalating treatment as balances age.
+business_process:
+  - key: monitor_aging
+    name: "Monitor aging"
+    description: "Track invoices against due dates and aging buckets, flagging accounts the moment they slip past due."
+    goal: "No past-due balance goes unnoticed as it ages."
+  - key: triage_treatment
+    name: "Triage treatment"
+    description: "Classify each account by aging, dispute status, payment history, and credit risk to choose the right treatment."
+    goal: "Each account gets proportionate treatment, not a one-size dunning blast."
+  - key: dun_and_recover
+    name: "Dun and recover"
+    description: "Run the dunning sequence in order (reminder, firm notice, call, plan) and secure a promise to pay."
+    goal: "Recover cash through the lightest effective, compliant touch."
+  - key: escalate_or_resolve
+    name: "Escalate or resolve"
+    description: "Resolve disputes, contain credit exposure, or escalate to settlement, agency, or write-off with the right approvals."
+    goal: "At-risk balances reach a clear resolution within policy."
+
+# The lifecycle a past-due balance travels through, from a freshly missed due
+# date to either recovery or a governed write-off.
+customer_journey:
+  - key: current
+    name: "Current and due"
+    description: "The invoice is issued and approaching or just reaching its due date."
+    goal: "Get paid on terms with a clean, undisputed invoice."
+    risks:
+      - "Invoice errors or non-delivery surface only after the due date."
+  - key: early_overdue
+    name: "Early overdue"
+    description: "The invoice has just passed due with no dispute and no prior pattern of nonpayment."
+    goal: "Recover quickly with a courteous reminder before the balance ages."
+    risks:
+      - "Silence to early outreach lets the balance slip into older buckets."
+  - key: aging
+    name: "Aging and escalation"
+    description: "The balance slips into older aging buckets and routine reminders have not worked."
+    goal: "Apply firmer, compliant treatment and secure a payment commitment."
+    risks:
+      - "Broken promises and rising days sales outstanding."
+      - "Open disputes block payment until resolved."
+  - key: at_risk
+    name: "At risk and recovery"
+    description: "Credit exposure, high-value balances, or insolvency signals require senior, relationship-aware handling."
+    goal: "Recover as much cash as possible while containing exposure."
+    risks:
+      - "Aggressive escalation damages a strategic relationship."
+      - "Uncollectible balances drive bad-debt expense."
+  - key: resolution
+    name: "Resolution"
+    description: "The balance is recovered, settled, or written off with the required approvals and documentation."
+    goal: "Reach a clean, governed close on every past-due account."
+    risks:
+      - "Write-offs taken without governance or full documentation."
 
 personas:
   - key: collections_specialist
@@ -79,95 +136,152 @@ decision_points:
   early_stage_overdue:
     label: "Early-stage overdue"
     description: "An invoice has just passed due with no dispute and no prior pattern of nonpayment."
+    when: "Fires the moment an invoice passes its due date with no open dispute and no history of nonpayment."
     trigger_signals: [invoice_past_due, no_remittance_response]
     primary_kpi: DSO
     default_persona: collections_specialist
+    roster: [retrieval, risk_scorer, play_recommender, drafter]
+    rationale: "Early-stage overdue: ground the invoice, rank the lightest effective dunning play, and draft a courteous reminder; KPI simulation adds little this early."
   aging_escalation:
     label: "Aging escalation"
     description: "Balance has slipped into an older aging bucket and routine reminders have not worked."
+    when: "Fires when a balance moves into an older aging bucket (30/60/90+) and prior reminders have gone unanswered."
     trigger_signals: [aging_bucket_slip, no_remittance_response, repeat_late_payer]
     primary_kpi: collection_effectiveness_index
     default_persona: collections_specialist
+    roster: [retrieval, risk_scorer, play_recommender, outcome_simulator, drafter]
+    rationale: "Aging escalation: ground the aging history, rank firmer treatment, simulate recovery, and draft the notice."
   broken_promise:
     label: "Broken promise to pay"
     description: "The customer committed to a payment date and then missed it."
+    when: "Fires when a customer who committed to a payment date lets it pass without paying."
     trigger_signals: [broken_promise_to_pay, no_remittance_response]
     primary_kpi: promise_to_pay_kept_rate
     default_persona: collections_specialist
+    roster: [retrieval, risk_scorer, play_recommender, drafter]
+    rationale: "Broken promise: ground the missed commitment, rank re-engagement, and draft a firm but professional follow-up."
   dispute_resolution:
     label: "Dispute or short-pay"
     description: "Payment is blocked by a disputed charge, billing error, or short-pay that must be resolved first."
+    when: "Fires when a customer disputes a charge or short-pays, blocking the disputed amount until it is resolved."
     trigger_signals: [payment_dispute, partial_payment]
     primary_kpi: dispute_cycle_time
     default_persona: ar_manager
+    roster: [retrieval, risk_scorer, play_recommender]
+    rationale: "Dispute: ground the case and decide routing before any dunning outreach."
   credit_risk_review:
     label: "Credit risk review"
     description: "Exposure or external risk signals warrant a hold or credit-limit change before more shipments."
+    when: "Fires when exposure breaches the credit limit or a third-party risk score deteriorates, before more credit is extended."
     trigger_signals: [credit_limit_breach, credit_score_drop, repeat_late_payer]
     primary_kpi: bad_debt_ratio
     default_persona: credit_analyst
+    roster: [retrieval, risk_scorer, play_recommender, outcome_simulator]
+    rationale: "Credit review: quantify exposure and the treatment decision; outreach is not drafted."
   high_value_recovery:
     label: "High-value recovery"
     description: "A large, material balance is overdue and needs a senior, relationship-aware recovery motion."
+    when: "Fires when a large balance material to the cash forecast is overdue and warrants senior, relationship-aware handling."
     trigger_signals: [high_value_overdue, broken_promise_to_pay, no_remittance_response]
     primary_kpi: cash_recovered
     default_persona: ar_manager
+    roster: [retrieval, risk_scorer, play_recommender, drafter]
+    rationale: "High-value recovery: prioritize a relationship-aware, drafted outreach over simulation."
   pre_writeoff:
     label: "Pre-write-off / insolvency"
     description: "An account shows insolvency signals or is uncollectible through normal treatment."
+    when: "Fires when insolvency or bankruptcy signals appear, or normal treatment is exhausted and the balance is likely uncollectible."
     trigger_signals: [bankruptcy_signal, broken_promise_to_pay, credit_score_drop]
     primary_kpi: bad_debt_ratio
     default_persona: finance_controller
+    roster: [retrieval, risk_scorer, play_recommender]
+    rationale: "Pre-write-off: focus on evidence and the recovery decision; no outreach drafted here."
 
 actions:
   - key: send_payment_reminder
     title: "Send a courteous payment reminder"
     description: "Email a friendly reminder with the invoice copy, amount due, and a one-click pay link."
     eligibility: "Use for early-stage overdue with no dispute and no prior broken promise."
+    base_value: 0.55
+    effort: 0.15
+    eligible_points: [early_stage_overdue]
   - key: send_dunning_notice
     title: "Send a firm dunning notice"
     description: "Issue a formal past-due notice that states the balance, due date, and next steps."
     eligibility: "Use after reminders go unanswered and the balance has aged, with no open dispute."
+    base_value: 0.62
+    effort: 0.3
+    eligible_points: [early_stage_overdue, aging_escalation, broken_promise]
   - key: schedule_collection_call
     title: "Schedule a collection call"
     description: "Place an outbound call to confirm receipt, understand the delay, and secure a payment commitment."
     eligibility: "Use when written outreach is ignored or a personal touch is likely to unblock payment."
+    base_value: 0.68
+    effort: 0.45
+    eligible_points: [aging_escalation, broken_promise, dispute_resolution, credit_risk_review, high_value_recovery]
   - key: negotiate_payment_plan
     title: "Offer an installment payment plan"
     description: "Structure a written installment schedule that recovers the balance over time."
     eligibility: "Use when the customer signals willingness but cannot pay the full balance at once."
+    base_value: 0.66
+    effort: 0.6
+    eligible_points: [aging_escalation, broken_promise, high_value_recovery]
   - key: secure_promise_to_pay
     title: "Secure a promise to pay"
     description: "Capture a specific committed payment date and amount, and set a follow-up checkpoint."
     eligibility: "Use when the customer confirms intent to pay on a near-term date."
+    base_value: 0.64
+    effort: 0.4
+    eligible_points: [early_stage_overdue, aging_escalation, broken_promise, high_value_recovery]
   - key: open_dispute_case
     title: "Open and route a dispute case"
     description: "Log the disputed amount, gather backup, and route to the owner who can resolve it."
     eligibility: "Use when a billing error, short-pay, or disagreement is blocking payment."
+    base_value: 0.6
+    effort: 0.55
+    eligible_points: [dispute_resolution]
   - key: place_credit_hold
     title: "Place a credit hold"
     description: "Pause new orders or shipments until the past-due balance is cleared or terms are renegotiated."
     eligibility: "Use when exposure exceeds the credit limit or risk signals spike, per policy thresholds."
+    base_value: 0.58
+    effort: 0.6
+    eligible_points: [credit_risk_review]
   - key: adjust_credit_terms
     title: "Adjust credit limit or terms"
     description: "Lower the credit limit, shorten terms, or require prepayment to cap future exposure."
     eligibility: "Use when a credit review shows deteriorating risk but the relationship continues."
+    base_value: 0.6
+    effort: 0.65
+    eligible_points: [credit_risk_review]
   - key: offer_settlement
     title: "Offer a settlement or write-down"
     description: "Propose a discounted lump-sum settlement to recover part of an otherwise at-risk balance."
     eligibility: "Use only with controller approval for high-risk or pre-insolvency balances."
+    base_value: 0.57
+    effort: 0.75
+    eligible_points: [high_value_recovery, pre_writeoff]
   - key: escalate_to_agency
     title: "Escalate to a collections agency or legal"
     description: "Refer the account to a third-party agency or legal after internal treatment is exhausted."
     eligibility: "Use only after the full internal dunning path and required wait periods are complete."
+    base_value: 0.5
+    effort: 0.7
+    eligible_points: [pre_writeoff]
   - key: recommend_writeoff
     title: "Recommend write-off"
     description: "Propose writing the balance off as bad debt and removing it from active collection."
     eligibility: "Use only for confirmed-uncollectible balances with controller approval."
+    base_value: 0.45
+    effort: 0.6
+    eligible_points: [pre_writeoff]
   - key: monitor_no_action
     title: "Monitor and hold"
     description: "Keep the account on a watch list with thresholds for re-evaluation."
     eligibility: "Use when a promise to pay is in force or signals are weak and intervention risk is high."
+    base_value: 0.3
+    effort: 0.1
+    eligible_points: [early_stage_overdue, dispute_resolution]
 
 playbooks:
   - key: early_dunning_sequence
@@ -259,6 +373,34 @@ kpis:
     description: "Past-due cash recovered through collection activity in the period."
     unit: currency
     target: "trend up"
+
+# Business-legible success metrics: how the collections function defines winning.
+success_metrics:
+  - key: DSO
+    name: "Days Sales Outstanding (DSO)"
+    definition: "Average number of days to collect revenue after a sale."
+    target: "<= 45 days"
+    benchmark: "Strong AR teams hold DSO near or below net terms; rising DSO ties up working capital."
+  - key: collection_effectiveness_index
+    name: "Collection Effectiveness Index (CEI)"
+    definition: "Share of available receivables actually collected in a period."
+    target: ">= 85%"
+    benchmark: "Above 80% is healthy; consistently high CEI signals an effective dunning motion."
+  - key: bad_debt_ratio
+    name: "Bad Debt Ratio"
+    definition: "Uncollectible balances written off as a share of total receivables."
+    target: "<= 1.5%"
+    benchmark: "Under 1% is strong for established B2B portfolios."
+  - key: promise_to_pay_kept_rate
+    name: "Promise-to-Pay Kept Rate"
+    definition: "Share of promised payments that arrive on or before the committed date."
+    target: ">= 75%"
+    benchmark: "A leading indicator of queue quality and the credibility of commitments secured."
+  - key: dispute_cycle_time
+    name: "Dispute Cycle Time"
+    definition: "Average days from a dispute being opened to its resolution."
+    target: "<= 10 days"
+    benchmark: "Faster dispute clearance directly lowers DSO on otherwise payable balances."
 
 retrieval_sources:
   - key: invoice_records

@@ -12,13 +12,89 @@ available through the ``DOMAIN_PACKS_DIR`` environment variable.
 from __future__ import annotations
 
 import os
+from contextvars import ContextVar
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import yaml
 
 from app.packs.schema import DomainPack
+
+# ---------------------------------------------------------------------------
+# Org-uploaded pack registry.
+#
+# Base packs ship as YAML on disk. An org can also upload a brand new domain at
+# runtime (the "add a domain in 60 seconds" flow); those packs are not on disk,
+# so the loader keeps an in-process registry keyed by ``(org_id, domain)``. The
+# org_packs repository populates it on save and clears it on delete. A run sets
+# the current org (via ``pack_org`` / ``set_pack_org``) so the synchronous graph,
+# which calls ``load_pack(domain)`` with no org argument, still resolves the
+# correct org's uploaded pack. The registry is consulted before disk, so an org
+# pack can also shadow a base pack of the same key for that org only.
+# ---------------------------------------------------------------------------
+
+_ORG_PACKS: Dict[tuple[str, str], DomainPack] = {}
+
+# Best-effort, domain-keyed fallback (last uploaded wins). The run path drives
+# the graph through ``load_pack(domain)`` with no org bound; this lets a run on a
+# just-added domain resolve its uploaded pack so the "run a decision now"
+# shortcut works. It is consulted ONLY when no org is bound, so an org-scoped
+# caller (the API, which binds the org) never crosses tenant boundaries.
+_LAST_PACKS: Dict[str, DomainPack] = {}
+
+# The org whose packs ``load_pack`` should prefer for the current task. Defaults
+# to None (base packs only), which keeps every existing caller unchanged.
+_current_pack_org: ContextVar[Optional[str]] = ContextVar("current_pack_org", default=None)
+
+
+def set_pack_org(org_id: Optional[str]):
+    """Bind the org whose uploaded packs ``load_pack`` should resolve.
+
+    Returns the ContextVar token so the caller can ``reset`` it. Safe to call
+    from async request handlers: the binding propagates into the graph nodes
+    that run within the same task.
+    """
+
+    return _current_pack_org.set(org_id)
+
+
+def reset_pack_org(token) -> None:
+    """Undo a previous :func:`set_pack_org` using its token."""
+
+    try:
+        _current_pack_org.reset(token)
+    except (ValueError, LookupError):  # pragma: no cover - defensive only
+        pass
+
+
+def register_org_pack(org_id: str, domain: str, parsed: Dict[str, Any]) -> None:
+    """Register a validated, org-uploaded pack so runs and lookups resolve it."""
+
+    try:
+        pack = DomainPack.model_validate(parsed)
+    except Exception:  # noqa: BLE001 - never let a bad cached blob break loading.
+        _ORG_PACKS.pop((org_id, domain), None)
+        return
+    _ORG_PACKS[(org_id, domain)] = pack
+    _LAST_PACKS[domain] = pack
+
+
+def unregister_org_pack(org_id: str, domain: str) -> None:
+    """Drop an org-uploaded pack from the registry (on delete)."""
+
+    _ORG_PACKS.pop((org_id, domain), None)
+    # Clear the domain-only fallback only when no other org still has this pack.
+    if not any(d == domain for (_o, d) in _ORG_PACKS):
+        _LAST_PACKS.pop(domain, None)
+
+
+def org_pack(org_id: Optional[str], domain: str) -> Optional[DomainPack]:
+    """Return an org's uploaded pack for ``domain`` if registered, else None."""
+
+    if not org_id:
+        return None
+    return _ORG_PACKS.get((org_id, domain))
 
 
 def _candidate_dirs() -> List[Path]:
@@ -55,6 +131,15 @@ def packs_dir() -> Path:
         if candidate.is_dir():
             return candidate
     return _candidate_dirs()[-3]
+
+
+def _disk_pack_exists(domain: str) -> bool:
+    """True when a base pack YAML for ``domain`` ships on disk."""
+
+    directory = packs_dir()
+    return (directory / f"{domain}.yaml").is_file() or (
+        directory / f"{domain}.yml"
+    ).is_file()
 
 
 def _minimal_pack(domain: str) -> DomainPack:
@@ -96,13 +181,33 @@ def _minimal_pack(domain: str) -> DomainPack:
     )
 
 
-@lru_cache(maxsize=32)
 def load_pack(domain: str) -> DomainPack:
-    """Load and validate a domain pack by key.
+    """Resolve the effective domain pack for the current org, by key.
 
-    Returns a minimal generic pack if the YAML file cannot be found, so the
-    walking skeleton never crashes on a missing pack.
+    Resolution order: an org-uploaded pack for the org bound via
+    :func:`set_pack_org` (so a run on a freshly added domain uses it), then the
+    base YAML on disk, then a minimal generic pack so the walking skeleton never
+    crashes on a missing pack. The disk read is cached; the org registry lookup
+    is not, so an org's edits take effect immediately.
     """
+
+    org_id = _current_pack_org.get()
+    uploaded = org_pack(org_id, domain)
+    if uploaded is not None:
+        return uploaded
+    # No org bound (for example the run path that drives the graph org-blind):
+    # fall back to the last uploaded pack for this domain so a just-added domain
+    # is runnable. An org-bound caller never reaches here cross-tenant.
+    if org_id is None:
+        last = _LAST_PACKS.get(domain)
+        if last is not None and not _disk_pack_exists(domain):
+            return last
+    return _load_pack_from_disk(domain)
+
+
+@lru_cache(maxsize=32)
+def _load_pack_from_disk(domain: str) -> DomainPack:
+    """Load and validate a base domain pack from ``domain_packs/<domain>.yaml``."""
 
     path = packs_dir() / f"{domain}.yaml"
     if not path.is_file():
@@ -118,6 +223,105 @@ def load_pack(domain: str) -> DomainPack:
 
     raw.setdefault("domain", domain)
     return DomainPack.model_validate(raw)
+
+
+# ---------------------------------------------------------------------------
+# Org overrides: configurable rules and actions.
+#
+# An org tailors a domain pack without forking it. The base pack (loaded from
+# YAML) stays intact; an org's edits are stored as a small JSONB override blob
+# shaped like ``{"policies": [...], "actions": [...]}``. The helpers below merge
+# that override onto the base pack so ``app.policy`` and the planner can read the
+# *effective* pack for the current org. The merge is replace-by-id: when the
+# override carries a ``policies`` (or ``actions``) list it defines the effective
+# set, and each entry is backfilled from the matching base entry by id so a
+# partial edit keeps the base fields it did not touch. Absent a list, the base
+# is used unchanged. This supports adding, editing, and removing entries while
+# never mutating the cached base pack.
+# ---------------------------------------------------------------------------
+
+
+def _merge_entries(
+    base: List[Dict[str, Any]],
+    override: Any,
+    id_key: str,
+) -> List[Dict[str, Any]]:
+    """Merge an override list onto a base list, keyed by ``id_key``.
+
+    Returns the base list unchanged when ``override`` is not a list (no edit).
+    Otherwise the override list defines membership and ordering, with each entry
+    shallow-merged over the matching base entry so partial edits inherit the
+    base fields they omit.
+    """
+
+    if not isinstance(override, list):
+        return [dict(item) for item in base]
+
+    base_by_id: Dict[str, Dict[str, Any]] = {
+        str(item.get(id_key, "")): item for item in base if isinstance(item, dict)
+    }
+    merged: List[Dict[str, Any]] = []
+    for entry in override:
+        if not isinstance(entry, dict):
+            continue
+        entry_id = str(entry.get(id_key, ""))
+        if not entry_id:
+            continue
+        base_entry = base_by_id.get(entry_id, {})
+        merged.append({**base_entry, **entry})
+    return merged
+
+
+def _base_policy_dicts(domain: str) -> List[Dict[str, Any]]:
+    """The base policy rules for a domain as plain dicts (pack or built-ins)."""
+
+    # Lazy import keeps the packs layer free of a hard dependency on the policy
+    # layer (which imports the loader), avoiding an import cycle at module load.
+    from app.policy.rules import load_policies
+
+    return [rule.model_dump() for rule in load_policies(domain)]
+
+
+def _base_action_dicts(domain: str) -> List[Dict[str, Any]]:
+    """The base action catalog for a domain as plain dicts."""
+
+    return [action.model_dump() for action in load_pack(domain).actions]
+
+
+def effective_rules(domain: str, overrides: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Return the effective policies and actions for an org as plain dicts.
+
+    Merges ``overrides`` (``{"policies"?: [...], "actions"?: [...]}``) onto the
+    base pack and returns ``{"policies": [...], "actions": [...]}``. Never raises
+    and never mutates the cached base pack, so it is safe for the API, the policy
+    engine, and the planner to call on every request.
+    """
+
+    overrides = overrides or {}
+    policies = _merge_entries(
+        _base_policy_dicts(domain), overrides.get("policies"), "id"
+    )
+    actions = _merge_entries(
+        _base_action_dicts(domain), overrides.get("actions"), "key"
+    )
+    return {"policies": policies, "actions": actions}
+
+
+def merged_pack(domain: str, overrides: Optional[Dict[str, Any]]) -> DomainPack:
+    """Return a DomainPack with the org's overrides merged onto the base pack.
+
+    The base pack is copied (never mutated), then its ``actions`` and the extra
+    ``policies`` section are replaced with the effective, merged values. The
+    planner and policy layer can treat the result exactly like a normally loaded
+    pack while seeing the current org's configured rules and actions.
+    """
+
+    base = load_pack(domain)
+    data: Dict[str, Any] = base.model_dump()
+    effective = effective_rules(domain, overrides)
+    data["actions"] = effective["actions"]
+    data["policies"] = effective["policies"]
+    return DomainPack.model_validate(data)
 
 
 def list_packs() -> List[Dict[str, Any]]:
