@@ -16,11 +16,12 @@ deterministic offline router when it is not.
 from __future__ import annotations
 
 import contextvars
-import functools
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Dict, List, Optional
+
+from fastapi.concurrency import run_in_threadpool
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +99,7 @@ async def list_accounts(domain: Optional[str] = None) -> Dict[str, Any]:
 
     from app.api.accounts import list_accounts as _list_accounts
 
-    accounts = await _list_accounts(domain=domain)
+    accounts = await _list_accounts(domain=domain, org_id=current_org_id())
     return {"count": len(accounts), "accounts": accounts}
 
 
@@ -110,7 +111,7 @@ async def get_account(account_id: str) -> Dict[str, Any]:
     from app.api.accounts import get_account as _get_account
 
     try:
-        return await _get_account(account_id)
+        return await _get_account(account_id, org_id=current_org_id())
     except HTTPException as exc:
         return {"error": exc.detail, "account_id": account_id}
 
@@ -120,7 +121,7 @@ async def list_domains() -> Dict[str, Any]:
 
     from app.api.domains import get_domains as _get_domains
 
-    packs = await _get_domains()
+    packs = await _get_domains(org_id=current_org_id())
     return {"count": len(packs), "domains": packs}
 
 
@@ -132,9 +133,38 @@ async def get_domain(domain_key: str) -> Dict[str, Any]:
     from app.api.domains import get_domain as _get_domain
 
     try:
-        return await _get_domain(domain_key)
+        return await _get_domain(domain_key, org_id=current_org_id())
     except HTTPException as exc:
         return {"error": exc.detail, "domain_key": domain_key}
+
+
+async def _resolve_org_account(org_id: str, ref: str) -> Optional[str]:
+    """Resolve an account reference (id OR name) to an id owned by ``org_id``.
+
+    Returns None when the workspace has no such account, so a run never lands on
+    an account the caller does not own (e.g. the LLM guessing a demo id), and a
+    name like "Halcyon" maps to its real id.
+    """
+
+    if not ref:
+        return None
+    try:
+        from app.api.accounts import _org_accounts
+
+        accounts = await _org_accounts(org_id, None)
+    except Exception:  # noqa: BLE001 - accounts slice optional
+        return None
+    ref_l = str(ref).strip().lower()
+    by_id = [a for a in accounts if str(a.get("account_id", "")).lower() == ref_l]
+    if by_id:
+        return by_id[0].get("account_id")
+    by_name = [a for a in accounts if str(a.get("name", "")).lower() == ref_l]
+    if by_name:
+        return by_name[0].get("account_id")
+    contains = [a for a in accounts if ref_l and ref_l in str(a.get("name", "")).lower()]
+    if contains:
+        return contains[0].get("account_id")
+    return None
 
 
 async def run_nba(
@@ -146,15 +176,26 @@ async def run_nba(
 
     Drives the same planner graph the runs API streams, but synchronously to a
     final state. The run is registered in the runs registry so a follow-up
-    ``execute_action`` can reference it by ``run_id``.
+    ``execute_action`` can reference it by ``run_id``. ``account_id`` may be an
+    account id OR a name (e.g. "Halcyon"); it is resolved against the caller's
+    workspace and rejected if the account is not theirs.
     """
 
     from app.api.runs import _RUNS
     from app.deps import get_checkpointer
     from app.graph.planner import build_graph
+    from app.packs.loader import reset_pack_org, set_pack_org
+    from app.repositories import org_packs as org_packs_repo
 
-    run_id = str(uuid.uuid4())
     org_id = current_org_id()
+    resolved = await _resolve_org_account(org_id, account_id)
+    if resolved is None:
+        return {
+            "error": f"account not found in your workspace: {account_id}",
+            "account_id": account_id,
+        }
+    account_id = resolved
+    run_id = str(uuid.uuid4())
     signal = {"type": "", "content": signal_text}
     initial_state: Dict[str, Any] = {
         "run_id": run_id,
@@ -170,9 +211,20 @@ async def run_nba(
     }
     config = {"configurable": {"thread_id": run_id}}
 
+    # Bind the caller's org so the graph resolves THIS org's uploaded domain pack
+    # (never another tenant's) when the copilot runs a decision on a new domain.
+    try:
+        await org_packs_repo.hydrate_loader(org_id)
+    except Exception:  # noqa: BLE001 - hydration is best effort
+        pass
+
     checkpointer = await get_checkpointer()
     graph = build_graph(checkpointer)
-    final = await graph.ainvoke(initial_state, config=config)
+    token = set_pack_org(org_id)
+    try:
+        final = await graph.ainvoke(initial_state, config=config)
+    finally:
+        reset_pack_org(token)
 
     recommendation = final.get("recommendation")
     episode_id = final.get("episode_id")
@@ -218,7 +270,11 @@ async def search_knowledge(
     from app.retrieval.store import get_retriever
 
     retriever = get_retriever(domain)
-    evidence = await retriever.search(query, account_id=account_id, k=k)
+    # Scope retrieval to the caller's org so a non-demo user sees only their own
+    # plus shared seed evidence, never another tenant's ingested knowledge.
+    evidence = await retriever.search(
+        query, account_id=account_id, k=k, org_id=current_org_id()
+    )
 
     chunks: List[Dict[str, Any]] = []
     citations: List[Dict[str, Any]] = []
@@ -275,7 +331,10 @@ async def execute_action(
         artifact_type=artifact_type,
     )
     try:
-        out = await _execute(body)
+        # Pass the authenticated org explicitly: calling the route function
+        # directly bypasses FastAPI's dependency resolution, and the endpoint is
+        # org-scoped so a client-supplied run_id never crosses the tenant line.
+        out = await _execute(body, org_id=current_org_id())
     except HTTPException as exc:
         return {"error": exc.detail, "artifact_type": artifact_type}
     return out.model_dump()
@@ -318,10 +377,50 @@ def _find_run(run_id: str, org_id: str) -> Optional[Dict[str, Any]]:
     return run
 
 
-def _org_runs(org_id: str) -> List[Dict[str, Any]]:
-    """Return the org's runs, most recent first."""
+def _episode_runs(org_id: str) -> List[Dict[str, Any]]:
+    """Durable runs derived from persisted episodes.
 
-    runs = [r for r in _all_runs().values() if r.get("org_id") == org_id]
+    The in-memory ``_RUNS`` registry is wiped on every restart, so a follow-up
+    like "email the last run" would lose the user's real decision (and resolve
+    the wrong account). Episodes are durable and org-scoped, so we surface them
+    as runs too: this keeps the last-run lookup correct across restarts.
+    """
+
+    try:
+        from app.api._org import DEMO_ORG
+        from app.memory.store import get_memory
+
+        episodes = get_memory().all_episodes()
+    except Exception:  # noqa: BLE001 - memory slice optional
+        return []
+
+    out: List[Dict[str, Any]] = []
+    for ep in episodes:
+        ep_org = getattr(ep, "org_id", None) or DEMO_ORG
+        if ep_org != org_id:
+            continue
+        out.append(
+            {
+                "run_id": getattr(ep, "id", None),
+                "org_id": ep_org,
+                "account_id": getattr(ep, "account_id", None),
+                "domain": getattr(ep, "domain", None),
+                "status": "finished",
+                "recommendation": getattr(ep, "recommendation", None),
+                "created_at": getattr(ep, "created_at", None),
+                "episode_id": getattr(ep, "id", None),
+            }
+        )
+    return out
+
+
+def _org_runs(org_id: str) -> List[Dict[str, Any]]:
+    """Return the org's runs (live in-memory plus durable episode runs), recent first."""
+
+    live = [r for r in _all_runs().values() if r.get("org_id") == org_id]
+    seen = {r.get("episode_id") for r in live if r.get("episode_id")}
+    durable = [r for r in _episode_runs(org_id) if r.get("episode_id") not in seen]
+    runs = live + durable
     return sorted(runs, key=lambda r: r.get("created_at") or "", reverse=True)
 
 
@@ -437,28 +536,34 @@ def _connect_hint(channel: str) -> str:
     )
 
 
-def _lookup_account_record(account_id: Optional[str]) -> Dict[str, Any]:
-    """Resolve account context (best-effort, tolerant of missing slices)."""
+async def _account_contact_emails(
+    org_id: str, account_id: Optional[str]
+) -> List[str]:
+    """Return every SAVED contact email for an account, in saved order.
+
+    This is how 'email all contacts of <account>' resolves its recipients: the
+    org's own contacts linked to the account (``contacts_repo.list_for_account``),
+    never the account OWNER (the owner is a CSM name, not a customer recipient).
+    Contacts without a valid email are skipped so a name can never reach SES.
+    """
 
     if not account_id:
-        return {}
+        return []
     try:
-        from app.api.execute import _lookup_account
-
-        return _lookup_account(account_id) or {}
-    except Exception:  # noqa: BLE001 - accounts slice optional
-        return {}
-
-
-def _recipient(account_id: Optional[str]) -> Optional[str]:
-    """Pick the best email recipient for an account."""
-
-    account = _lookup_account_record(account_id)
-    return (
-        account.get("email")
-        or account.get("contact_email")
-        or account.get("owner_email")
-    )
+        from app.repositories import contacts as contacts_repo
+        from app.services.email import is_valid_email
+    except Exception:  # noqa: BLE001 - contacts / email slice optional offline
+        return []
+    try:
+        rows = await contacts_repo.list_for_account(org_id, account_id)
+    except Exception:  # noqa: BLE001 - degrade gracefully when unavailable
+        return []
+    out: List[str] = []
+    for row in rows:
+        email = (row.get("email") or "").strip()
+        if email and is_valid_email(email):
+            out.append(email)
+    return out
 
 
 def _send_slack(webhook_url: Optional[str], text: str) -> Dict[str, Any]:
@@ -493,23 +598,92 @@ def _send_gmail(
     return send_gmail(connector, to, subject, body)
 
 
+async def _resolve_contact(org_id: str, contact: str) -> Optional[Dict[str, Any]]:
+    """Resolve a saved contact by name or email within the org (best-effort)."""
+
+    try:
+        from app.repositories import contacts as contacts_repo
+
+        return await contacts_repo.find_by_name_or_email(org_id, contact)
+    except Exception:  # noqa: BLE001 - contacts slice optional / offline
+        return None
+
+
+def _split_addresses(value: Optional[str]) -> List[str]:
+    """Split a free-text address field into individual addresses.
+
+    Lets the copilot pass several addresses in one ``to`` string (comma,
+    semicolon, or whitespace separated), e.g. 'ops@x.com, lead@x.com'.
+    """
+
+    if not value:
+        return []
+    parts = value.replace(";", ",").replace("\n", ",").split(",")
+    out: List[str] = []
+    for part in parts:
+        for token in part.split():
+            token = token.strip()
+            if token:
+                out.append(token)
+    return out
+
+
 async def send_artifact(
     channel: str = "email",
     run_id: Optional[str] = None,
     recommendation: Optional[Dict[str, Any]] = None,
     account_id: Optional[str] = None,
     to: Optional[str] = None,
+    contact: Optional[str] = None,
+    contacts: Optional[List[str]] = None,
+    recipients: Optional[List[str]] = None,
+    all_account_contacts: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """Send a run's recommendation to a channel using the org's connectors.
 
     Resolves the recommendation (inline, by ``run_id``, or the org's most
     recent run), generates the matching artifact (email or Slack message), and
-    delivers it through the org's configured connector. Refuses (never raises)
-    when the channel is not connected, telling the user to connect it in
-    Settings. This is the same send path the execute API uses.
+    delivers it through the org's configured connector. For email it can fan out
+    to several people at once: pass any number of saved contacts (``contact`` /
+    ``contacts``, by name or email) plus any number of explicit addresses
+    (``to`` / ``recipients``), and it sends to each so the copilot can 'email the
+    play to ops@x.com and the account contact'.
+
+    EMAIL ALL OF AN ACCOUNT'S CONTACTS: to 'email the play to all contacts of
+    <account>', pass ``account_id`` and set ``all_account_contacts`` true (this
+    is also the default when no explicit recipient is given). It resolves the
+    account's SAVED contacts and emails every one of them. It NEVER uses the
+    account owner name as an address; contacts without a valid email are skipped;
+    if the account has no contacts it returns ``reason='no_contacts'`` instead of
+    guessing.
+
+    Refuses (never raises) when the channel is not connected, telling the user to
+    connect it in Settings. This is the same send path the execute API uses.
     """
 
     org_id = current_org_id()
+    # Resolve every saved contact (single ``contact`` plus the ``contacts`` list)
+    # to an address up front so 'email the recommendation to Dana and ops@x.com'
+    # targets the saved person and the literal address.
+    contact_emails: List[str] = []
+    contact_queries = list(contacts or [])
+    if contact:
+        contact_queries.append(contact)
+    for query in contact_queries:
+        # A literal email address can be sent to directly without a lookup.
+        if "@" in str(query):
+            contact_emails.append(str(query).strip())
+            continue
+        resolved = await _resolve_contact(org_id, query)
+        if resolved is None:
+            # The query did not match a specific saved contact (e.g. "all
+            # contacts", "halcyon contacts", a typo). Do NOT hard-fail: treat it
+            # as "email the account's contacts" and let the fan-out below resolve
+            # every saved contact of the run's account.
+            continue
+        if resolved.get("email"):
+            contact_emails.append(str(resolved["email"]))
+        account_id = account_id or resolved.get("account_id")
     channel = (channel or "email").lower().strip()
     kind = _CHANNEL_KIND.get(channel)
     if kind is None:
@@ -594,19 +768,111 @@ async def send_artifact(
         }
     artifact = gen.get("artifact", {}) if isinstance(gen, dict) else {}
 
+    # The senders below use synchronous HTTP / boto3 clients; offload them so a
+    # slow Slack or SES round-trip never blocks the event loop (offline / no-creds
+    # paths return before any network).
     if kind == "slack":
         config = (connector or {}).get("config") or {}
         text = artifact.get("message") or artifact.get("body") or ""
-        result = _send_slack(config.get("webhook_url"), text)
+        result = await run_in_threadpool(_send_slack, config.get("webhook_url"), text)
         meta: Dict[str, Any] = {"channel": "slack", "preview": text[:280]}
     else:  # email / gmail / google all send via SES
         from app.config import settings
 
-        recipient = to or _recipient(account_id)
+        # Explicit recipients the caller named: resolved saved contacts
+        # (``contact`` / ``contacts``), the ``recipients`` list, and a possibly
+        # multi-address ``to``.
+        explicit = list(contact_emails)
+        explicit.extend(recipients or [])
+        explicit.extend(_split_addresses(to))
+
+        # When no explicit recipient is given, or the caller asked to email the
+        # whole account, fan out to EVERY saved contact of the account. We never
+        # fall back to the account owner name (which is not an email address).
+        fan_all = bool(all_account_contacts) or not explicit
+        account_emails: List[str] = []
+        if fan_all:
+            account_emails = await _account_contact_emails(org_id, account_id)
+
+        # Dedupe case-insensitively, preserving order (explicit first).
+        seen: set[str] = set()
+        addresses: List[str] = []
+        for addr in [*explicit, *account_emails]:
+            clean = (addr or "").strip()
+            if not clean or clean.lower() in seen:
+                continue
+            seen.add(clean.lower())
+            addresses.append(clean)
+
+        if not addresses:
+            # Asked to email the account's contacts but it has none: say so
+            # plainly instead of guessing the owner name.
+            if fan_all and account_id:
+                return {
+                    "sent": False,
+                    "reason": "no_contacts",
+                    "channel": channel,
+                    "run_id": resolved_run_id,
+                    "account_id": account_id,
+                    "message": (
+                        f"{account_id} has no saved contacts with an email. Add "
+                        "contacts on the Contacts page, or give me an address."
+                    ),
+                }
+            return {
+                "sent": False,
+                "reason": "no_recipient",
+                "channel": channel,
+                "run_id": resolved_run_id,
+                "account_id": account_id,
+                "message": (
+                    "No recipient to email. Give me an address, or an account "
+                    "with saved contacts."
+                ),
+            }
+
         subject = artifact.get("subject", "")
         body = artifact.get("body", "")
-        result = _send_email(recipient, subject, body, settings.ses_sender_email)
-        meta = {"channel": "email", "to": recipient, "subject": subject}
+        # Map each address back to its EXACT saved contact name so the assistant
+        # reports real names instead of guessing one from the email address.
+        name_by_email: Dict[str, str] = {}
+        if account_id:
+            try:
+                from app.repositories import contacts as contacts_repo
+
+                for c in await contacts_repo.list_for_account(org_id, account_id):
+                    em = str(c.get("email") or "").strip().lower()
+                    if em and c.get("name"):
+                        name_by_email[em] = str(c["name"])
+            except Exception:  # noqa: BLE001 - names are best effort
+                pass
+        per: List[Dict[str, Any]] = []
+        for addr in addresses:
+            one = await run_in_threadpool(
+                _send_email, addr, subject, body, settings.ses_sender_email
+            )
+            per.append(
+                {
+                    "to": addr,
+                    "name": name_by_email.get(addr.strip().lower()),
+                    "sent": bool(one.get("sent")),
+                    "reason": one.get("reason"),
+                    "detail": one.get("detail") or one.get("message_id"),
+                }
+            )
+        if not per:
+            result = {"sent": False, "reason": "no_recipient"}
+        else:
+            sent_any = any(p["sent"] for p in per)
+            result = {
+                "sent": sent_any,
+                "reason": None
+                if sent_any
+                else next((p["reason"] for p in per if p["reason"]), None),
+                "results": per,
+            }
+        to_line = ", ".join(p["to"] for p in per) or None
+        meta = {"channel": "email", "to": to_line, "subject": subject}
 
     out: Dict[str, Any] = {
         **meta,
@@ -640,7 +906,7 @@ async def ingest_interaction(
         domain=domain,
     )
     try:
-        return await _ingest(body)
+        return await _ingest(body, org_id=current_org_id())
     except HTTPException as exc:
         return {"error": exc.detail}
 
@@ -650,7 +916,7 @@ async def get_learning() -> Dict[str, Any]:
 
     from app.api.learning import get_learning as _get_learning
 
-    return await _get_learning()
+    return await _get_learning(org_id=current_org_id())
 
 
 async def get_eval() -> Dict[str, Any]:
@@ -658,7 +924,7 @@ async def get_eval() -> Dict[str, Any]:
 
     from app.api.eval import get_eval as _get_eval
 
-    return await _get_eval(refresh=False)
+    return await _get_eval(refresh=False, org_id=current_org_id())
 
 
 # ---------------------------------------------------------------------------
@@ -855,9 +1121,15 @@ TOOLS: Dict[str, Tool] = {
             "'slack' posts via the org's incoming webhook (must be connected in "
             "Settings). Resolves the recommendation from an inline object, a "
             "run_id, or the org's most recent run, generates the artifact, and "
-            "delivers it. Pass 'to' to email a specific address; otherwise it "
-            "uses the account's contact. Use for 'email the latest run to "
-            "someone@x.com' or 'send the Northwind play to slack'."
+            "delivers it. Pass 'to' to email a specific address, or 'contact' / "
+            "'contacts' to resolve saved people by name or email. To EMAIL ALL "
+            "CONTACTS OF AN ACCOUNT (for example 'email the play to all contacts "
+            "of Northwind' or 'email everyone at ACC-1001'), pass 'account_id' "
+            "and set 'all_account_contacts' true: it emails every SAVED contact "
+            "of that account and never uses the account owner name as an address. "
+            "Use for 'email the latest run to someone@x.com', 'email the "
+            "recommendation to Dana', 'email all contacts of ACC-1001', or 'send "
+            "the Northwind play to slack'."
         ),
         parameters={
             "type": "object",
@@ -870,6 +1142,34 @@ TOOLS: Dict[str, Tool] = {
                 "to": {
                     "type": "string",
                     "description": "Optional explicit email recipient address.",
+                },
+                "contact": {
+                    "type": "string",
+                    "description": (
+                        "Optional saved contact to resolve the recipient by name "
+                        "or email, e.g. 'Dana Lee' or 'dana@acme.com'."
+                    ),
+                },
+                "contacts": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "Optional list of saved contacts (names or emails) to "
+                        "email in one send."
+                    ),
+                },
+                "recipients": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional list of explicit email addresses.",
+                },
+                "all_account_contacts": {
+                    "type": "boolean",
+                    "description": (
+                        "Set true to email EVERY saved contact of 'account_id' "
+                        "(use for 'email all contacts of <account>'). Defaults to "
+                        "on when no explicit recipient is given."
+                    ),
                 },
                 "run_id": {
                     "type": "string",

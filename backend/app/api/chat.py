@@ -5,8 +5,11 @@ Two endpoints share one agent (``app.chat.agent``):
 * ``POST /chat/stream`` streams the agent's work as Server Sent Events using the
   same envelope style as the runs API: a monotonic ``seq`` and a typed payload.
   Event types: ``message`` (answer text), ``tool.called`` ({tool, args}),
-  ``tool.result`` ({tool, summary}), and a final ``message`` carrying the full
-  answer and the tool trace.
+  ``tool.result`` ({tool, summary}), ``thinking`` ({text?}: a lightweight
+  reasoning pulse emitted when the agent starts and between tool calls, carrying
+  the model's reasoning summary when it exposes one), and a final ``message``
+  carrying the full answer and the tool trace. The event stream is additive: new
+  event types (like ``thinking``) and fields may be added, never removed.
 
 * ``POST /chat`` runs the agent to completion and returns the final answer plus
   the tool trace in one JSON response.
@@ -27,6 +30,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
+from app.api._org import current_org
 from app.api.runs import require_auth
 from app.chat import agent as chat_agent
 
@@ -75,7 +79,9 @@ def _envelope(seq: int, event_type: str, data: Dict[str, Any]) -> Dict[str, str]
 
 
 @router.post("/chat/stream")
-async def chat_stream(body: ChatIn) -> EventSourceResponse:
+async def chat_stream(
+    body: ChatIn, org_id: str = Depends(current_org)
+) -> EventSourceResponse:
     """Stream the agent's tokens, tool calls, and final answer as SSE."""
 
     messages = [m.model_dump() for m in body.messages]
@@ -85,7 +91,9 @@ async def chat_stream(body: ChatIn) -> EventSourceResponse:
         yield _envelope(seq, "chat.started", {"messages": len(messages)})
         seq += 1
         try:
-            async for event in chat_agent.stream(messages, body.context):
+            # Pass the authenticated org so every tool runs under THIS tenant,
+            # never a client-supplied or default org.
+            async for event in chat_agent.stream(messages, body.context, org_id=org_id):
                 yield _envelope(seq, event["type"], event["data"])
                 seq += 1
         except Exception:  # noqa: BLE001 - keep the stream contract intact
@@ -95,11 +103,11 @@ async def chat_stream(body: ChatIn) -> EventSourceResponse:
 
 
 @router.post("/chat", response_model=ChatOut)
-async def chat(body: ChatIn) -> ChatOut:
+async def chat(body: ChatIn, org_id: str = Depends(current_org)) -> ChatOut:
     """Run the agent to completion and return the final answer plus tool trace."""
 
     messages = [m.model_dump() for m in body.messages]
-    result = await chat_agent.answer(messages, body.context)
+    result = await chat_agent.answer(messages, body.context, org_id=org_id)
     return ChatOut(answer=result["answer"], trace=result["trace"])
 
 
@@ -109,7 +117,6 @@ async def chat(body: ChatIn) -> ChatOut:
 
 from fastapi import HTTPException  # noqa: E402
 
-from app.api._org import current_org  # noqa: E402
 from app.repositories import chat_sessions as chat_repo  # noqa: E402
 
 

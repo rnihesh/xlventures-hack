@@ -18,6 +18,7 @@ Both paths are exposed as async generators that yield typed events
 
 from __future__ import annotations
 
+import asyncio
 import functools
 import json
 import re
@@ -27,6 +28,13 @@ from app.chat import tools as toolkit
 
 # Hard cap on tool-calling iterations so a misbehaving model cannot loop forever.
 _MAX_STEPS = 6
+
+# Pacing for the offline (DEMO) path so the deterministic reply streams visibly
+# without a key: a brief pause while a tool "runs" (called -> result) and a small
+# gap between text chunks. Kept tiny so tests and the non-streaming path stay fast.
+_TOOL_DELAY = 0.12
+_CHUNK_DELAY = 0.02
+_WORDS_PER_CHUNK = 3
 
 _SYSTEM_PROMPT = (
     "You are the assistant for an Intelligent Next Best Action platform. You "
@@ -40,6 +48,13 @@ _SYSTEM_PROMPT = (
     "evidence, or run_nba for a recommendation) rather than stopping after one "
     "call. When you cite knowledge, mention the source ids. Format answers in "
     "clean markdown (headings, bold, lists, tables) and keep them grounded.\n\n"
+    "NO HALLUCINATION: Never invent, embellish, or guess any fact that is not "
+    "present in a tool result. Report names, emails, numbers, ids, and "
+    "recipients EXACTLY as the tools return them. Do NOT add or expand names "
+    "(for example, do not turn a contact named 'Nihesh' into 'Nihesh Reddy', or "
+    "derive a person's name from their email address). If a detail was not "
+    "returned by a tool, do not state it. When you report who an email was sent "
+    "to, list the exact addresses the send tool returned.\n\n"
     "ACTING ON RUNS: You can reference a prior run and act on it. Use "
     "get_last_run / get_run to pull a stored recommendation, then chain "
     "send_artifact to deliver it, and tag_run to associate a run with an "
@@ -131,10 +146,84 @@ def _to_lc_messages(messages: List[Dict[str, str]]) -> List[Any]:
     return lc
 
 
+def _delta_text(chunk: Any) -> str:
+    """Pull the incremental text from a streamed message chunk, if any."""
+
+    content = getattr(chunk, "content", "")
+    if isinstance(content, str):
+        return content
+    # Some providers stream content as a list of parts; concatenate text parts.
+    if isinstance(content, list):
+        out = []
+        for part in content:
+            if isinstance(part, str):
+                out.append(part)
+            elif isinstance(part, dict) and isinstance(part.get("text"), str):
+                out.append(part["text"])
+        return "".join(out)
+    return ""
+
+
+def _reasoning_text(chunk: Any) -> str:
+    """Best-effort extraction of a model's exposed reasoning/summary delta.
+
+    Reasoning-capable models (and the OpenAI Responses API) surface their
+    thinking outside ``content``: in ``additional_kwargs`` under keys like
+    ``reasoning`` / ``reasoning_content``, sometimes as a string and sometimes as
+    a ``{summary: [{text}]}`` structure. We read it defensively so a 'thinking'
+    pulse can carry real summary text when available, and stay silent otherwise.
+    """
+
+    ak = getattr(chunk, "additional_kwargs", None)
+    if not isinstance(ak, dict):
+        return ""
+    for key in ("reasoning_content", "reasoning"):
+        val = ak.get(key)
+        if isinstance(val, str) and val.strip():
+            return val
+        if isinstance(val, dict):
+            summary = val.get("summary")
+            if isinstance(summary, list):
+                texts = [
+                    s.get("text")
+                    for s in summary
+                    if isinstance(s, dict) and isinstance(s.get("text"), str)
+                ]
+                joined = "".join(t for t in texts if t)
+                if joined.strip():
+                    return joined
+            text = val.get("text")
+            if isinstance(text, str) and text.strip():
+                return text
+    return ""
+
+
+async def _stream_model(model: Any, convo: List[Any]):
+    """Stream a model turn, yielding ('delta', text) for answer tokens and
+    ('reasoning', text) for any exposed thinking, then ('done', message) with the
+    fully accumulated message (carrying any tool calls) at the end."""
+
+    gathered = None
+    async for chunk in model.astream(convo):
+        gathered = chunk if gathered is None else gathered + chunk
+        reasoning = _reasoning_text(chunk)
+        if reasoning:
+            yield ("reasoning", reasoning)
+        delta = _delta_text(chunk)
+        if delta:
+            yield ("delta", delta)
+    yield ("done", gathered)
+
+
 async def _stream_llm(
     messages: List[Dict[str, str]], context: Optional[Dict[str, Any]]
 ) -> AsyncIterator[Dict[str, Any]]:
-    """Drive real OpenAI tool-calling, yielding events until a final answer."""
+    """Drive real OpenAI tool-calling, streaming tokens as the model produces them.
+
+    Token deltas are emitted as ``message`` events the instant they arrive, tool
+    calls stream as ``tool.called`` / ``tool.result`` as they happen, and the
+    accumulated answer is sent once in a closing ``final`` frame.
+    """
 
     from langchain_core.messages import ToolMessage
 
@@ -145,17 +234,35 @@ async def _stream_llm(
 
     convo = _to_lc_messages(messages)
     trace: List[Dict[str, Any]] = []
+    full_text = ""
 
-    for _ in range(_MAX_STEPS):
-        ai = await bound.ainvoke(convo)
+    # Lightweight 'thinking' pulse the instant the turn starts, so the UI can show
+    # a Thinking indicator before any token or tool call arrives.
+    yield _event("thinking", {"text": "Analyzing your request"})
+
+    for step in range(_MAX_STEPS):
+        ai = None
+        async for kind, payload in _stream_model(bound, convo):
+            if kind == "delta":
+                full_text += payload
+                yield _event("message", {"content": payload})
+            elif kind == "reasoning":
+                # Surface the model's own reasoning/summary text when exposed.
+                yield _event("thinking", {"text": payload})
+            else:
+                ai = payload
+        if ai is None:
+            break
         convo.append(ai)
 
         tool_calls = getattr(ai, "tool_calls", None) or []
         if not tool_calls:
-            text = ai.content if isinstance(ai.content, str) else str(ai.content)
-            yield _event("message", {"content": text})
-            yield _event("final", {"content": text, "trace": trace})
+            yield _event("final", {"content": full_text, "trace": trace})
             return
+
+        # About to act: a thinking pulse between reasoning and tool execution.
+        names = ", ".join(c.get("name") or "tool" for c in tool_calls)
+        yield _event("thinking", {"text": f"Using {names}"})
 
         for call in tool_calls:
             name = call.get("name")
@@ -172,11 +279,17 @@ async def _stream_llm(
                 )
             )
 
-    # Exhausted the step budget: ask the model for a final summary with no tools.
-    final_ai = await llm.ainvoke(convo)
-    text = final_ai.content if isinstance(final_ai.content, str) else str(final_ai.content)
-    yield _event("message", {"content": text})
-    yield _event("final", {"content": text, "trace": trace})
+        # Tools done for this round: signal that we are reasoning over results.
+        yield _event("thinking", {"text": "Reviewing results"})
+
+    # Exhausted the step budget: stream a final summary with no further tools.
+    async for kind, payload in _stream_model(llm, convo):
+        if kind == "delta":
+            full_text += payload
+            yield _event("message", {"content": payload})
+        elif kind == "reasoning":
+            yield _event("thinking", {"text": payload})
+    yield _event("final", {"content": full_text, "trace": trace})
 
 
 # ---------------------------------------------------------------------------
@@ -277,8 +390,12 @@ def _route(message: str, context: Optional[Dict[str, Any]]) -> List[Dict[str, An
     mentions_channel = has("email", "slack", "gmail")
     mentions_run = has("run", "recommendation", "last run", "play", "the rec")
     mentions_send = has("send", "fire off", "shoot over", "deliver", "forward")
-    if (mentions_channel and (mentions_run or mentions_send)) or (
-        mentions_send and mentions_run
+    # 'email all contacts of <account>' / 'email everyone at ACC-1001' is also a
+    # send: a plural/'everyone' contact reference triggers the fan-out.
+    mentions_contacts = has("contact", "everyone")
+    if (
+        (mentions_channel and (mentions_run or mentions_send or mentions_contacts))
+        or (mentions_send and (mentions_run or mentions_contacts))
     ):
         channel = "slack" if "slack" in lowered else ("gmail" if "gmail" in lowered else "email")
         send_args: Dict[str, Any] = {"channel": channel}
@@ -289,6 +406,10 @@ def _route(message: str, context: Optional[Dict[str, Any]]) -> List[Dict[str, An
             send_args["recommendation"] = ctx["recommendation"]
         if account_id:
             send_args["account_id"] = account_id
+        # Fan out to every saved contact of the account when the user asks for
+        # the account's contacts ('all contacts', 'every contact', 'everyone').
+        if has("contacts", "everyone", "every contact", "all contacts"):
+            send_args["all_account_contacts"] = True
         return [{"tool": "send_artifact", "args": send_args}]
 
     # Tag / associate a run with an account or note.
@@ -546,10 +667,42 @@ def _compose_answer(calls: List[Dict[str, Any]], results: List[Any]) -> str:
     return "\n\n".join(p for p in parts if p)
 
 
+def _text_chunks(text: str, words_per_chunk: int = _WORDS_PER_CHUNK) -> List[str]:
+    """Split text into whitespace-preserving word groups for progressive streaming.
+
+    Each returned chunk keeps its trailing whitespace so concatenating the chunks
+    reproduces the original answer exactly (the client appends deltas verbatim).
+    """
+
+    tokens = re.split(r"(\s+)", text)
+    chunks: List[str] = []
+    buf = ""
+    words = 0
+    for tok in tokens:
+        if tok == "":
+            continue
+        buf += tok
+        if tok.strip():
+            words += 1
+        if words >= words_per_chunk:
+            chunks.append(buf)
+            buf = ""
+            words = 0
+    if buf:
+        chunks.append(buf)
+    return chunks
+
+
 async def _stream_offline(
     messages: List[Dict[str, str]], context: Optional[Dict[str, Any]]
 ) -> AsyncIterator[Dict[str, Any]]:
-    """Deterministic router path: route, execute, compose, yield events."""
+    """Deterministic router path: route, execute, compose, then stream the reply.
+
+    Tool calls stream as they run (a ``tool.called`` then, after the tool resolves,
+    a ``tool.result``) and the composed answer is chunked into ``message`` deltas
+    so the streaming UX is visible with no key. The closing ``final`` carries the
+    full answer and trace.
+    """
 
     user_msg = ""
     for msg in reversed(messages):
@@ -563,18 +716,30 @@ async def _stream_offline(
     results: List[Any] = []
     trace: List[Dict[str, Any]] = []
 
+    # Offline still emits a sensible 'thinking' pulse so the UI's Thinking
+    # indicator behaves the same with or without a key.
+    yield _event("thinking", {"text": "Working through your request"})
+    await asyncio.sleep(_CHUNK_DELAY)
+
     for call in calls:
         name = call["tool"]
         args = call.get("args") or {}
+        # A pulse naming the capability about to run, between sequential tools.
+        yield _event("thinking", {"text": f"Calling {name}"})
         yield _event("tool.called", {"tool": name, "args": args})
+        # Brief pause so the "running" state is perceptible before the result.
+        await asyncio.sleep(_TOOL_DELAY)
         result = await toolkit.run_tool(name, args)
         results.append(result)
         summary = _summarize_result(name, result)
         trace.append({"tool": name, "args": args, "summary": summary})
         yield _event("tool.result", {"tool": name, "summary": summary})
 
+    yield _event("thinking", {"text": "Composing the answer"})
     answer = _compose_answer(calls, results) or "I am not sure how to help with that yet."
-    yield _event("message", {"content": answer})
+    for chunk in _text_chunks(answer):
+        yield _event("message", {"content": chunk})
+        await asyncio.sleep(_CHUNK_DELAY)
     yield _event("final", {"content": answer, "trace": trace})
 
 
@@ -590,7 +755,9 @@ def _use_offline() -> bool:
 
 
 async def stream(
-    messages: List[Dict[str, str]], context: Optional[Dict[str, Any]] = None
+    messages: List[Dict[str, str]],
+    context: Optional[Dict[str, Any]] = None,
+    org_id: Optional[str] = None,
 ) -> AsyncIterator[Dict[str, Any]]:
     """Stream agent events for a conversation, picking the right path.
 
@@ -598,9 +765,12 @@ async def stream(
     transient model error) so the chat never hard-fails mid-stream.
     """
 
-    # Bind the caller's org for this turn so org-scoped tools (runs, connectors)
-    # resolve correctly. Offline this is the demo org.
-    toolkit.set_current_org((context or {}).get("org_id"))
+    # Bind the caller's org for this turn so every org-scoped tool (retrieval,
+    # runs, ingest, connectors) resolves to the authenticated tenant. The org
+    # comes from the request's authenticated principal (``org_id``), which always
+    # wins over any client-supplied context hint so a caller cannot read another
+    # org's data by spoofing context. Offline (no auth) this is the demo org.
+    toolkit.set_current_org(org_id or (context or {}).get("org_id"))
 
     if _use_offline():
         async for event in _stream_offline(messages, context):
@@ -616,13 +786,15 @@ async def stream(
 
 
 async def answer(
-    messages: List[Dict[str, str]], context: Optional[Dict[str, Any]] = None
+    messages: List[Dict[str, str]],
+    context: Optional[Dict[str, Any]] = None,
+    org_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Run the agent to completion and return the final answer plus tool trace."""
 
     final_content = ""
     trace: List[Dict[str, Any]] = []
-    async for event in stream(messages, context):
+    async for event in stream(messages, context, org_id=org_id):
         if event["type"] == "final":
             final_content = event["data"].get("content", "")
             trace = event["data"].get("trace", [])
