@@ -78,9 +78,12 @@ class Settings(BaseSettings):
     # Comma-separated exact origins (e.g. "http://localhost:3200,http://localhost:3001").
     cors_origins: str = "http://localhost:3200"
     # Regex matching whole origins, for wildcard subdomains. Defaults to any
-    # niheshr.com subdomain over http or https (aperture.niheshr.com,
-    # aperture-api.niheshr.com, ...). Override with CORS_ORIGIN_REGEX.
-    cors_origin_regex: str = r"https?://([a-z0-9-]+\.)*niheshr\.com"
+    # niheshr.com subdomain over HTTPS only (aperture.niheshr.com,
+    # aperture-api.niheshr.com, ...): credentialed CORS must not allow plaintext
+    # http origins. Local http://localhost stays allowed via cors_origins above.
+    # Anchored (re.fullmatch), so lookalikes like evilniheshr.com never match.
+    # Override with CORS_ORIGIN_REGEX (e.g. list exact origins for a stricter set).
+    cors_origin_regex: str = r"https://([a-z0-9-]+\.)*niheshr\.com"
 
     @field_validator("jwt_secret", mode="before")
     @classmethod
