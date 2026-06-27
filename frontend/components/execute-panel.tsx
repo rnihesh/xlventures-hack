@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Check,
@@ -10,15 +10,21 @@ import {
   ListTodo,
   Loader2,
   Mail,
+  Plus,
   PlugZap,
+  RefreshCw,
   Send,
   Settings,
+  User,
+  X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { listContacts, type Contact } from "@/lib/api/contacts";
 import {
   Card,
   CardContent,
@@ -74,6 +80,13 @@ const CHANNEL_NOUN: Record<ArtifactType, string> = {
   crm_task: "CRM",
   slack: "Slack",
 };
+
+// A saved-but-not-yet-sent generated artifact for one kind. Cached in component
+// state so switching tabs shows the saved draft instead of regenerating it.
+interface CachedArtifact {
+  artifact: Artifact;
+  audit: AuditRecord;
+}
 
 // A not-sent result is a missing-connection state (vs a hard failure) when the
 // backend reports a *_not_configured / *_not_connected reason.
@@ -136,6 +149,38 @@ function Field({
   );
 }
 
+// A removable recipient chip (a saved contact or a typed address).
+function RecipientChip({
+  label,
+  title,
+  onRemove,
+}: {
+  label: string;
+  title?: string;
+  onRemove: () => void;
+}) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 py-0.5 pl-2.5 pr-1 text-xs"
+      title={title}
+    >
+      {label}
+      <button
+        type="button"
+        onClick={onRemove}
+        className="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        aria-label={`Remove ${label}`}
+      >
+        <X className="size-3" />
+      </button>
+    </span>
+  );
+}
+
+function looksLikeEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
 export function ExecutePanel({
   recommendation,
   runId,
@@ -144,21 +189,99 @@ export function ExecutePanel({
 }: ExecutePanelProps) {
   const [activeType, setActiveType] = useState<ArtifactType | null>(null);
   const [pendingType, setPendingType] = useState<ArtifactType | null>(null);
-  const [artifact, setArtifact] = useState<Artifact | null>(null);
-  const [audit, setAudit] = useState<AuditRecord | null>(null);
+  // Generated artifacts cached per kind: the first click of a kind generates
+  // once, switching tabs shows the saved draft, and Regenerate re-runs it.
+  const [cache, setCache] = useState<
+    Partial<Record<ArtifactType, CachedArtifact>>
+  >({});
+  // Send outcomes cached per kind so a sent email stays "sent" after switching.
+  const [sendResults, setSendResults] = useState<
+    Partial<Record<ArtifactType, SendResult>>
+  >({});
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const [sendResult, setSendResult] = useState<SendResult | null>(null);
 
+  // Email recipients: any number of saved contacts plus any number of typed
+  // addresses. The send fans out to all of them; empty falls back to the
+  // account's own contact.
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
+  const [customEmails, setCustomEmails] = useState<string[]>([]);
+  const [emailInput, setEmailInput] = useState<string>("");
+
+  const active = activeType ? cache[activeType] : undefined;
+  const artifact = active?.artifact ?? null;
+  const audit = active?.audit ?? null;
+  const sendResult = (activeType ? sendResults[activeType] : null) ?? null;
   const sent = sendResult?.sent === true;
 
-  const resolvedAccountId =
-    accountId ?? recommendation?.account_id ?? null;
+  const resolvedAccountId = accountId ?? recommendation?.account_id ?? null;
 
-  async function run(type: ArtifactType) {
-    setPendingType(type);
+  // Load the org's contacts once so the email picker can target saved people.
+  useEffect(() => {
+    const ctrl = new AbortController();
+    void listContacts(ctrl.signal).then(setContacts);
+    return () => ctrl.abort();
+  }, []);
+
+  const selectedContacts = selectedContactIds
+    .map((id) => contacts.find((c) => c.id === id))
+    .filter((c): c is Contact => Boolean(c));
+
+  // True when the user has chosen at least one explicit recipient. When false,
+  // an email send falls back to the account's own contact.
+  const hasExplicitRecipients =
+    selectedContacts.length > 0 || customEmails.length > 0;
+
+  function addContact(id: string) {
+    if (!id) return;
+    setSelectedContactIds((prev) =>
+      prev.includes(id) ? prev : [...prev, id],
+    );
+    setSendResults((prev) => ({ ...prev, email: undefined }));
+  }
+
+  function removeContact(id: string) {
+    setSelectedContactIds((prev) => prev.filter((c) => c !== id));
+    setSendResults((prev) => ({ ...prev, email: undefined }));
+  }
+
+  function addEmail() {
+    const value = emailInput.trim();
+    if (!value) return;
+    if (!looksLikeEmail(value)) {
+      toast("That does not look like an email", {
+        description: "Enter an address like name@company.com.",
+        variant: "error",
+      });
+      return;
+    }
+    setCustomEmails((prev) =>
+      prev.some((e) => e.toLowerCase() === value.toLowerCase())
+        ? prev
+        : [...prev, value],
+    );
+    setEmailInput("");
+    setSendResults((prev) => ({ ...prev, email: undefined }));
+  }
+
+  function removeEmail(value: string) {
+    setCustomEmails((prev) => prev.filter((e) => e !== value));
+    setSendResults((prev) => ({ ...prev, email: undefined }));
+  }
+
+  // Contacts not already chosen, for the "add a saved contact" dropdown.
+  const availableContacts = contacts.filter(
+    (c) => !selectedContactIds.includes(c.id),
+  );
+
+  // Generate (or regenerate) the artifact for a kind. With force=false an
+  // already-cached kind is just shown again (no network, no regeneration).
+  async function run(type: ArtifactType, force = false) {
+    setActiveType(type);
     setError(null);
-    setSendResult(null);
+    if (!force && cache[type]) return;
+    setPendingType(type);
     try {
       const res = await executeAction({
         artifact_type: type,
@@ -166,10 +289,13 @@ export function ExecutePanel({
         recommendation: recommendation ?? undefined,
         account_id: resolvedAccountId ?? undefined,
       });
-      setArtifact(res.artifact);
-      setAudit(res.audit);
-      setActiveType(type);
-      toast(`${TYPE_LABEL[type]} ready`, {
+      setCache((prev) => ({
+        ...prev,
+        [type]: { artifact: res.artifact, audit: res.audit },
+      }));
+      // A fresh draft invalidates any prior send for this kind.
+      setSendResults((prev) => ({ ...prev, [type]: undefined }));
+      toast(`${TYPE_LABEL[type]} ${force ? "regenerated" : "ready"}`, {
         description: "Review, edit inline, and copy it when you are happy.",
         variant: "success",
       });
@@ -201,19 +327,36 @@ export function ExecutePanel({
     return "";
   }
 
+  // Patch the active kind's cached artifact in place. An edit invalidates a
+  // prior send so the user can re-send the revision.
   function patch(next: Partial<Artifact>) {
-    setArtifact((prev) => (prev ? ({ ...prev, ...next } as Artifact) : prev));
-    // An edit invalidates a prior send so the user can re-send the revision.
-    setSendResult(null);
+    if (!activeType) return;
+    const type = activeType;
+    setCache((prev) => {
+      const cur = prev[type];
+      if (!cur) return prev;
+      return {
+        ...prev,
+        [type]: { ...cur, artifact: { ...cur.artifact, ...next } as Artifact },
+      };
+    });
+    setSendResults((prev) => ({ ...prev, [type]: undefined }));
   }
 
-  // Recipient shown in the success line: where the artifact actually went.
+  // Recipient(s) shown in the success line: where the artifact actually went.
   function sentTo(result: SendResult): string | null {
     if (result.to) return result.to;
-    if (activeType && isSlack(artifact as Artifact, activeType)) {
+    if (activeType && artifact && isSlack(artifact, activeType)) {
       return (artifact as SlackArtifact).channel;
     }
-    if (activeType === "email" && resolvedAccountId) return resolvedAccountId;
+    if (activeType === "email") {
+      if (selectedContacts.length || customEmails.length) {
+        return [...selectedContacts.map((c) => c.email), ...customEmails].join(
+          ", ",
+        );
+      }
+      return resolvedAccountId;
+    }
     return null;
   }
 
@@ -222,29 +365,38 @@ export function ExecutePanel({
   // result is rendered inline (success or connect-in-settings), never a throw.
   async function send() {
     if (!artifact || !activeType || sending) return;
+    const type = activeType;
     setSending(true);
     setError(null);
     const action = recommendation?.action;
     try {
       const result = await sendArtifact({
-        artifact_type: activeType,
+        artifact_type: type,
         artifact,
         run_id: runId ?? undefined,
         account_id: resolvedAccountId ?? undefined,
         recommendation_id: recommendation?.id ?? undefined,
         action_key: action?.key ?? undefined,
+        // For email, target the chosen saved contacts and/or typed addresses.
+        // Omitted when none are set, so the backend falls back to the account.
+        contact_ids:
+          type === "email" && selectedContactIds.length
+            ? selectedContactIds
+            : undefined,
+        recipients:
+          type === "email" && customEmails.length ? customEmails : undefined,
       });
-      setSendResult(result);
+      setSendResults((prev) => ({ ...prev, [type]: result }));
       if (result.sent) {
         const where = sentTo(result);
-        toast(`${TYPE_LABEL[activeType]} sent`, {
+        toast(`${TYPE_LABEL[type]} sent`, {
           description: where
             ? `Delivered to ${where}.`
             : "Delivered successfully.",
           variant: "success",
         });
       } else {
-        toast(`${CHANNEL_NOUN[activeType]} not connected`, {
+        toast(`${CHANNEL_NOUN[type]} not connected`, {
           description: "Connect it in Settings, then send again.",
           variant: "info",
         });
@@ -253,6 +405,8 @@ export function ExecutePanel({
       setSending(false);
     }
   }
+
+  const regenerating = pendingType !== null && pendingType === activeType;
 
   return (
     <Card className={cn("w-full", className)}>
@@ -280,6 +434,7 @@ export function ExecutePanel({
           {ACTIONS.map(({ type, label, icon: Icon }) => {
             const loading = pendingType === type;
             const isActive = activeType === type;
+            const isCached = Boolean(cache[type]);
             return (
               <Button
                 key={type}
@@ -292,6 +447,8 @@ export function ExecutePanel({
               >
                 {loading ? (
                   <Loader2 className="animate-spin" />
+                ) : isCached ? (
+                  <Check className={isActive ? "" : "text-primary"} />
                 ) : (
                   <Icon />
                 )}
@@ -301,9 +458,7 @@ export function ExecutePanel({
           })}
         </div>
 
-        {error ? (
-          <p className="text-sm text-destructive">{error}</p>
-        ) : null}
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
         {artifact && activeType ? (
           <div className="space-y-4 rounded-xl border border-border bg-background/50 p-4">
@@ -317,6 +472,21 @@ export function ExecutePanel({
                 </Badge>
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => run(activeType, true)}
+                  disabled={pendingType !== null}
+                  className="gap-1.5"
+                >
+                  {regenerating ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <RefreshCw />
+                  )}
+                  Regenerate
+                </Button>
                 <CopyButton text={copyText()} />
                 <Button
                   type="button"
@@ -339,6 +509,85 @@ export function ExecutePanel({
 
             {isEmail(artifact, activeType) ? (
               <div className="space-y-3">
+                <Field label="Recipients">
+                  <div className="space-y-2">
+                    {hasExplicitRecipients ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedContacts.map((c) => (
+                          <RecipientChip
+                            key={c.id}
+                            label={c.name}
+                            title={c.email}
+                            onRemove={() => removeContact(c.id)}
+                          />
+                        ))}
+                        {customEmails.map((e) => (
+                          <RecipientChip
+                            key={e}
+                            label={e}
+                            onRemove={() => removeEmail(e)}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {availableContacts.length > 0 ? (
+                        <Select
+                          value=""
+                          onChange={(e) => addContact(e.target.value)}
+                          className="w-auto min-w-44"
+                        >
+                          <option value="">Add a saved contact...</option>
+                          {availableContacts.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name} ({c.email})
+                            </option>
+                          ))}
+                        </Select>
+                      ) : null}
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          type="email"
+                          value={emailInput}
+                          placeholder="name@company.com"
+                          onChange={(e) => setEmailInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addEmail();
+                            }
+                          }}
+                          className="w-52"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={addEmail}
+                          disabled={!emailInput.trim()}
+                          className="gap-1.5"
+                        >
+                          <Plus />
+                          Add
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </Field>
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <User className="size-3.5" />
+                  {hasExplicitRecipients
+                    ? `Will send to ${
+                        selectedContacts.length + customEmails.length
+                      } recipient${
+                        selectedContacts.length + customEmails.length === 1
+                          ? ""
+                          : "s"
+                      }`
+                    : resolvedAccountId
+                      ? `Will send to this account's contact (${resolvedAccountId})`
+                      : "Will send to this account's contact"}
+                </p>
                 <Field label="Subject">
                   <Input
                     value={artifact.subject}
@@ -431,9 +680,7 @@ export function ExecutePanel({
                   <div className="space-y-0.5 text-sm">
                     <p className="font-medium text-foreground">
                       {CHANNEL_NOUN[activeType]} sent
-                      {sentTo(sendResult)
-                        ? ` to ${sentTo(sendResult)}`
-                        : ""}
+                      {sentTo(sendResult) ? ` to ${sentTo(sendResult)}` : ""}
                     </p>
                     {sendResult.detail ? (
                       <p className="text-muted-foreground">

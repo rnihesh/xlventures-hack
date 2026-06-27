@@ -1,7 +1,8 @@
 // Typed fetch client for the Aperture REST + SSE API.
 //
-// Every read endpoint falls back to deterministic seed data when the backend
-// is unreachable, so the UI boots and demos cleanly offline. Mutations
+// Read endpoints for real, org-scoped data (accounts, domains, learning, eval)
+// fall back to honest-empty results when the backend is unreachable, so a
+// logged-in user never sees fabricated account or domain data. Mutations
 // (createRun, hitl) surface real errors because they require the live agent.
 // The what-if endpoint computes a counterfactual; it degrades to a local,
 // deterministic approximation when the backend is unreachable so the demo
@@ -10,8 +11,10 @@
 import type {
   Account,
   AccountDetail,
+  AccountTimeline,
   CreateRunRequest,
   CreateRunResponse,
+  DecisionBriefData,
   DomainSummary,
   EvalReport,
   HealthResponse,
@@ -25,7 +28,7 @@ import type {
 import { authHeaders } from "@/lib/auth";
 
 export const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8200";
 
 export class ApiError extends Error {
   status: number;
@@ -97,17 +100,37 @@ export async function getAccount(
   id: string,
   signal?: AbortSignal,
 ): Promise<AccountDetail> {
+  // Real, org-scoped data: no hardcoded fallback. On error the caller shows a
+  // loading/not-found state rather than flashing a fake placeholder account.
   return getJson<AccountDetail>(`/accounts/${encodeURIComponent(id)}`, {
-    fallback: seedAccountDetail(id),
     signal,
   });
 }
 
+export function getAccountTimeline(
+  id: string,
+  signal?: AbortSignal,
+): Promise<AccountTimeline> {
+  // Read-only audit trail. Falls back to an empty timeline so the section
+  // renders cleanly when the backend is unreachable.
+  return getJson<AccountTimeline>(
+    `/accounts/${encodeURIComponent(id)}/timeline`,
+    {
+      fallback: {
+        account_id: id,
+        name: id,
+        events: [],
+        counts: { interaction: 0, recommendation: 0, decision: 0, outcome: 0, total: 0 },
+      },
+      signal,
+    },
+  );
+}
+
 export function getDomains(signal?: AbortSignal): Promise<DomainSummary[]> {
-  return getJson<DomainSummary[]>("/domains", {
-    fallback: SEED_DOMAINS,
-    signal,
-  });
+  // Domains come from the backend (base packs + the org's uploaded packs); no
+  // hardcoded list so the UI never shows packs the org does not have.
+  return getJson<DomainSummary[]>("/domains", { fallback: [], signal });
 }
 
 // Honest-empty fallbacks: a new org legitimately has no learning/eval data and
@@ -156,6 +179,21 @@ export function hitl(
   return postJson<HitlResponse>(
     `/runs/${encodeURIComponent(runId)}/hitl`,
     payload,
+  );
+}
+
+// Fetch the read-only, org-scoped decision brief for a finished run. This is
+// the authoritative, self-contained projection (account + signal, the action
+// and reasoning, confidence, evidence, alternatives, policy gate, and the human
+// decision + recorded outcome). No fallback: the caller degrades to a brief
+// built from the in-memory recommendation when the backend is unreachable.
+export function getBrief(
+  runId: string,
+  signal?: AbortSignal,
+): Promise<DecisionBriefData> {
+  return getJson<DecisionBriefData>(
+    `/runs/${encodeURIComponent(runId)}/brief`,
+    { signal },
   );
 }
 
@@ -387,21 +425,6 @@ export const SEED_ACCOUNTS: Account[] = [
   },
 ];
 
-const SEED_DOMAINS: DomainSummary[] = [
-  {
-    key: "customer_success",
-    display_name: "Customer Success and Churn Prevention",
-    actions_count: 9,
-    decision_points_count: 4,
-  },
-  {
-    key: "saas_sales",
-    display_name: "SaaS Sales and Expansion",
-    actions_count: 7,
-    decision_points_count: 3,
-  },
-];
-
 function seedRecommendation(
   accountId: string,
   overrides: Partial<Recommendation> = {},
@@ -468,125 +491,3 @@ function seedRecommendation(
   return { ...base, ...overrides };
 }
 
-function seedAccountDetail(id: string): AccountDetail {
-  const profile =
-    SEED_ACCOUNTS.find((a) => a.account_id === id) ?? SEED_ACCOUNTS[0];
-  return {
-    profile: {
-      ...profile,
-      segment: "Enterprise",
-      owner: "J. Okafor (CSM)",
-      plan: "Scale Annual",
-      seats: 240,
-      renewal_date: "2026-09-30",
-    },
-    signals: [
-      {
-        type: "usage_metric",
-        label: "Support tickets +40% MoM",
-        content:
-          "Open tickets rose from 12 to 17 versus prior month, concentrated in the data import workflow.",
-        ts: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-        severity: "high",
-        source: "Zendesk",
-      },
-      {
-        type: "crm_record",
-        label: "QBR cancelled",
-        content: "May quarterly business review cancelled by customer, not rescheduled.",
-        ts: new Date(Date.now() - 1000 * 60 * 60 * 24 * 9).toISOString(),
-        severity: "medium",
-        source: "Salesforce",
-      },
-      {
-        type: "engagement",
-        label: "Champion logged in 3x this week",
-        content: "Primary champion remains active in the analytics module.",
-        ts: new Date(Date.now() - 1000 * 60 * 60 * 24 * 12).toISOString(),
-        severity: "low",
-        source: "Product telemetry",
-      },
-    ],
-    history: [
-      seedRecommendation(id, {
-        id: `rec_${id}_h1`,
-        status: "approved",
-        action: {
-          key: "share_adoption_playbook",
-          title: "Share the data-import adoption playbook with the champion",
-          description:
-            "Send the curated enablement path to reduce the support burden on the import workflow.",
-        },
-        created_at: new Date(
-          Date.now() - 1000 * 60 * 60 * 24 * 14,
-        ).toISOString(),
-      }),
-    ],
-    current: seedRecommendation(id),
-  };
-}
-
-const SEED_LEARNING: Learning = {
-  accepted_rate: 0.72,
-  before_after: {
-    kpi: "Gross renewal rate",
-    before: 84,
-    after: 91,
-    note: "Across accounts where a recommended save play was accepted.",
-  },
-  episodes: [
-    {
-      id: "ep_001",
-      account_id: "acct_001",
-      account_name: "Northwind Labs",
-      domain: "customer_success",
-      situation: "Ticket spike plus skipped QBR before renewal",
-      action_key: "schedule_executive_business_review",
-      action_title: "Schedule an executive business review",
-      decision: "approve",
-      outcome: "QBR booked, renewal secured",
-      created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-    },
-    {
-      id: "ep_002",
-      account_id: "acct_002",
-      account_name: "Helios Manufacturing",
-      domain: "customer_success",
-      situation: "Usage decline with no executive sponsor",
-      action_key: "offer_value_realization_workshop",
-      action_title: "Offer a value realization workshop",
-      decision: "edit",
-      reason: "CSM preferred a lighter-touch check-in first",
-      outcome: "Workshop scheduled for next sprint",
-      created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 6).toISOString(),
-    },
-    {
-      id: "ep_003",
-      account_id: "acct_004",
-      account_name: "Cobalt Retail Group",
-      domain: "saas_sales",
-      situation: "Renewal approaching without identified sponsor",
-      action_key: "map_executive_sponsor",
-      action_title: "Map and engage an executive sponsor",
-      decision: "reject",
-      reason: "Account already in procurement, too late for new contacts",
-      outcome: "Closed lost",
-      created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 11).toISOString(),
-    },
-  ],
-};
-
-const SEED_EVAL: EvalReport = {
-  outcomes: {
-    kpi: "ARR protected per quarter",
-    baseline: 1.2,
-    projected: 1.9,
-    unit: "$M",
-  },
-  suites: [
-    { name: "Grounding faithfulness", metric: "citation accuracy", score: 0.94, passed: 47, total: 50 },
-    { name: "Action validity", metric: "schema + policy pass", score: 0.98, passed: 49, total: 50 },
-    { name: "Confidence calibration", metric: "ECE (inverted)", score: 0.89, passed: 18, total: 20 },
-    { name: "Guardrail compliance", metric: "policy gates honored", score: 1.0, passed: 24, total: 24 },
-  ],
-};

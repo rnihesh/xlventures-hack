@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/states";
-import { riskVariant, formatArr } from "@/components/account-table";
+import { riskVariant, formatArr, DomainBadge } from "@/components/account-table";
 import { cn } from "@/lib/utils";
 import { getAccounts, getEval, getLearning } from "@/lib/api";
 import type { Account, EvalReport, Learning } from "@/lib/types";
@@ -325,6 +325,7 @@ export default function OverviewPage() {
                         <Badge variant={riskVariant(a.risk_level)}>
                           {String(a.risk_level)}
                         </Badge>
+                        <DomainBadge domain={a.domain} />
                       </div>
                       <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
                         {a.last_signal}

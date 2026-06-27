@@ -118,6 +118,67 @@ export interface Signal {
   content: string;
 }
 
+// GET /runs/{id}/brief
+// A self-contained, exportable decision brief projected from a stored run: the
+// one-pager a CSM hands to leadership. Every field is read from the persisted
+// run/episode (no re-run, no LLM), so the shape mirrors the recommendation plus
+// the human decision and recorded outcome.
+export interface BriefAccount {
+  account_id: string;
+  name: string;
+  domain: string;
+  health_score: number | null;
+  stage: string | null;
+}
+
+export interface BriefHumanDecision {
+  decision: string | null;
+  edited_action: Record<string, unknown> | null;
+  reason: string | null;
+  recorded_at: string | null;
+}
+
+export interface BriefOutcome {
+  decision: string;
+  reason: string | null;
+  metrics: Record<string, unknown>;
+  recorded_at: string | null;
+}
+
+export interface DecisionBriefData {
+  run_id: string;
+  generated_at: string;
+  status?: string;
+  account: BriefAccount;
+  signal: Signal;
+  recommendation: {
+    id: string | null;
+    status: RecommendationStatus | string | null;
+    action: RecommendationAction;
+    reasoning: string;
+    risk_opportunity: RiskOpportunity | null;
+    counterfactual: string | null;
+  };
+  confidence: Confidence;
+  expected_impact: ExpectedImpact | null;
+  evidence: Evidence[];
+  signals: Signals;
+  alternatives: Alternative[];
+  policy: {
+    results: PolicyGate[];
+    summary: {
+      total: number;
+      passed: number;
+      warned: number;
+      failed: number;
+      requires_approval: boolean;
+    };
+  } | null;
+  missing_information: MissingInformation[];
+  human_decision: BriefHumanDecision | null;
+  outcome: BriefOutcome | null;
+}
+
 export interface CreateRunRequest {
   domain: string;
   account_id: string;
@@ -126,6 +187,47 @@ export interface CreateRunRequest {
 
 export interface CreateRunResponse {
   run_id: string;
+}
+
+// Account 360 audit timeline (GET /accounts/{id}/timeline). One merged,
+// newest-first stream of everything the platform knows about an account.
+export type TimelineKind =
+  | "interaction"
+  | "recommendation"
+  | "decision"
+  | "outcome";
+
+export interface TimelineEvent {
+  id: string;
+  kind: TimelineKind;
+  ts: string | null;
+  title: string;
+  summary?: string | null;
+  // interaction
+  source_type?: string;
+  text?: string | null;
+  // recommendation
+  action?: RecommendationAction;
+  confidence?: Confidence | { score?: number | null; label?: string | null; method?: string | null };
+  // decision
+  decision?: string;
+  reason?: string | null;
+  // outcome
+  metrics?: Record<string, unknown>;
+  episode_id?: string;
+}
+
+export interface AccountTimeline {
+  account_id: string;
+  name: string;
+  events: TimelineEvent[];
+  counts: {
+    interaction: number;
+    recommendation: number;
+    decision: number;
+    outcome: number;
+    total: number;
+  };
 }
 
 export type HitlDecision = "approve" | "reject" | "edit";
@@ -191,10 +293,21 @@ export interface AccountProfile extends Partial<Account> {
   [key: string]: unknown;
 }
 
+// A source document backing an account: the org's own ingested interactions
+// (uploaded crm-notes / transcript / email) and, for the Demo org, seed docs.
+export interface AccountDocument {
+  id: string;
+  source_type?: string;
+  title?: string;
+  excerpt?: string;
+  ts?: string | null;
+}
+
 export interface AccountDetail {
   profile: AccountProfile;
   signals: AccountSignal[];
   history: Recommendation[];
+  documents?: AccountDocument[];
   current: Recommendation | null;
 }
 
@@ -204,6 +317,10 @@ export interface DomainSummary {
   display_name: string;
   actions_count: number;
   decision_points_count: number;
+  // Present when the list distinguishes base packs from org-uploaded packs.
+  source?: "base" | "org";
+  editable?: boolean;
+  created_at?: string;
 }
 
 // GET /learning
@@ -249,6 +366,11 @@ export interface EvalSuite {
   score: number;
   passed: number;
   total: number;
+  // Backend's verdict (score over the suite threshold). Preferred over a strict
+  // passed===total check so a strong-but-imperfect suite is not shown as failing.
+  healthy?: boolean;
+  // Org-scoped suite (Outcome Lift) with no data yet: awaiting, not failing.
+  no_data?: boolean;
 }
 
 export interface EvalOutcomes {

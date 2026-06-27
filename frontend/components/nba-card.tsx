@@ -6,8 +6,10 @@ import {
   FileText,
   GitBranch,
   HelpCircle,
+  Loader2,
   Pencil,
   Quote,
+  Send,
   TrendingDown,
   TrendingUp,
   X,
@@ -27,8 +29,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alternatives } from "@/components/alternatives";
+import { DecisionBrief } from "@/components/decision-brief";
+import { MemoryInsight, type SimilarEpisode } from "@/components/memory-insight";
 import { InfoHint } from "@/components/ui/tooltip";
 import { toast } from "@/components/ui/toast";
+import { sendApprovalHandoff } from "@/lib/api/actions";
 import { explainSignal, SIGNAL_GROUP_HELP } from "@/lib/signal-glossary";
 import { cn } from "@/lib/utils";
 import type { Alternative, MissingInformation } from "@/lib/types";
@@ -52,6 +57,15 @@ function readMissingInformation(rec: Recommendation): MissingInformation[] {
   const gaps = (rec as unknown as { missing_information?: MissingInformation[] })
     .missing_information;
   return Array.isArray(gaps) ? gaps : [];
+}
+
+// The streamed Recommendation may also carry the prior episodes that memory
+// recalled and used to shift the ranking (state.similar_episodes). Read them
+// safely so the "what changed since last time" panel can surface them.
+function readSimilarEpisodes(rec: Recommendation): SimilarEpisode[] {
+  const eps = (rec as unknown as { similar_episodes?: SimilarEpisode[] })
+    .similar_episodes;
+  return Array.isArray(eps) ? eps : [];
 }
 
 function ConfidenceDial({
@@ -179,6 +193,7 @@ export function NbaCard({
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [reason, setReason] = useState("");
+  const [slackSending, setSlackSending] = useState(false);
 
   if (!recommendation) {
     return (
@@ -206,6 +221,7 @@ export function NbaCard({
   const isOpportunity = rec.risk_opportunity?.type === "opportunity";
   const alternatives = readAlternatives(rec);
   const missingInformation = readMissingInformation(rec);
+  const similarEpisodes = readSimilarEpisodes(rec);
 
   const beginEdit = () => {
     setEditTitle(rec.action.title);
@@ -246,6 +262,40 @@ export function NbaCard({
     });
   };
 
+  // Push the pending action to the org's Slack channel for human sign-off. This
+  // is a visibility handoff: it never changes the decision, so the in-app
+  // approve / edit / reject controls stay live. Result is shown via the toast.
+  const sendToSlack = async () => {
+    if (slackSending) return;
+    setSlackSending(true);
+    try {
+      const result = await sendApprovalHandoff({
+        run_id: rec.run_id ?? undefined,
+        recommendation: rec,
+        account_id: rec.account_id ?? undefined,
+      });
+      if (result.sent) {
+        toast("Sent to Slack for approval", {
+          description: "Your team can review and sign off in Slack.",
+          variant: "success",
+        });
+      } else if (/not_configured|not_connected/.test(result.reason ?? "")) {
+        toast("Slack not connected", {
+          description: "Connect Slack in Settings, then send again.",
+          variant: "info",
+        });
+      } else {
+        toast("Could not send to Slack", {
+          description:
+            result.detail ?? result.reason ?? "Try again in a moment.",
+          variant: "error",
+        });
+      }
+    } finally {
+      setSlackSending(false);
+    }
+  };
+
   const statusVariant =
     rec.status === "approved"
       ? "success"
@@ -265,6 +315,8 @@ export function NbaCard({
                 {rec.risk_opportunity?.type ?? "action"}
               </Badge>
               <Badge variant={statusVariant}>{rec.status}</Badge>
+              {/* The one-pager a CSM hands to leadership: print + Markdown. */}
+              <DecisionBrief recommendation={rec} className="ml-auto" />
             </div>
             <CardTitle className="text-base font-semibold leading-snug">
               {rec.action.title}
@@ -392,6 +444,11 @@ export function NbaCard({
           )}
         </div>
 
+        <MemoryInsight
+          similarEpisodes={similarEpisodes}
+          alternatives={alternatives}
+        />
+
         {alternatives.length > 0 && <Alternatives alternatives={alternatives} />}
 
         {missingInformation.length > 0 && (
@@ -505,6 +562,22 @@ export function NbaCard({
               Reject
             </Button>
           </div>
+        )}
+        {!decided && hitlRequired && !editing && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={sendToSlack}
+            disabled={slackSending}
+            className="w-full text-muted-foreground"
+          >
+            {slackSending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+            {slackSending ? "Sending to Slack" : "Send to Slack for approval"}
+          </Button>
         )}
         {!decided && !hitlRequired && !editing && (
           <p className="text-center text-xs text-muted-foreground">

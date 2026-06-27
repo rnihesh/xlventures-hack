@@ -27,6 +27,7 @@ import {
   formatArr,
   healthTone,
   healthLabel,
+  DomainBadge,
 } from "@/components/account-table";
 import { cn } from "@/lib/utils";
 import { getAccounts } from "@/lib/api";
@@ -68,6 +69,7 @@ function TriageRow({ account }: { account: Account }) {
           <Badge variant={riskVariant(account.risk_level)}>
             {String(account.risk_level)} churn risk
           </Badge>
+          <DomainBadge domain={account.domain} />
           <span className="text-xs text-muted-foreground">
             Health {account.health_score} ({healthLabel(account.health_score)}){" "}
             · {formatArr(account.arr)} ARR

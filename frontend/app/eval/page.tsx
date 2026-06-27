@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FlaskConical, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 import { EvalPanel, type EvalData } from "@/components/eval-panel";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/ui/page-header";
 import { getEval } from "@/lib/api";
 
 export default function EvalPage() {
@@ -37,22 +38,14 @@ export default function EvalPage() {
   }, []);
 
   return (
-    <div className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between border-b border-border px-6 py-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
-            <FlaskConical className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-sm font-medium text-muted-foreground">Eval</h1>
-            <p className="text-lg font-semibold tracking-tight">
-              Quality gates and projected outcomes
-            </p>
-          </div>
-        </div>
-      </header>
+    <div className="mx-auto w-full max-w-5xl px-6 py-8">
+      <PageHeader
+        eyebrow="Insight"
+        title="Evaluation"
+        description="Projected and realised business outcomes for this workspace, from its accounts and recorded decisions."
+      />
 
-      <div className="mx-auto w-full max-w-5xl px-6 py-8">
+      <div>
         {loading ? (
           <div className="flex flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-3">
@@ -71,9 +64,7 @@ export default function EvalPage() {
               Evaluation unavailable
             </h2>
             <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-              The eval runner could not be reached. Scores are computed over the
-              golden cases on the backend, so no numbers are shown until a run
-              succeeds.
+              The outcomes service could not be reached, so no numbers are shown.
             </p>
           </div>
         ) : (
