@@ -2,7 +2,6 @@
 .venv/
 venv/
 .uv/
-uv.lock
 __pycache__/
 *.py[cod]
 *.egg-info/
