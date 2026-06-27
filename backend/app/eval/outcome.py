@@ -17,6 +17,11 @@ Honesty rules baked in here:
 * Every KPI is marked ``projected: true`` and carries a ``method`` note. The
   dollar figure (``arr_at_risk_addressed``) is computed from the real ARR of the
   org's at-risk accounts multiplied by the projected save rate.
+* Alongside the projection, the breakdown carries a REALISED block: the plays the
+  org's humans actually accepted (real decisions), the real ARR those plays
+  cover, and the projected-NRR tracked against them. It is honestly empty (no
+  data) until real decisions exist, so the page can show projected AND
+  learning-loop-realised numbers side by side without fabricating either.
 
 The headline ``outcomes`` object keeps the ``/eval`` contract exactly:
 ``{kpi, baseline, projected, unit}``.
@@ -56,14 +61,22 @@ def _parse_impact_points(estimate: str) -> float:
     return float(match.group()) if match else 0.0
 
 
-async def _live_acceptance(org_id: str) -> Optional[Tuple[int, int]]:
-    """Real (accepted_like, decided) counts from the ORG's recorded episodes.
+async def _memory_outcomes(org_id: str) -> Optional[Dict[str, Any]]:
+    """Realised learning-loop aggregates from the ORG's recorded episodes.
+
+    This is the REALISED side of the page: the plays the org's humans actually
+    accepted (real decisions through ``memory.record_outcome``), not a
+    projection. A single scoped pass returns the acceptance counts plus, for the
+    accepted-like plays, the real ARR they cover and the projected-NRR that was
+    tracked against them at decision time.
 
     Scoped to ``org_id``: seeded day-zero episodes carry no ``org_id`` and belong
     to the Demo org, so an unscoped episode counts only for the demo tenant. Every
-    other org sees only the decisions it produced. Returns ``None`` when the org
-    has no decided episode yet, so callers fall back to a confidence-based
-    projection instead of a fabricated decision log.
+    other org sees only the decisions it produced.
+
+    Returns ``None`` only when the memory store is unreachable, so callers can
+    tell "store down" apart from "store empty" (``decided == 0``). When reachable
+    but empty, the realised block is an honest zero, never a fabricated log.
     """
 
     try:
@@ -79,6 +92,8 @@ async def _live_acceptance(org_id: str) -> Optional[Tuple[int, int]]:
 
     decided = 0
     accepted = 0
+    accepted_arr = 0.0
+    nrr_values: List[float] = []
     for ep in episodes:
         if (getattr(ep, "org_id", None) or DEMO_ORG) != org_id:
             continue
@@ -86,11 +101,84 @@ async def _live_acceptance(org_id: str) -> Optional[Tuple[int, int]]:
         if outcome is None or outcome.decision == "pending":
             continue
         decided += 1
-        if outcome.decision in ACCEPTED_LIKE:
-            accepted += 1
-    if decided == 0:
-        return None
-    return accepted, decided
+        if outcome.decision not in ACCEPTED_LIKE:
+            continue
+        accepted += 1
+        metrics = getattr(outcome, "metrics", None) or {}
+        arr = metrics.get("arr_at_risk")
+        if isinstance(arr, (int, float)):
+            accepted_arr += float(arr)
+        nrr = metrics.get("nrr_projected")
+        if isinstance(nrr, (int, float)):
+            nrr_values.append(float(nrr))
+
+    return {
+        "decided": decided,
+        "accepted": accepted,
+        "accepted_arr": round(accepted_arr, 2),
+        "nrr_values": nrr_values,
+    }
+
+
+def _realised_block(mem: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Shape the REALISED learning-loop block for the breakdown.
+
+    ``accepted_plays``, ``decided`` and ``arr_under_accepted`` are real (human
+    decisions and the real ARR of the accounts they cover). ``tracked_nrr`` is
+    the projected-NRR recorded against those plays at decision time, kept clearly
+    labeled as a projection. With no decided plays yet (or the store down) the
+    block is an honest empty state, not seed numbers.
+    """
+
+    if not mem or mem.get("decided", 0) == 0:
+        return {
+            "has_data": False,
+            "source": "none",
+            "accepted_plays": 0,
+            "decided": 0,
+            "acceptance_rate": 0.0,
+            "arr_under_accepted": 0.0,
+            "tracked_nrr": None,
+            "baseline_nrr": _BASELINE_NRR,
+            "nrr_lift": None,
+            "note": (
+                "No accepted plays recorded for this org yet. Approve or edit "
+                "recommendations (or run 'make gen-runs') to populate the realised "
+                "learning-loop side from real outcomes."
+            ),
+        }
+
+    decided = int(mem["decided"])
+    accepted = int(mem["accepted"])
+    nrr_values = mem.get("nrr_values") or []
+    tracked_nrr = round(sum(nrr_values) / len(nrr_values), 1) if nrr_values else None
+    nrr_lift = round(tracked_nrr - _BASELINE_NRR, 1) if tracked_nrr is not None else None
+    accept_rate = round(accepted / decided, 3) if decided else 0.0
+
+    note = (
+        f"Realised from {accepted} accepted of {decided} decided plays (real human "
+        "decisions). ARR under accepted plays is real account ARR"
+    )
+    if tracked_nrr is not None:
+        note += (
+            f"; tracked NRR {tracked_nrr:.1f} is the projection recorded against "
+            "those plays at decision time, not an actual."
+        )
+    else:
+        note += "."
+
+    return {
+        "has_data": True,
+        "source": "memory",
+        "accepted_plays": accepted,
+        "decided": decided,
+        "acceptance_rate": accept_rate,
+        "arr_under_accepted": float(mem.get("accepted_arr", 0.0)),
+        "tracked_nrr": tracked_nrr,
+        "baseline_nrr": _BASELINE_NRR,
+        "nrr_lift": nrr_lift,
+        "note": note,
+    }
 
 
 def _avg_confidence(records: List[Dict[str, Any]]) -> float:
@@ -156,10 +244,16 @@ async def compute_outcomes(
     ``no_data`` flag is set, rather than the seed corpus numbers.
     """
 
-    live = await _live_acceptance(org_id)
+    mem = await _memory_outcomes(org_id)
+    realised = _realised_block(mem)
     arr_at_risk, at_risk_accounts, total_accounts = await _arr_at_risk(org_id)
     avg_conf = _avg_confidence(records)
     avg_points = _avg_impact_points(records)
+
+    # Real decisions exist only when the store is reachable AND has decided plays.
+    live: Optional[Tuple[int, int]] = None
+    if mem is not None and mem.get("decided", 0) > 0:
+        live = (int(mem["accepted"]), int(mem["decided"]))
 
     # Honest empty state: the org owns no accounts and has decided nothing yet.
     no_data = live is None and total_accounts == 0
@@ -259,7 +353,12 @@ async def compute_outcomes(
         "score": round(improved / total, 3) if total else 0.0,
         "passed": improved,
         "total": total,
-        "healthy": improved == total,
+        # This suite is ORG-scoped: with no accounts and no decisions there is
+        # nothing to lift yet, so it is "awaiting data", not a failing 1/4. The
+        # UI uses this to exclude it from the passing-count and the mean rather
+        # than penalising a brand new org for the engine-quality average.
+        "healthy": (improved == total) if not no_data else False,
+        "no_data": no_data,
     }
 
     headline = {
@@ -304,6 +403,10 @@ async def compute_outcomes(
         "avg_confidence": round(avg_conf, 3),
         "avg_impact_points": round(avg_points, 2),
         "adoption_factor": round(adoption, 3),
+        # REALISED learning-loop side: the plays the org's humans actually
+        # accepted and the outcomes tracked against them. Empty until real
+        # decisions exist; never seeded.
+        "realised": realised,
         "kpis": kpis,
     }
     return suite, headline, breakdown
@@ -333,3 +436,4 @@ if __name__ == "__main__":  # pragma: no cover - manual invocation
     print("outcomes:", result["outcomes"])
     print("acceptance:", result["breakdown"]["acceptance"])
     print("arr_at_risk:", result["breakdown"]["arr_at_risk"])
+    print("realised:", result["breakdown"]["realised"])

@@ -34,6 +34,10 @@ def _slim_suite(suite: Dict[str, Any]) -> Dict[str, Any]:
 
     out = {key: suite[key] for key in _SUITE_KEYS}
     out["healthy"] = bool(suite.get("healthy", suite["score"] >= 0.6))
+    # Preserve the org-scoped "awaiting data" flag so the UI can show Outcome
+    # Lift as awaiting (not failing) for a brand new org.
+    if suite.get("no_data"):
+        out["no_data"] = True
     return out
 
 

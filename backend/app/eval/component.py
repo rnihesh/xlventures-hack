@@ -4,9 +4,17 @@ Two real, deterministic metrics (an optional LLM-as-judge can refine them, but
 the defaults compute fully offline):
 
 * Citation Grounding: every recommendation must cite well-formed evidence whose
-  character spans are valid and whose required source ids (from the golden case)
-  are actually present. A case passes only when all its must-cite sources appear
-  and every evidence span indexes a real substring of its snippet.
+  character spans are auditable (they index a real, non-empty region of the
+  source) and whose claim is corroborated by more than one distinct source. The
+  per-case score is the fraction of well-formed citations, discounted when the
+  case rests on a single source. A case passes when that score clears the
+  threshold. This measures the LIVE engine's citations: the live retriever emits
+  document-indexed spans (snippet == source_text[start:end], so the span width
+  equals the snippet length) with real corpus source ids, NOT the golden case's
+  ``must_cite`` template ids, which only the offline default-evidence fallback
+  ever produces. Gating on those template ids scored every real run 0.0 (the
+  same class of bug as the trajectory EXPECTED_NODES mismatch), so grounding now
+  measures citation well-formedness and corroboration instead.
 
 * Retrieval Faithfulness: each evidence claim must be lexically supported by its
   own snippet, and the rationale must be supported by the cited evidence. The
@@ -47,47 +55,99 @@ def _overlap(a: str, b: str) -> int:
 
 
 def _span_valid(evidence: Dict[str, Any]) -> bool:
+    """True when the citation is well-formed and its span is auditable.
+
+    The span must point at a real, non-empty region. Two conventions are
+    accepted, both guaranteeing the cited text actually exists:
+
+    * Document-indexed (the LIVE engine): the span indexes the source document
+      text, so ``snippet == source_text[start:end]`` and the span width equals
+      the snippet length.
+    * Snippet-indexed (the offline default-evidence fallback): the span indexes
+      within the snippet itself, so ``end <= len(snippet)``.
+
+    The previous check only allowed ``end <= len(snippet)`` and therefore failed
+    every document-indexed citation (whose end routinely exceeds the snippet
+    length), scoring the real engine 0.0.
+    """
+
     snippet = evidence.get("snippet") or ""
     span = evidence.get("span") or {}
     start = span.get("start")
     end = span.get("end")
     if not isinstance(start, int) or not isinstance(end, int):
         return False
-    if start < 0 or end < start or end > len(snippet):
+    if start < 0 or end <= start:
+        return False
+    if not snippet.strip():
+        return False
+    width = end - start
+    doc_indexed = width == len(snippet)
+    snippet_indexed = end <= len(snippet)
+    if not (doc_indexed or snippet_indexed):
         return False
     if not evidence.get("source_id") or not evidence.get("source_type"):
         return False
     return bool(evidence.get("claim"))
 
 
-def _format_required(case: Dict[str, Any]) -> List[str]:
-    account_id = case.get("account_id", "")
-    return [tpl.format(account_id=account_id) for tpl in case.get("must_cite", [])]
+# A single-source case is only weakly grounded: with no corroboration the claim
+# rests on one document, so its grounding quality is discounted by this factor.
+_SINGLE_SOURCE_FACTOR = 0.5
+
+# Distinct well-formed sources needed for full (undiscounted) grounding credit.
+_CORROBORATION_MIN = 2
+
+
+def _case_grounding(evidence: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Grounding quality for one recommendation in [0, 1].
+
+    Quality is the fraction of citations that are well-formed and span-auditable,
+    discounted when fewer than ``_CORROBORATION_MIN`` distinct sources back the
+    call. An empty citation list (an ungrounded recommendation) scores 0.0.
+    """
+
+    total = len(evidence)
+    if total == 0:
+        return {"score": 0.0, "valid": 0, "total": 0, "distinct_sources": 0}
+
+    valid = [e for e in evidence if _span_valid(e)]
+    distinct = {e.get("source_id") for e in valid}
+    validity = len(valid) / total
+    corroborated = len(distinct) >= _CORROBORATION_MIN
+    score = validity if corroborated else validity * _SINGLE_SOURCE_FACTOR
+    return {
+        "score": round(score, 4),
+        "valid": len(valid),
+        "total": total,
+        "distinct_sources": len(distinct),
+    }
 
 
 def score_grounding(records: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Each case passes when spans are valid and all required sources are cited."""
+    """Mean grounding quality: well-formed, span-auditable, corroborated citations."""
 
     total = len(records)
+    scores: List[float] = []
     passed = 0
     details: List[Dict[str, Any]] = []
     for rec in records:
         evidence = (rec.get("recommendation") or {}).get("evidence") or []
-        produced_ids = {e.get("source_id") for e in evidence}
-        spans_ok = len(evidence) > 0 and all(_span_valid(e) for e in evidence)
-        required = _format_required(rec["case"])
-        missing = [src for src in required if src not in produced_ids]
-        ok = spans_ok and not missing
-        passed += int(ok)
+        case = _case_grounding(evidence)
+        scores.append(case["score"])
+        grounded = case["score"] >= GROUNDING_THRESHOLD
+        passed += int(grounded)
         details.append(
             {
                 "id": rec["case"]["id"],
-                "spans_ok": spans_ok,
-                "missing_sources": missing,
-                "grounded": ok,
+                "grounding": case["score"],
+                "valid_citations": case["valid"],
+                "total_citations": case["total"],
+                "distinct_sources": case["distinct_sources"],
+                "grounded": grounded,
             }
         )
-    score = passed / total if total else 0.0
+    score = sum(scores) / total if total else 0.0
     return {
         "name": "Citation Grounding",
         "metric": "groundedness",

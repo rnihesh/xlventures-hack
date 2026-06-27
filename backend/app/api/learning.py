@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.api._org import DEMO_ORG, current_org
@@ -46,6 +46,22 @@ def _for_org(episodes: List[Any], org_id: str) -> List[Any]:
     org sees only the episodes it produced.
     """
     return [ep for ep in episodes if (getattr(ep, "org_id", None) or DEMO_ORG) == org_id]
+
+
+def _owned_episode(memory: Any, episode_id: str, org_id: str) -> Optional[Any]:
+    """Resolve ``episode_id`` only if it belongs to ``org_id``, else ``None``.
+
+    An episode with no ``org_id`` is owned by the Demo org (it is seeded day-zero
+    history), mirroring ``_for_org``. Returning ``None`` for a missing OR a
+    non-owned id lets the caller answer 404 uniformly, so a caller cannot use the
+    response to tell another tenant's real episode id apart from a random one.
+    """
+    episode = memory.get_episode(episode_id)
+    if episode is None:
+        return None
+    owner = getattr(episode, "org_id", None) or DEMO_ORG
+    return episode if owner == org_id else None
+
 
 _KPI = "Net Revenue Retention (projected %)"
 
@@ -240,9 +256,18 @@ class OutcomeIn(BaseModel):
 async def record_learning_outcome(
     body: OutcomeIn, org_id: str = Depends(current_org)
 ) -> Dict[str, Any]:
-    """Write an outcome back into memory so the learning metric moves live."""
+    """Write an outcome back into memory so the learning metric moves live.
+
+    The ``episode_id`` is an opaque, caller-supplied id, so we resolve it and
+    confirm it belongs to the caller's org before recording. A missing or
+    other-org episode returns 404 (not 403) so the endpoint cannot be used to
+    enumerate which episode ids exist for other tenants, and no outcome is
+    written against memory the caller does not own.
+    """
     memory = get_memory()
     await memory._ensure_db()
+    if _owned_episode(memory, body.episode_id, org_id) is None:
+        raise HTTPException(status_code=404, detail="episode not found")
     await memory.record_outcome(
         body.episode_id, body.decision, body.reason, body.metrics
     )
