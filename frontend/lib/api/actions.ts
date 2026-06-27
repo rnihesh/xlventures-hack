@@ -71,12 +71,23 @@ export interface SendResult {
   // Machine code when not sent, eg "ses_not_configured", "slack_not_configured",
   // "google_not_connected". Used to detect the connect-in-settings state.
   reason?: string;
-  // Where it went (recipient email or Slack channel) when sent.
+  // Where it went (recipient email or Slack channel) when sent. For a
+  // multi-recipient email this is the comma-joined list of addresses.
   to?: string;
   // Human-friendly detail, surfaced verbatim when present.
   detail?: string;
   // Provider message id when the channel returns one.
   id?: string;
+  // Per-recipient breakdown for a multi-recipient email send.
+  results?: SendRecipientResult[];
+}
+
+// Outcome for a single address in a fan-out email send.
+export interface SendRecipientResult {
+  to: string;
+  sent: boolean;
+  reason?: string;
+  detail?: string;
 }
 
 export interface SendPayload {
@@ -87,6 +98,14 @@ export interface SendPayload {
   account_id?: string | null;
   recommendation_id?: string | null;
   action_key?: string | null;
+  // Email recipient resolution. An email can fan out to several people: any
+  // number of saved contacts (`contact_ids`) plus any number of raw addresses
+  // (`recipients`). The singular `contact_id` / `to` are kept for back-compat.
+  // When none are set the send falls back to the account's contact.
+  contact_id?: string | null;
+  to?: string | null;
+  contact_ids?: string[];
+  recipients?: string[];
 }
 
 const NOT_CONFIGURED_REASON: Record<ArtifactType, string> = {
@@ -121,6 +140,40 @@ export async function sendArtifact(
       channel: payload.artifact_type,
       reason: NOT_CONFIGURED_REASON[payload.artifact_type],
     };
+  }
+}
+
+export interface ApprovalHandoffPayload {
+  // Pass either a run_id (to use the stored recommendation and its signal) or an
+  // inline recommendation object. account_id supplies account context.
+  run_id?: string | null;
+  recommendation?: Recommendation | Record<string, unknown> | null;
+  account_id?: string | null;
+}
+
+/**
+ * Push a pending recommendation to the org's Slack channel for human sign-off
+ * via POST /execute/approval-handoff. The backend posts a rich approval summary
+ * to the org's saved webhook and degrades gracefully (sent=false,
+ * slack_not_configured) when no webhook is set. When the backend is unreachable
+ * we mirror that graceful not-configured result so the UI never dead-ends.
+ */
+export async function sendApprovalHandoff(
+  payload: ApprovalHandoffPayload,
+): Promise<SendResult> {
+  try {
+    const res = await fetch(`${API_BASE}/execute/approval-handoff`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      throw new Error(`POST /execute/approval-handoff failed (${res.status})`);
+    }
+    return (await res.json()) as SendResult;
+  } catch {
+    return { sent: false, channel: "slack", reason: "slack_not_configured" };
   }
 }
 

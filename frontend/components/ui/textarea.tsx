@@ -6,10 +6,35 @@ export type TextareaProps =
   React.TextareaHTMLAttributes<HTMLTextAreaElement>;
 
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, ...props }, ref) => {
+  (
+    {
+      className,
+      id,
+      placeholder,
+      "aria-label": ariaLabel,
+      "aria-labelledby": ariaLabelledby,
+      ...props
+    },
+    ref,
+  ) => {
+    // Always give the control a stable id so it satisfies the "form field
+    // should have an id or name" check even when a caller omits one.
+    const autoId = React.useId();
+    const fieldId = id ?? autoId;
+    // A placeholder-only field (no caller id, so no <label htmlFor> can target
+    // it, and no explicit aria-label) still needs an accessible name. Properly
+    // labeled fields always pass an explicit id, so this never overrides one.
+    const fallbackLabel =
+      !ariaLabel && !ariaLabelledby && id == null && placeholder
+        ? placeholder
+        : undefined;
     return (
       <textarea
         ref={ref}
+        id={fieldId}
+        placeholder={placeholder}
+        aria-label={ariaLabel ?? fallbackLabel}
+        aria-labelledby={ariaLabelledby}
         className={cn(
           "flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
           className,

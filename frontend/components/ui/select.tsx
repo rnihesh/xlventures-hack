@@ -8,11 +8,16 @@ export type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement>;
 // Styled wrapper around the native <select>. No external dependency, so it
 // works offline and stays consistent with the Input control.
 const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, children, ...props }, ref) => {
+  ({ className, children, id, ...props }, ref) => {
+    // Always give the control a stable id so it satisfies the "form field
+    // should have an id or name" check even when a caller omits one.
+    const autoId = React.useId();
+    const fieldId = id ?? autoId;
     return (
       <div className="relative">
         <select
           ref={ref}
+          id={fieldId}
           className={cn(
             "flex h-10 w-full appearance-none rounded-md border border-input bg-background px-3 py-2 pr-9 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
             className,

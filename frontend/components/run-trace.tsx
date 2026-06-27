@@ -7,6 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { OrchestrationGraph } from "@/components/orchestration-graph";
 import type { AgentEvent } from "@/lib/useAgentStream";
 
 type StepStatus = "running" | "done" | "info" | "error";
@@ -176,7 +177,12 @@ export function RunTrace({ events, className }: RunTraceProps) {
   const active = steps.some((s) => s.status === "running");
 
   return (
-    <Card className={cn("h-full", className)}>
+    <div className={cn("space-y-4", className)}>
+      {/* Live orchestration DAG: lights up the planner -> specialists -> critic
+          path as nodes stream, and greys the specialists the planner skipped.
+          Renders nothing for an empty/older run, so the trace below still shows. */}
+      <OrchestrationGraph events={events} />
+      <Card className="h-full">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-sm font-semibold tracking-tight">
@@ -249,7 +255,8 @@ export function RunTrace({ events, className }: RunTraceProps) {
           </ol>
         )}
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }
 

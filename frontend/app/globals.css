@@ -169,3 +169,31 @@
 .animate-rise {
   animation: aperture-rise 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+/* Decision brief print isolation. The brief overlay is portalled to <body> as
+   #decision-brief-portal; when printing we hide the rest of the app and flatten
+   the sheet into a clean, full-width document (no scrim, no toolbar, no shadow). */
+@media print {
+  body > *:not(#decision-brief-portal) {
+    display: none !important;
+  }
+  #decision-brief-portal .brief-scrim,
+  #decision-brief-portal .brief-toolbar {
+    display: none !important;
+  }
+  #decision-brief-portal .brief-sheet {
+    position: static !important;
+    transform: none !important;
+    inset: auto !important;
+    max-height: none !important;
+    width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+  }
+  #decision-brief-portal .brief-content {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+}
