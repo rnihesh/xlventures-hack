@@ -141,6 +141,49 @@ def _classify_decision_point(pack: Any, signal: Dict[str, Any]) -> str:
     return next(iter(pack.decision_points), "general_review")
 
 
+async def _classify_decision_point_llm(pack: Any, signal: Dict[str, Any]) -> Optional[str]:
+    """Use the model to map the signal to a decision point. None offline / on error.
+
+    This is what makes the planner actually READ the signal: an SSO + seats
+    request routes to expansion, a payment-risk signal to a collections point,
+    and so on, instead of the keyword fallback defaulting to renewal_risk.
+    """
+    from app.demo import demo_mode_enabled
+
+    dps = pack.decision_points or {}
+    if not dps or demo_mode_enabled():
+        return None
+    content = (signal.get("content") or signal.get("type") or "").strip()
+    if not content:
+        return None
+    from app.deps import get_llm
+
+    options = "\n".join(
+        f"- {key}: {getattr(dp, 'label', key)}."
+        f" Triggers: {', '.join(getattr(dp, 'trigger_signals', None) or []) or 'n/a'}"
+        for key, dp in dps.items()
+    )
+    prompt = (
+        "You route an account signal to exactly ONE decision point in a domain "
+        "workflow. Read the signal and pick the single best matching key.\n\n"
+        f"Decision points:\n{options}\n\n"
+        f'Signal: "{content}"\n\n'
+        "Respond with ONLY the decision point key, nothing else."
+    )
+    try:
+        resp = await get_llm(temperature=0).ainvoke(prompt)
+        text = (getattr(resp, "content", "") or "").strip().lower()
+    except Exception:  # noqa: BLE001 - fall back to the keyword classifier
+        return None
+    for key in dps:
+        if key.lower() == text:
+            return key
+    for key in dps:
+        if key.lower() in text:
+            return key
+    return None
+
+
 # Per decision-point routing profiles, kept here only as a SAFE FALLBACK. The
 # rosters are now first-class pack configuration (``decision_points[*].roster``
 # and ``rationale`` in the domain YAML); the planner reads those at run time and
@@ -392,7 +435,11 @@ async def planner_node(state: RunState) -> Dict[str, Any]:
     signal = dict(state.get("signal") or {})
     pack = load_pack(domain)
 
-    decision_point = _classify_decision_point(pack, signal)
+    # Read the signal with the model first; fall back to keyword routing only
+    # offline or if the model is unavailable.
+    decision_point = await _classify_decision_point_llm(pack, signal) or _classify_decision_point(
+        pack, signal
+    )
 
     # Org-configured roster (Workflow Studio): when the org has pinned which
     # specialists run for this decision point, honor it verbatim and skip the

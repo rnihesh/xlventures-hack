@@ -53,31 +53,30 @@ def record_embedding(model: str | None, total_tokens: int) -> None:
     sink.entries.append(_Entry("embedding", model or "unknown", int(total_tokens or 0), 0))
 
 
-class UsageCallback:
-    """LangChain async callback that records completion token usage to the sink."""
+try:
+    from langchain_core.callbacks.base import BaseCallbackHandler as _BaseCB
+except Exception:  # noqa: BLE001 - keep usage import-safe even if langchain shifts
+    _BaseCB = object  # type: ignore[assignment, misc]
 
-    # Implements the AsyncCallbackHandler protocol structurally; we avoid the
-    # import-time dependency by duck typing the one method we need.
-    ignore_llm = False
+
+class UsageCallback(_BaseCB):  # type: ignore[valid-type, misc]
+    """Records completion token usage to the sink.
+
+    SYNCHRONOUS on purpose: the graph specialists call ``llm.invoke`` (sync), so
+    an async-only handler would error those calls and silently force the whole
+    planner into its deterministic fallback. A sync BaseCallbackHandler runs on
+    both ``invoke`` and ``ainvoke`` and never breaks a model call.
+    """
+
     raise_error = False
 
-    async def on_llm_end(self, response, **kwargs) -> None:  # noqa: ANN001
+    def on_llm_end(self, response, **kwargs) -> None:  # noqa: ANN001
         try:
             model, in_tok, out_tok = _extract_usage(response)
             if in_tok or out_tok:
                 record_completion(model, in_tok, out_tok)
         except Exception as exc:  # noqa: BLE001 - accounting never breaks a run
             logger.debug("usage capture failed: %s", exc)
-
-    # No-op hooks so LangChain treats this as a full async handler.
-    async def on_llm_start(self, *a, **k):  # noqa: ANN002, ANN003
-        return None
-
-    async def on_llm_error(self, *a, **k):  # noqa: ANN002, ANN003
-        return None
-
-    async def on_llm_new_token(self, *a, **k):  # noqa: ANN002, ANN003
-        return None
 
 
 def _extract_usage(response) -> tuple[str | None, int, int]:  # noqa: ANN001
