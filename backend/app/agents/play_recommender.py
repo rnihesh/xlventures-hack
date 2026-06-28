@@ -348,8 +348,12 @@ async def _llm_rank_plays(
         f"Evidence:\n{ev_text}\n\n"
         f"Eligible plays (use ONLY these keys):\n{plays}\n\n"
         f"Plays the team accepted before on similar accounts: {precedent}\n\n"
+        "Important: rank by what the SIGNAL and the account's evidence actually "
+        "say. Do NOT assume an incident, outage, Sev-1, or event that is not "
+        "present in the evidence. Playbook and knowledge-base snippets describe "
+        "recommended STEPS, they are not facts about this account.\n"
         'Return STRICT JSON: {"ranking": [{"key": "<play key>", "score": <0.0 to 1.0>, '
-        '"reason": "<why, grounded in the evidence>"}]}. Rank ALL eligible plays.'
+        '"reason": "<why, grounded in the account evidence>"}]}. Rank ALL eligible plays.'
     )
     try:
         resp = await get_llm(temperature=0).ainvoke(prompt)

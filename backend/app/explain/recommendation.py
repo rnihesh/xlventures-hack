@@ -293,7 +293,11 @@ def _verbalized_rationale(
     prompt = (
         "You are a Customer Success strategist. In 2 short sentences, explain why "
         f"'{action_title}' is the next best action for account {account_id}. "
-        f"Signal: {signal_content}. Evidence: {claims}. Reference the evidence."
+        f"Signal: {signal_content}. Evidence: {claims}.\n"
+        "Ground the explanation ONLY in the signal and evidence above. Do NOT "
+        "assert any incident, outage, Sev-1, or event that is not stated there: "
+        "playbook or knowledge-base lines describe recommended steps, not things "
+        "that happened to this account. Reference the real evidence."
     )
     try:
         result = llm.invoke(prompt)

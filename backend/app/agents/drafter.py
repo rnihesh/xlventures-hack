@@ -37,11 +37,16 @@ def _llm_draft(state: Dict[str, Any], action: Dict[str, Any]) -> str | None:
 
     account_id = state.get("account_name") or state.get("account_id", "the account")
     risk = (state.get("risk_opportunity") or {}).get("summary", "")
+    signal = (state.get("signal") or {}).get("content", "")
     prompt = (
         "You are a Customer Success Manager. Draft a concise, warm outreach email "
         f"(under 120 words) to {account_id} to execute this play: "
-        f"{action.get('title', '')}. Context: {risk}. "
-        "No subject line filler, no placeholders in brackets."
+        f"{action.get('title', '')}.\n"
+        f"What prompted this: {signal}\nSituation: {risk}\n"
+        "Ground the email ONLY in this real context. Do NOT invent or assert any "
+        "incident, outage, Sev-1, or event that is not stated here: if you have no "
+        "specific incident, speak generally about the situation. No subject line "
+        "filler, no placeholders in brackets, no fabricated specifics."
     )
     try:
         result = llm.invoke(prompt)

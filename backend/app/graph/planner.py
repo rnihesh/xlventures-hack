@@ -168,6 +168,12 @@ async def _classify_decision_point_llm(pack: Any, signal: Dict[str, Any]) -> Opt
         "workflow. Read the signal and pick the single best matching key.\n\n"
         f"Decision points:\n{options}\n\n"
         f'Signal: "{content}"\n\n'
+        "Guidance: a signal about wanting to cancel, discontinue, downgrade, not "
+        "renew, leave, churn, or offboard is CHURN intent: pick the renewal or "
+        "churn-risk decision point, never an escalation point. Escalation is only "
+        "for an outage, incident, Sev-1, complaint, or urgent service failure that "
+        "the signal explicitly describes. Expansion/upsell intent picks the "
+        "expansion point. Pick by what the signal ACTUALLY says.\n"
         "Respond with ONLY the decision point key, nothing else."
     )
     try:
