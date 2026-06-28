@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     openai_base_url: str | None = None
 
+    # --- Web search (Serper, google.serper.dev). Blank disables web search. ---
+    serper_api_key: str = ""
+
     # --- Database (optional) -------------------------------------------------
     # When unset the app runs in DB-less mode (in-memory checkpointer, no pool).
     database_url: str | None = None

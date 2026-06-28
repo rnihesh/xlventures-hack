@@ -960,6 +960,25 @@ async def get_eval() -> Dict[str, Any]:
     return await _get_eval(refresh=False, org_id=current_org_id())
 
 
+async def web_search(query: str, k: int = 6) -> Dict[str, Any]:
+    """Live Google web search via Serper. Returns title/snippet/link results.
+
+    Lets the copilot pull fresh public context (company news, market signals,
+    background on an account) and reason over it. Degrades to an empty result
+    with a clear reason when SERPER_API_KEY is not configured.
+    """
+    from app.config import settings
+    from app.retrieval.connectors.web_search import serper_search
+
+    q = (query or "").strip()
+    if not q:
+        return {"error": "empty query", "results": []}
+    if not settings.serper_api_key:
+        return {"error": "web search not configured (set SERPER_API_KEY)", "results": []}
+    results = await serper_search(q, num=max(1, min(int(k or 6), 10)))
+    return {"query": q, "count": len(results), "results": results}
+
+
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
@@ -1061,6 +1080,25 @@ TOOLS: Dict[str, Tool] = {
             "required": ["query"],
         },
         run=search_knowledge,
+    ),
+    "web_search": Tool(
+        name="web_search",
+        description=(
+            "Search the live web (Google via Serper) for fresh public context: "
+            "company news, market conditions, background on an account or "
+            "industry. Returns title, snippet, and link for each result. Use when "
+            "the answer needs current external information the knowledge base does "
+            "not have. Cite the links you use."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Web search query."},
+                "k": {"type": "integer", "description": "Max results (default 6, max 10)."},
+            },
+            "required": ["query"],
+        },
+        run=web_search,
     ),
     "evaluate_policy": Tool(
         name="evaluate_policy",

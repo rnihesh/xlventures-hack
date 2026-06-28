@@ -1,60 +1,87 @@
-"""Optional live web-search connector (guarded by network, degrades gracefully).
+"""Live web-search connector backed by Serper (google.serper.dev).
 
-Pulls public context for an account or topic from a live search and ingests the
-result snippets as ``web`` evidence. It is strictly best-effort: with no network
-(or on any HTTP error) it returns a disabled :class:`IngestResult` rather than
-raising, so the rest of the app, and the primary file/paste path, are never
-blocked by it.
+Pulls public context for an account or topic from a real Google search and
+ingests the result snippets as ``web`` evidence. Strictly best-effort: with no
+API key, no network, or any HTTP error it returns a disabled :class:`IngestResult`
+rather than raising, so the rest of the app (and the primary file/paste path) is
+never blocked by it.
 
-The default backend is the DuckDuckGo Instant Answer API, which needs no API key
-(``https://api.duckduckgo.com/?q=...&format=json``). A custom OpenAI-compatible
-or other search endpoint is out of scope here; this stays dependency-light and
-offline-safe.
+Set ``SERPER_API_KEY`` to enable. Without it, the connector is a graceful no-op.
 """
 
 from __future__ import annotations
 
 from typing import Any, List, Optional
 
+from app.config import settings
+
 from .base import IngestResult, ingest_text
 
-_DDG_URL = "https://api.duckduckgo.com/"
-_TIMEOUT = 8.0
-_MAX_SNIPPETS = 6
+_SERPER_URL = "https://google.serper.dev/search"
+_TIMEOUT = 12.0
+_MAX_SNIPPETS = 8
 
 
-def _collect_snippets(data: dict) -> List[str]:
-    """Extract human-readable snippets from a DuckDuckGo IA JSON payload."""
-    snippets: List[str] = []
+async def serper_search(query: str, num: int = 8) -> List[dict]:
+    """Return structured Google results via Serper, or [] when unavailable.
 
-    abstract = (data.get("AbstractText") or "").strip()
-    if abstract:
-        source = (data.get("AbstractSource") or "").strip()
-        heading = (data.get("Heading") or "").strip()
-        prefix = f"{heading} ({source}): " if heading else ""
-        snippets.append(f"{prefix}{abstract}")
+    Each item is {"title", "snippet", "link"}. Includes the answer box and
+    knowledge graph (when present) ahead of the organic results.
+    """
+    q = (query or "").strip()
+    if not q or not settings.serper_api_key:
+        return []
+    try:
+        import httpx
 
-    answer = (data.get("Answer") or "").strip()
-    if answer:
-        snippets.append(answer)
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            resp = await client.post(
+                _SERPER_URL,
+                headers={
+                    "X-API-KEY": settings.serper_api_key,
+                    "Content-Type": "application/json",
+                },
+                json={"q": q, "num": num},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception:  # noqa: BLE001 - offline / no key / HTTP error degrades
+        return []
 
-    def _walk(topics: list) -> None:
-        for item in topics or []:
-            if len(snippets) >= _MAX_SNIPPETS:
-                return
-            if isinstance(item, dict):
-                txt = (item.get("Text") or "").strip()
-                if txt:
-                    snippets.append(txt)
-                elif item.get("Topics"):
-                    _walk(item["Topics"])
+    results: List[dict] = []
 
-    _walk(data.get("RelatedTopics") or [])
-    return snippets[:_MAX_SNIPPETS]
+    ab = data.get("answerBox") or {}
+    ab_text = (ab.get("answer") or ab.get("snippet") or "").strip()
+    if ab_text:
+        results.append(
+            {"title": ab.get("title") or "Answer", "snippet": ab_text, "link": ab.get("link", "")}
+        )
+
+    kg = data.get("knowledgeGraph") or {}
+    kg_text = (kg.get("description") or "").strip()
+    if kg_text:
+        results.append(
+            {"title": kg.get("title") or "Overview", "snippet": kg_text, "link": kg.get("descriptionLink", "")}
+        )
+
+    for item in data.get("organic") or []:
+        snippet = (item.get("snippet") or "").strip()
+        if not snippet:
+            continue
+        results.append(
+            {
+                "title": (item.get("title") or "").strip(),
+                "snippet": snippet,
+                "link": (item.get("link") or "").strip(),
+            }
+        )
+        if len(results) >= num:
+            break
+    return results[:num]
 
 
 class WebSearchConnector:
-    """Search the live web for context and ingest it as ``web`` evidence."""
+    """Search the live web (Serper) for context and ingest it as ``web`` evidence."""
 
     name = "web_search"
 
@@ -75,39 +102,25 @@ class WebSearchConnector:
                 ok=False, chunks_written=0, source_type="web", domain=domain,
                 detail="empty query",
             )
-
-        try:
-            import httpx
-
-            params = {
-                "q": q,
-                "format": "json",
-                "no_html": "1",
-                "no_redirect": "1",
-                "skip_disambig": "1",
-            }
-            async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-                resp = await client.get(
-                    _DDG_URL,
-                    params=params,
-                    headers={"User-Agent": "aperture-nba/0.1"},
-                )
-                resp.raise_for_status()
-                data = resp.json()
-        except Exception:  # noqa: BLE001 - offline / network failure degrades
+        if not settings.serper_api_key:
             return IngestResult(
                 ok=False, chunks_written=0, source_type="web", domain=domain,
-                detail="web search unavailable (offline or no results)",
+                detail="web search not configured (set SERPER_API_KEY)",
             )
 
-        snippets = _collect_snippets(data)
-        if not snippets:
+        results = await serper_search(q, num=_MAX_SNIPPETS)
+        if not results:
             return IngestResult(
                 ok=False, chunks_written=0, source_type="web", domain=domain,
                 detail="no web results for that query",
             )
 
-        text = "\n".join(snippets)
+        # One readable block per result so the ingested evidence carries the link.
+        lines = [
+            f"{r['title']}: {r['snippet']}" + (f" ({r['link']})" if r.get("link") else "")
+            for r in results
+        ]
+        text = "\n".join(lines)
         return await ingest_text(
             text=text,
             source_type="web",

@@ -177,6 +177,7 @@ _COPILOT_TOOLS: List[ToolSpec] = [
     ToolSpec("get_domain", "python", "Inspect a domain pack (process, journey, decision points).", False, "low"),
     ToolSpec("run_nba", "python", "Run the full planner graph and return an explained recommendation.", True, "medium", {"graph": "planner"}),
     ToolSpec("search_knowledge", "python", "Hybrid retrieval over the evidence corpus with citations.", False, "low"),
+    ToolSpec("web_search", "http", "Live Google web search via Serper for fresh public context.", False, "low"),
     ToolSpec("evaluate_policy", "python", "Check a candidate action against the org's policy guardrails.", False, "low"),
     ToolSpec("execute_action", "python", "Generate a concrete artifact (email, task, slack) from a recommendation.", True, "medium"),
     ToolSpec("get_last_run", "python", "Return the org's most recent run and recommendation.", False, "low"),
