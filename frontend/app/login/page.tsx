@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { KeyRound, Loader2 } from "lucide-react";
 
 import { AuthScreen } from "@/components/auth-screen";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { API_BASE } from "@/lib/api";
 import { authHeaders } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
+import { isPasskeySupported, loginWithPasskey } from "@/lib/api/passkey";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,6 +21,29 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
+  const [passkeyReady, setPasskeyReady] = useState(false);
+
+  // WebAuthn is a client-only API; detect support after mount to keep the
+  // server-rendered markup stable and avoid a hydration mismatch.
+  useEffect(() => {
+    setPasskeyReady(isPasskeySupported());
+  }, []);
+
+  async function onPasskey() {
+    setError(null);
+    setPasskeyLoading(true);
+    try {
+      // A filled email targets that account's passkeys; otherwise fall back to
+      // a discoverable (usernameless) credential.
+      await loginWithPasskey(email.trim() || undefined);
+      await refresh();
+      router.replace("/dashboard");
+    } catch (err) {
+      setError((err as Error).message || "Could not sign in with a passkey.");
+      setPasskeyLoading(false);
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -122,6 +146,22 @@ export default function LoginPage() {
           <span className="h-px flex-1 bg-border" />
         </div>
         <GoogleButton />
+        {passkeyReady ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={onPasskey}
+            disabled={passkeyLoading || submitting}
+          >
+            {passkeyLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <KeyRound className="h-4 w-4" />
+            )}
+            Sign in with a passkey
+          </Button>
+        ) : null}
       </form>
     </AuthScreen>
   );

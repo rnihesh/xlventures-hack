@@ -55,6 +55,24 @@ class Settings(BaseSettings):
     # Comma-separated emails that may access the admin panel (case-insensitive).
     admin_emails: str = ""
 
+    # --- WebAuthn / passkeys -------------------------------------------------
+    # RP id defaults to the host of app_base_url (e.g. aperture.niheshr.com),
+    # the origin is app_base_url. Override rp_id only for special setups.
+    webauthn_rp_name: str = "Aperture"
+    webauthn_rp_id: str = ""
+
+    @property
+    def rp_id(self) -> str:
+        if self.webauthn_rp_id:
+            return self.webauthn_rp_id
+        from urllib.parse import urlparse
+
+        return urlparse(self.app_base_url).hostname or "localhost"
+
+    @property
+    def rp_origin(self) -> str:
+        return self.app_base_url.rstrip("/")
+
     # --- AWS / SES (email, all optional) ------------------------------------
     aws_region: str = "us-east-1"
     ses_sender_email: str | None = None

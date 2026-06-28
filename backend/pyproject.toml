@@ -28,6 +28,7 @@ dependencies = [
     "PyJWT>=2.9",
     "bcrypt>=4.1",
     "email-validator>=2.1",
+    "webauthn>=2.8.0",
 ]
 
 [project.optional-dependencies]

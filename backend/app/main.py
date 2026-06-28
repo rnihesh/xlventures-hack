@@ -108,6 +108,7 @@ def create_app() -> FastAPI:
         health,
         ingest,
         integrations,
+        passkey,
         rules,
         runs,
         whatif,
@@ -116,6 +117,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(passkey.router)
     app.include_router(runs.router)
     app.include_router(accounts.router)
     app.include_router(domains.router)

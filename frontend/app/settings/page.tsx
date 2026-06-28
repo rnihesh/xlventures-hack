@@ -21,6 +21,9 @@ import {
   ShieldCheck,
   Building2,
   AtSign,
+  KeyRound,
+  Plus,
+  Loader2,
 } from "lucide-react";
 
 import {
@@ -48,6 +51,12 @@ import {
   type ConnectorKind,
   type ConnectorStatus,
 } from "@/lib/api/integrations";
+import {
+  isPasskeySupported,
+  listPasskeys,
+  registerPasskey,
+  type PasskeySummary,
+} from "@/lib/api/passkey";
 
 // The verified SES sending domain. Only senders on this domain are accepted.
 const VERIFIED_DOMAIN = "niheshr.com";
@@ -529,6 +538,138 @@ function WorkspaceCard() {
 }
 
 // ---------------------------------------------------------------------------
+// Passkeys
+// ---------------------------------------------------------------------------
+
+function formatPasskeyDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function PasskeysCard() {
+  const { user } = useAuth();
+  const [supported, setSupported] = useState(false);
+  const [passkeys, setPasskeys] = useState<PasskeySummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+
+  // WebAuthn is client-only; detect after mount to avoid a hydration mismatch.
+  useEffect(() => {
+    setSupported(isPasskeySupported());
+  }, []);
+
+  const reload = useCallback(async (signal?: AbortSignal) => {
+    const list = await listPasskeys(signal);
+    if (!signal?.aborted) setPasskeys(list);
+  }, []);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    (async () => {
+      try {
+        await reload(ac.signal);
+      } finally {
+        if (!ac.signal.aborted) setLoading(false);
+      }
+    })();
+    return () => ac.abort();
+  }, [reload]);
+
+  const add = async () => {
+    setAdding(true);
+    try {
+      await registerPasskey();
+      toast("Passkey added", {
+        variant: "success",
+        description: "You can now sign in with this device.",
+      });
+      await reload();
+    } catch (err) {
+      toast("Could not add passkey", {
+        variant: "error",
+        description: (err as Error).message,
+      });
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+              <KeyRound className="h-5 w-5" aria-hidden />
+            </div>
+            <div>
+              <CardTitle className="text-base">Passkeys</CardTitle>
+              <CardDescription className="mt-0.5">
+                Sign in to {user?.email ?? "your account"} with Face ID, a
+                fingerprint, or a security key.
+              </CardDescription>
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {!supported ? (
+          <p className="text-xs text-muted-foreground">
+            This browser does not support passkeys. Try a recent version of
+            Safari, Chrome, or Edge.
+          </p>
+        ) : loading ? (
+          <p className="text-xs text-muted-foreground">Loading passkeys</p>
+        ) : passkeys.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No passkeys yet. Add one to skip your password next time.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border rounded-lg border border-border">
+            {passkeys.map((pk) => (
+              <li
+                key={pk.credential_id}
+                className="flex items-center gap-3 px-3 py-2.5"
+              >
+                <KeyRound
+                  className="h-4 w-4 shrink-0 text-muted-foreground"
+                  aria-hidden
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">
+                    {pk.label || "Passkey"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Added {formatPasskeyDate(pk.created_at)}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+      {supported ? (
+        <CardFooter className="gap-2 border-t border-border pt-4">
+          <Button onClick={add} disabled={adding} className="ml-auto">
+            {adding ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
+            {adding ? "Adding" : "Add a passkey"}
+          </Button>
+        </CardFooter>
+      ) : null}
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -592,6 +733,9 @@ export default function SettingsPage() {
         </p>
         <div className="mb-5">
           <WorkspaceCard />
+        </div>
+        <div className="mb-5">
+          <PasskeysCard />
         </div>
         <div className="grid gap-5 md:grid-cols-2">
           {/* Email always sends from the platform sender over SES (no per-user
