@@ -1,37 +1,500 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Intelligent Next Best Action API",
-    "version": "1.0.0",
-    "description": "REST and SSE API for the agentic decision intelligence platform. Turns business signals into explainable, confidence-scored Next Best Actions gated by human-in-the-loop approval."
+    "title": "nba-backend",
+    "version": "0.1.0"
   },
-  "servers": [
-    {
-      "url": "http://localhost:8000",
-      "description": "Local development server."
-    }
-  ],
   "paths": {
     "/health": {
       "get": {
-        "operationId": "getHealth",
-        "summary": "Health check.",
-        "description": "Returns service liveness status.",
+        "tags": [
+          "health"
+        ],
+        "summary": "Health",
+        "description": "Liveness probe.",
+        "operationId": "health_health_get",
         "responses": {
           "200": {
-            "description": "Service is healthy.",
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/signup": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Signup",
+        "description": "Create an org + user, send a verification email (or auto-verify in dev).",
+        "operationId": "signup_auth_signup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Signup Auth Signup Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/verify": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Verify",
+        "description": "Mark the user owning ``token`` as verified.",
+        "operationId": "verify_auth_verify_get",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": false,
-                  "required": ["status"],
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "const": "ok"
-                    }
-                  }
+                  "additionalProperties": true,
+                  "title": "Response Verify Auth Verify Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "description": "Verify credentials, set the session cookie, and return user + org.",
+        "operationId": "login_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Login Auth Login Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout",
+        "description": "Clear the session cookie.",
+        "operationId": "logout_auth_logout_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Logout Auth Logout Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Me",
+        "description": "Return the current authenticated user and org, or 401.",
+        "operationId": "me_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Me Auth Me Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/org": {
+      "put": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Rename Org",
+        "description": "Rename the current user's org (workspace) and return the updated org.",
+        "operationId": "rename_org_auth_org_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameOrgRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Rename Org Auth Org Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/google/start": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Google Start",
+        "description": "Return the Google consent URL for signing in, with a CSRF state nonce that\nis also bound to this browser via a short-lived httpOnly cookie.",
+        "operationId": "google_start_auth_google_start_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Google Start Auth Google Start Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/google/exchange": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Google Exchange",
+        "description": "Complete Google sign-in: validate state, resolve the Google account email,\nfind or create the user (+ a personal org for first-time users), and set the\nsession cookie.",
+        "operationId": "google_exchange_auth_google_exchange_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Google Exchange Auth Google Exchange Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/passkey/register/options": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Register Options",
+        "operationId": "register_options_auth_passkey_register_options_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Register Options Auth Passkey Register Options Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/passkey/register/verify": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Register Verify",
+        "operationId": "register_verify_auth_passkey_register_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegVerifyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Register Verify Auth Passkey Register Verify Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/passkey": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List Passkeys",
+        "operationId": "list_passkeys_auth_passkey_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Passkeys Auth Passkey Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/passkey/login/options": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login Options",
+        "operationId": "login_options_auth_passkey_login_options_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginOptionsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Login Options Auth Passkey Login Options Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/passkey/login/verify": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login Verify",
+        "operationId": "login_verify_auth_passkey_login_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginVerifyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Login Verify Auth Passkey Login Verify Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -41,41 +504,108 @@
     },
     "/runs": {
       "post": {
-        "operationId": "createRun",
-        "summary": "Start a decision run.",
-        "description": "Submits a signal for an account in a given domain and starts an agentic run that produces recommendations.",
+        "tags": [
+          "runs"
+        ],
+        "summary": "Create Run",
+        "description": "Create a run scoped to the caller's org, store it, and return its id.",
+        "operationId": "create_run_runs_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/CreateRunRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/CreateRunIn"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Run accepted and started.",
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": ["run_id"],
-                  "properties": {
-                    "run_id": {
-                      "type": "string",
-                      "description": "Identifier of the created run."
-                    }
-                  }
+                  "$ref": "#/components/schemas/CreateRunOut"
                 }
               }
             }
           },
           "422": {
-            "description": "Validation error in request body.",
+            "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "List Runs",
+        "description": "List the caller's recent runs, newest first, for the run history UI.",
+        "operationId": "list_runs_runs_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response List Runs Runs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -84,32 +614,126 @@
     },
     "/runs/{run_id}/stream": {
       "get": {
-        "operationId": "streamRun",
-        "summary": "Stream run events.",
-        "description": "Returns a Server-Sent Events stream of the event envelope. Each event is sent as 'data: <json>\\n\\n'. The stream ends with a run.finished event.",
+        "tags": [
+          "runs"
+        ],
+        "summary": "Stream Run",
+        "description": "Stream the graph execution as Server Sent Events.\n\n``disable_memory`` (query param) threads ``state['disable_memory'] = True``\ninto the graph so an A/B toggle can re-run the same signal without the\nlearned-memory re-ranking, making the learning loop's lift visible side by\nside. It does not change the event contract.",
+        "operationId": "stream_run_runs__run_id__stream_get",
         "parameters": [
           {
             "name": "run_id",
             "in": "path",
             "required": true,
-            "description": "Identifier of the run to stream.",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "disable_memory",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Disable Memory"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "SSE stream of run events.",
+            "description": "Successful Response",
             "content": {
-              "text/event-stream": {
-                "schema": { "$ref": "#/components/schemas/Event" }
+              "application/json": {
+                "schema": {}
               }
             }
           },
-          "404": {
-            "description": "Run not found.",
+          "422": {
+            "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{run_id}/brief": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Run Brief",
+        "description": "Return a self-contained, exportable decision brief for a run.\n\nRead-only and org-scoped: it never re-runs the graph or calls an LLM, it\nonly projects the stored run, recommendation, policy gate, human decision,\nand episode outcome into a one-page artifact. Returns 404 for unknown or\nother-org runs (same ownership rule as the rest of the runs API), and 409\nwhile a run has not yet produced a recommendation.",
+        "operationId": "run_brief_runs__run_id__brief_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Run Brief Runs  Run Id  Brief Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -118,58 +742,2460 @@
     },
     "/runs/{run_id}/hitl": {
       "post": {
-        "operationId": "submitHitlDecision",
-        "summary": "Submit a human-in-the-loop decision.",
-        "description": "Approves, rejects, or edits a recommendation, resuming the gated run.",
+        "tags": [
+          "runs"
+        ],
+        "summary": "Hitl",
+        "description": "Record a human in the loop decision and close the learning loop.",
+        "operationId": "hitl_runs__run_id__hitl_post",
         "parameters": [
           {
             "name": "run_id",
             "in": "path",
             "required": true,
-            "description": "Identifier of the run awaiting a decision.",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
           }
         ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/HitlRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/HitlIn"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Decision accepted.",
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": false,
-                  "required": ["status"],
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "description": "Resulting status after applying the decision."
-                    }
-                  }
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Hitl Runs  Run Id  Hitl Post"
                 }
               }
             }
           },
-          "404": {
-            "description": "Run not found.",
+          "422": {
+            "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts": {
+      "post": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Create Account",
+        "description": "Create an account in the caller's org and return its inbox summary.\n\nA stable ``account_id`` is generated, the record is upserted under the org,\nand any ``notes`` are ingested as retrievable evidence for that account.",
+        "operationId": "create_account_accounts_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Create Account Accounts Post"
+                }
               }
             }
           },
           "422": {
-            "description": "Validation error in request body.",
+            "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "List Accounts",
+        "description": "Return the triage inbox summaries for the caller's org, highest risk first.\n\nPass ``?domain=`` to scope the inbox to one vertical; omit it for the full\ncross-domain queue. A new org with no accounts returns an empty list.",
+        "operationId": "list_accounts_accounts_get",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Domain"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response List Accounts Accounts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/import-demo": {
+      "post": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Import Demo",
+        "description": "Copy the Demo seed accounts into the caller's org (idempotent).\n\nPopulates a brand-new workspace in one click. Each seed account is upserted\nunder the current org, so re-running imports the same set without dupes.",
+        "operationId": "import_demo_accounts_import_demo_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object",
+                  "title": "Response Import Demo Accounts Import Demo Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}": {
+      "put": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Update Account",
+        "description": "Update fields on an existing account in the caller's org.",
+        "operationId": "update_account_accounts__account_id__put",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Update Account Accounts  Account Id  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Delete Account",
+        "description": "Remove an account from the caller's org.",
+        "operationId": "delete_account_accounts__account_id__delete",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Account Accounts  Account Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Get Account",
+        "description": "Return the account 360: profile, signal timeline, history, current rec.",
+        "operationId": "get_account_accounts__account_id__get",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Account Accounts  Account Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}/timeline": {
+      "get": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Get Account Timeline",
+        "description": "Return the merged, newest-first audit timeline for one account.\n\nFolds together ingested interactions, NBA recommendations, the human\ndecision on each, and any recorded outcome into a single time-ordered\nstream, so the full workflow and memory are visible per account. Read-only,\noffline-safe, and org-scoped: the account fetch 404s for accounts the caller\ndoes not own, and only that org's interactions and episodes are merged.",
+        "operationId": "get_account_timeline_accounts__account_id__timeline_get",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Account Timeline Accounts  Account Id  Timeline Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/domains": {
+      "get": {
+        "tags": [
+          "domains"
+        ],
+        "summary": "Get Domains",
+        "description": "Return base packs merged with this org's uploaded packs, flagship first.\n\nOrg packs are scoped to the caller, so one org never sees another's uploads.\nAn org pack with the same key as a base pack shadows it (the org sees its own\nversion). Each entry carries ``source`` (\"base\" or \"org\") and ``editable`` so\nthe UI can offer delete only on uploaded packs.",
+        "operationId": "get_domains_domains_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Get Domains Domains Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "domains"
+        ],
+        "summary": "Create Domain",
+        "description": "Validate and store an uploaded pack as this org's domain.\n\nOn success the pack is queryable in GET /domains and a run can target it\nimmediately. On a validation failure responds 422 with the error messages.",
+        "operationId": "create_domain_domains_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PackYaml"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Create Domain Domains Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/domains/validate": {
+      "post": {
+        "tags": [
+          "domains"
+        ],
+        "summary": "Validate Domain",
+        "description": "Validate raw YAML against the pack schema without storing it.\n\nReturns ``{ok: true, summary}`` for a valid pack, or ``{ok: false, errors}``\nwith human readable messages otherwise. Never raises on a bad pack: the UI\nrenders the errors inline.",
+        "operationId": "validate_domain_domains_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PackYaml"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Validate Domain Domains Validate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/domains/{domain_key}": {
+      "delete": {
+        "tags": [
+          "domains"
+        ],
+        "summary": "Delete Domain",
+        "description": "Delete one of this org's uploaded packs (base packs cannot be deleted).",
+        "operationId": "delete_domain_domains__domain_key__delete",
+        "parameters": [
+          {
+            "name": "domain_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Domain Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Domain Domains  Domain Key  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "domains"
+        ],
+        "summary": "Get Domain",
+        "description": "Return the full parsed pack for one domain (the org's pack or the base).\n\nBinds the org so an uploaded pack (which is not on disk) resolves; ensures\nthe loader registry is hydrated from storage first for a fresh process.",
+        "operationId": "get_domain_domains__domain_key__get",
+        "parameters": [
+          {
+            "name": "domain_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Domain Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Domain Domains  Domain Key  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/whatif": {
+      "post": {
+        "tags": [
+          "whatif"
+        ],
+        "summary": "Whatif",
+        "description": "Re-plan with a couple of overridden inputs and report the delta.",
+        "operationId": "whatif_whatif_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WhatIfIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Whatif Whatif Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ingest/sources": {
+      "get": {
+        "tags": [
+          "ingest"
+        ],
+        "summary": "List Sources",
+        "description": "Return the recognized interaction source types (for the UI select).",
+        "operationId": "list_sources_ingest_sources_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "items": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "type": "object",
+                  "title": "Response List Sources Ingest Sources Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ingest/recent": {
+      "get": {
+        "tags": [
+          "ingest"
+        ],
+        "summary": "List Recent",
+        "description": "Return the caller's recently ingested interactions, most recent first.\n\nOptionally filter by ``account_id``. Org-scoped: an org only ever sees the\nevidence it ingested this process.",
+        "operationId": "list_recent_ingest_recent_get",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 25,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  },
+                  "title": "Response List Recent Ingest Recent Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ingest": {
+      "post": {
+        "tags": [
+          "ingest"
+        ],
+        "summary": "Ingest",
+        "description": "Ingest raw interaction text and make it retrievable in the next run.\n\nOrg-scoped and idempotent: re-pasting the same content for the same account\nreturns the original record instead of duplicating evidence. Runs a light,\ndeterministic signal-extraction pass so the response carries a short title\nand a few candidate signal phrases (no LLM, fully offline).",
+        "operationId": "ingest_ingest_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Ingest Ingest Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ingest/web": {
+      "post": {
+        "tags": [
+          "ingest"
+        ],
+        "summary": "Ingest Web",
+        "description": "Optional: run a live web search and ingest its snippets (best-effort).\n\nReturns ``ok: false`` with a reason when the network is unavailable or the\nquery has no public results, so the UI can degrade without an error toast.",
+        "operationId": "ingest_web_ingest_web_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebIngestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Ingest Web Ingest Web Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/integrations": {
+      "get": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "List Integrations",
+        "description": "List this org's connectors plus the Google OAuth availability flag.",
+        "operationId": "list_integrations_integrations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response List Integrations Integrations Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/integrations/{kind}": {
+      "put": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Save Integration",
+        "description": "Save a connector's config under the caller's org.",
+        "operationId": "save_integration_integrations__kind__put",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectorIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Save Integration Integrations  Kind  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Delete Integration",
+        "description": "Remove a connector from the caller's org.",
+        "operationId": "delete_integration_integrations__kind__delete",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Integration Integrations  Kind  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/integrations/slack/test": {
+      "post": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Slack Test",
+        "description": "Post a sample message to the org's saved Slack webhook to confirm it works.",
+        "operationId": "slack_test_integrations_slack_test_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Slack Test Integrations Slack Test Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/integrations/google/start": {
+      "get": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Google Start",
+        "description": "Return the Google consent URL, or a graceful not-configured status.\n\nBinds the flow to this org with a high-entropy single-shot state nonce so the\ncallback cannot be forged (CSRF).",
+        "operationId": "google_start_integrations_google_start_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Google Start Integrations Google Start Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/integrations/google/exchange": {
+      "post": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Google Exchange",
+        "description": "Exchange an OAuth code for tokens and store them on the org's connector.",
+        "operationId": "google_exchange_integrations_google_exchange_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleExchangeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Google Exchange Integrations Google Exchange Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts": {
+      "get": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "List Contacts",
+        "description": "Return every contact for the caller's org, most recent first.",
+        "operationId": "list_contacts_contacts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Contacts Contacts Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Create Contact",
+        "description": "Create a contact in the caller's org.",
+        "operationId": "create_contact_contacts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Create Contact Contacts Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contacts/{contact_id}": {
+      "put": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Update Contact",
+        "description": "Update fields on an existing contact in the caller's org.",
+        "operationId": "update_contact_contacts__contact_id__put",
+        "parameters": [
+          {
+            "name": "contact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Contact Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Update Contact Contacts  Contact Id  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Delete Contact",
+        "description": "Remove a contact from the caller's org.",
+        "operationId": "delete_contact_contacts__contact_id__delete",
+        "parameters": [
+          {
+            "name": "contact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Contact Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Contact Contacts  Contact Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/accounts/{account_id}/contacts": {
+      "get": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "List Account Contacts",
+        "description": "Return the org's contacts linked to a single account.",
+        "operationId": "list_account_contacts_accounts__account_id__contacts_get",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response List Account Contacts Accounts  Account Id  Contacts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/{domain}": {
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Get Rules",
+        "description": "Return the effective policy rules and action catalog for the org.\n\nThe result merges the base domain pack with any saved org override, so the\neditor shows exactly what the policy engine and planner will apply.",
+        "operationId": "get_rules_rules__domain__get",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Domain"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Rules Rules  Domain  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Save Rules",
+        "description": "Persist the org's override for a domain and return the new effective view.\n\nSending an empty body (no ``policies`` and no ``actions``) clears the\noverride and reverts the org to the base pack.",
+        "operationId": "save_rules_rules__domain__put",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Domain"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RulesIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Save Rules Rules  Domain  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agents": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Get Agents",
+        "description": "Return the agent registry plus always-on graph nodes as serializable cards.\n\nEach card exposes name (capability), description, the state ``output_keys``\nthe node produces, its ``cost_tier``, and ``tags``: everything the planner\nneeds to route work, minus the node callable.",
+        "operationId": "get_agents_agents_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Get Agents Agents Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tools": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Get Tools",
+        "description": "Return the tool registry with governance metadata.\n\nEach spec exposes name, description, ``side_effecting`` (does it mutate the\nworld), ``risk_tier``, and the ``binding`` that resolves the implementation,\nso the policy and approval story is auditable from one place.",
+        "operationId": "get_tools_tools_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Get Tools Tools Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/overview": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Overview",
+        "operationId": "overview_admin_overview_get",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "default": 30,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Overview Admin Overview Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/orgs": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Orgs",
+        "operationId": "orgs_admin_orgs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Orgs Admin Orgs Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Users",
+        "operationId": "users_admin_users_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Users Admin Users Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/usage": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Usage",
+        "operationId": "usage_admin_usage_get",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "default": 30,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Usage Admin Usage Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflow/{domain}": {
+      "get": {
+        "tags": [
+          "workflow"
+        ],
+        "summary": "Get Workflow",
+        "description": "Return the orchestration graph and each decision point's effective roster.",
+        "operationId": "get_workflow_workflow__domain__get",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Domain"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Workflow Workflow  Domain  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "workflow"
+        ],
+        "summary": "Put Workflow",
+        "description": "Save the org's per-decision-point roster overrides (merged onto rules).",
+        "operationId": "put_workflow_workflow__domain__put",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Domain"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkflowIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Put Workflow Workflow  Domain  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflow/{domain}/assistant": {
+      "post": {
+        "tags": [
+          "workflow"
+        ],
+        "summary": "Workflow Assistant",
+        "description": "Edit the workflow from a natural-language instruction (AI, context aware).\n\nReads the org's current effective workflow, asks the model to turn the\ninstruction into new rosters, validates them against the selectable\nspecialists, persists, and returns the updated view plus a short reply.\nThere is NO keyword fallback: when the model is unavailable the assistant\nsays so honestly rather than guessing.",
+        "operationId": "workflow_assistant_workflow__domain__assistant_post",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Domain"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Workflow Assistant Workflow  Domain  Assistant Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/stream": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Chat Stream",
+        "description": "Stream the agent's tokens, tool calls, and final answer as SSE.",
+        "operationId": "chat_stream_chat_stream_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Chat",
+        "description": "Run the agent to completion and return the final answer plus tool trace.",
+        "operationId": "chat_chat_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/sessions": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "List Chat Sessions",
+        "description": "List the org's saved conversations (id, title, updated_at), newest first.",
+        "operationId": "list_chat_sessions_chat_sessions_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response List Chat Sessions Chat Sessions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/sessions/{session_id}": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Get Chat Session",
+        "description": "Return one of the org's conversations with its full turns.",
+        "operationId": "get_chat_session_chat_sessions__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Chat Session Chat Sessions  Session Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Upsert Chat Session",
+        "description": "Create or update one of the org's conversations (title and turns).",
+        "operationId": "upsert_chat_session_chat_sessions__session_id__put",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionUpsert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Upsert Chat Session Chat Sessions  Session Id  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Delete Chat Session",
+        "description": "Delete one of the org's conversations.",
+        "operationId": "delete_chat_session_chat_sessions__session_id__delete",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Delete Chat Session Chat Sessions  Session Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/learning": {
+      "get": {
+        "tags": [
+          "learning"
+        ],
+        "summary": "Get Learning",
+        "description": "Return the org's episodes, acceptance rate, acceptance trend, and a delta.",
+        "operationId": "get_learning_learning_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Learning Learning Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/learning/distill": {
+      "post": {
+        "tags": [
+          "learning"
+        ],
+        "summary": "Trigger Distillation",
+        "description": "Re-run distillation on demand and return the updated summary.",
+        "operationId": "trigger_distillation_learning_distill_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Trigger Distillation Learning Distill Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/learning/outcome": {
+      "post": {
+        "tags": [
+          "learning"
+        ],
+        "summary": "Record Learning Outcome",
+        "description": "Write an outcome back into memory so the learning metric moves live.\n\nThe ``episode_id`` is an opaque, caller-supplied id, so we resolve it and\nconfirm it belongs to the caller's org before recording. A missing or\nother-org episode returns 404 (not 403) so the endpoint cannot be used to\nenumerate which episode ids exist for other tenants, and no outcome is\nwritten against memory the caller does not own.",
+        "operationId": "record_learning_outcome_learning_outcome_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutcomeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Record Learning Outcome Learning Outcome Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eval": {
+      "get": {
+        "tags": [
+          "eval"
+        ],
+        "summary": "Get Eval",
+        "description": "Return the engine suites + the requesting org's outcomes.\n\nFast by default: serves cached golden-suite scores (global engine quality)\nand computes only the cheap, org-scoped outcomes, so a dashboard load never\nruns the LLM and never hangs. ``?refresh=true`` re-runs the golden cases.",
+        "operationId": "get_eval_eval_get",
+        "parameters": [
+          {
+            "name": "refresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Re-run the golden suites (slow, uses the LLM)",
+              "default": false,
+              "title": "Refresh"
+            },
+            "description": "Re-run the golden suites (slow, uses the LLM)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Eval Eval Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/execute": {
+      "post": {
+        "tags": [
+          "execute"
+        ],
+        "summary": "Execute",
+        "description": "Generate an artifact from a recommendation and record an audit entry.\n\nOrg-scoped: a ``run_id`` that names another tenant's run returns 404 (never\n403, to avoid an id-enumeration oracle) and nothing is generated or stored.\nSame-org runs and inline recommendations behave exactly as before. The audit\nrecord is stamped with the caller's org so reads can be gated by tenant.",
+        "operationId": "execute_execute_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecuteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/execute/{run_id}": {
+      "get": {
+        "tags": [
+          "execute"
+        ],
+        "summary": "List Artifacts",
+        "description": "List artifacts generated for a run, most recent first, scoped to the org.\n\nReads are gated by tenant: a ``run_id`` owned by (or whose stored artifacts\nbelong to) another org returns 404 instead of leaking those records or\nrevealing they exist. An own run with no artifacts yet still returns an empty\nlist, preserving the existing success behavior.",
+        "operationId": "list_artifacts_execute__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response List Artifacts Execute  Run Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/execute/approval-handoff": {
+      "post": {
+        "tags": [
+          "execute"
+        ],
+        "summary": "Execute Approval Handoff",
+        "description": "Push a pending recommendation to the org's Slack channel for sign-off.\n\nPosts a rich approval summary (account, signal, recommended next best action\nplus reasoning, confidence, top alternative, and that it is pending human\napproval) to the org's saved Slack webhook. Offline-safe and org-scoped:\nwhen no webhook is configured it returns ``{sent: False, reason:\n'slack_not_configured'}`` rather than raising.",
+        "operationId": "execute_approval_handoff_execute_approval_handoff_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovalHandoffIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/execute/send": {
+      "post": {
+        "tags": [
+          "execute"
+        ],
+        "summary": "Execute Send",
+        "description": "Actually send an artifact through the org's configured channel.\n\nLooks up the org connector for the channel and sends for real (email via\nSES, slack via webhook, gmail via the stored Google token). Offline or\nunconfigured channels return ``{sent: False, reason: '... not configured'}``\nrather than raising, so the click-to-send flow never crashes.",
+        "operationId": "execute_send_execute_send_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/policy/{domain}": {
+      "get": {
+        "tags": [
+          "policy"
+        ],
+        "summary": "Get Policy",
+        "description": "Return the declared policy rules for a domain.",
+        "operationId": "get_policy_policy__domain__get",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Domain"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Policy Policy  Domain  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/policy/evaluate": {
+      "post": {
+        "tags": [
+          "policy"
+        ],
+        "summary": "Evaluate Policy",
+        "description": "Evaluate a recommendation against a domain's policy rules.",
+        "operationId": "evaluate_policy_policy_evaluate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Evaluate Policy Policy Evaluate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -179,90 +3205,1409 @@
   },
   "components": {
     "schemas": {
-      "CreateRunRequest": {
+      "AccountIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Account / company display name."
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain",
+            "description": "Domain pack the account belongs to.",
+            "default": "customer_success"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
+          "segment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segment"
+          },
+          "arr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arr",
+            "description": "Annual recurring revenue."
+          },
+          "health_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health Score"
+          },
+          "risk_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Level",
+            "description": "critical / high / medium / low."
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner",
+            "description": "Account owner / CSM."
+          },
+          "renewal_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Renewal Date"
+          },
+          "signals": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signals",
+            "description": "Active signals as keys, or {key,label} objects."
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes",
+            "description": "Free-text context, also ingested as evidence."
+          }
+        },
         "type": "object",
-        "additionalProperties": false,
-        "required": ["domain", "account_id", "signal"],
+        "required": [
+          "name"
+        ],
+        "title": "AccountIn",
+        "description": "Payload to create an account in the caller's org."
+      },
+      "AccountUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
+          "segment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segment"
+          },
+          "arr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arr"
+          },
+          "health_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health Score"
+          },
+          "risk_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Level"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner"
+          },
+          "renewal_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Renewal Date"
+          },
+          "signals": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signals"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "title": "AccountUpdate",
+        "description": "Partial update for an existing account (only set fields are applied)."
+      },
+      "ApprovalHandoffIn": {
+        "properties": {
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "recommendation": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommendation"
+          },
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          }
+        },
+        "type": "object",
+        "title": "ApprovalHandoffIn",
+        "description": "Body for POST /execute/approval-handoff.\n\nProvide either a ``run_id`` (to pull the stored recommendation and its\noriginating signal) or an inline ``recommendation``. ``account_id`` supplies\naccount context; when a ``run_id`` is given its account is used as a\nfallback. The endpoint posts a rich, sign-off-ready summary to the org's\nSlack channel so a human can approve the pending action."
+      },
+      "AssistantIn": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "AssistantIn"
+      },
+      "ChatIn": {
+        "properties": {
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context",
+            "description": "Optional hints (account_id, domain, run_id, recommendation)."
+          }
+        },
+        "type": "object",
+        "title": "ChatIn",
+        "description": "Body for the chat endpoints."
+      },
+      "ChatMessage": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "title": "Role",
+            "description": "user | assistant | system"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "ChatMessage"
+      },
+      "ChatOut": {
+        "properties": {
+          "answer": {
+            "type": "string",
+            "title": "Answer"
+          },
+          "trace": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Trace"
+          }
+        },
+        "type": "object",
+        "required": [
+          "answer",
+          "trace"
+        ],
+        "title": "ChatOut"
+      },
+      "ConnectorIn": {
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config",
+            "default": {}
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "title": "ConnectorIn",
+        "description": "Body for PUT /integrations/{kind}: the connector config and an optional status."
+      },
+      "ContactIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Person's display name."
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email",
+            "description": "Email address to reach the contact."
+          },
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id",
+            "description": "Optional account this contact belongs to."
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role",
+            "description": "Free-text role, e.g. 'Economic buyer'."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "email"
+        ],
+        "title": "ContactIn",
+        "description": "Payload to create a contact in the caller's org."
+      },
+      "ContactUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "title": "ContactUpdate",
+        "description": "Partial update for an existing contact (only set fields are applied)."
+      },
+      "CreateRunIn": {
         "properties": {
           "domain": {
             "type": "string",
-            "description": "Domain pack key (for example customer_success)."
+            "title": "Domain"
           },
           "account_id": {
             "type": "string",
-            "description": "Identifier of the target account."
+            "title": "Account Id"
           },
           "signal": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["type", "content"],
-            "properties": {
-              "type": {
-                "type": "string",
-                "description": "Signal type key from the domain pack."
-              },
-              "content": {
-                "type": "string",
-                "description": "Raw signal content to reason over."
-              }
-            }
+            "$ref": "#/components/schemas/SignalIn"
           }
-        }
-      },
-      "HitlRequest": {
+        },
         "type": "object",
+        "required": [
+          "domain",
+          "account_id",
+          "signal"
+        ],
+        "title": "CreateRunIn"
+      },
+      "CreateRunOut": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id"
+        ],
+        "title": "CreateRunOut"
+      },
+      "EditedAction": {
+        "properties": {
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
         "additionalProperties": false,
-        "required": ["decision"],
+        "type": "object",
+        "title": "EditedAction",
+        "description": "Whitelisted fields a human may override on the recommended action.\n\nextra='forbid' rejects any unexpected keys so a HITL edit cannot inject\narbitrary fields into the recommendation's action object."
+      },
+      "EvaluateRequest": {
+        "properties": {
+          "recommendation": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Recommendation"
+          },
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain",
+            "default": "customer_success"
+          }
+        },
+        "type": "object",
+        "title": "EvaluateRequest",
+        "description": "Body for ``POST /policy/evaluate``."
+      },
+      "ExecuteIn": {
+        "properties": {
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "recommendation": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommendation"
+          },
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "artifact_type": {
+            "type": "string",
+            "title": "Artifact Type",
+            "description": "email | crm_task | slack"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_type"
+        ],
+        "title": "ExecuteIn",
+        "description": "Body for POST /execute.\n\nProvide either ``run_id`` (to pull the stored recommendation) or an inline\n``recommendation`` object. ``account_id`` supplies account context; when a\n``run_id`` is given its account is used as a fallback."
+      },
+      "ExecuteOut": {
+        "properties": {
+          "artifact": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Artifact"
+          },
+          "audit": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Audit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact",
+          "audit"
+        ],
+        "title": "ExecuteOut"
+      },
+      "GoogleExchangeIn": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "state": {
+            "type": "string",
+            "title": "State",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "GoogleExchangeIn",
+        "description": "Body for POST /integrations/google/exchange."
+      },
+      "GoogleLoginRequest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "state": {
+            "type": "string",
+            "title": "State",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "GoogleLoginRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HitlIn": {
         "properties": {
           "decision": {
             "type": "string",
-            "enum": ["approve", "reject", "edit"],
-            "description": "The human decision to apply."
+            "title": "Decision",
+            "description": "approve | reject | edit"
           },
           "edited_action": {
-            "type": ["object", "null"],
-            "description": "Replacement action payload when decision is edit; otherwise null.",
-            "additionalProperties": true
-          },
-          "reason": {
-            "type": ["string", "null"],
-            "description": "Optional free-text justification for the decision."
-          }
-        }
-      },
-      "Event": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["id", "run_id", "seq", "type", "ts", "data"],
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "run_id": { "type": "string" },
-          "seq": { "type": "integer", "minimum": 0 },
-          "type": {
-            "type": "string",
-            "enum": [
-              "run.started",
-              "node.started",
-              "node.finished",
-              "token",
-              "recommendation",
-              "hitl.required",
-              "run.finished",
-              "error"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EditedAction"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
-          "ts": { "type": "string", "format": "date-time" },
-          "data": { "type": "object", "additionalProperties": true }
-        }
-      },
-      "Error": {
-        "type": "object",
-        "additionalProperties": true,
-        "properties": {
-          "detail": {
-            "description": "Error detail message or structured validation errors."
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
           }
-        }
+        },
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "HitlIn"
+      },
+      "IngestIn": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "The raw interaction text (note, transcript, email, CSV rows)."
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type",
+            "description": "Recognized source type key.",
+            "default": "document"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Optional human title for the import."
+          },
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id",
+            "description": "Optional account to scope the evidence to."
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain",
+            "description": "Domain pack the corpus belongs to.",
+            "default": "customer_success"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "IngestIn",
+        "description": "Raw interaction text to ingest into the retrieval corpus."
+      },
+      "LoginOptionsIn": {
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "title": "LoginOptionsIn"
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "LoginVerifyIn": {
+        "properties": {
+          "credential": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Credential"
+          },
+          "handle": {
+            "type": "string",
+            "title": "Handle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "credential",
+          "handle"
+        ],
+        "title": "LoginVerifyIn"
+      },
+      "OutcomeIn": {
+        "properties": {
+          "episode_id": {
+            "type": "string",
+            "title": "Episode Id"
+          },
+          "decision": {
+            "type": "string",
+            "title": "Decision",
+            "description": "approve | reject | edit (or accepted/rejected/edited)"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "episode_id",
+          "decision"
+        ],
+        "title": "OutcomeIn"
+      },
+      "Overrides": {
+        "properties": {
+          "usage_trend": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage Trend",
+            "description": "Quarter-over-quarter usage change, percent."
+          },
+          "nps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nps",
+            "description": "Net promoter score, 0..10."
+          },
+          "arr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arr",
+            "description": "Annual recurring revenue / contract size."
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "Overrides",
+        "description": "The signals a user may nudge. All optional; omitted ones keep baseline."
+      },
+      "PackYaml": {
+        "properties": {
+          "yaml": {
+            "type": "string",
+            "title": "Yaml"
+          }
+        },
+        "type": "object",
+        "required": [
+          "yaml"
+        ],
+        "title": "PackYaml",
+        "description": "The raw YAML body for validate and save."
+      },
+      "RegVerifyIn": {
+        "properties": {
+          "credential": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Credential"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "credential"
+        ],
+        "title": "RegVerifyIn"
+      },
+      "RenameOrgRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "RenameOrgRequest"
+      },
+      "RulesIn": {
+        "properties": {
+          "policies": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policies"
+          },
+          "actions": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actions"
+          }
+        },
+        "type": "object",
+        "title": "RulesIn",
+        "description": "Body for ``PUT /rules/{domain}``: the org's override for this domain.\n\nEither or both lists may be sent. When a list is present it defines the\neffective set for that section (policies or actions); when omitted, the base\npack's section is left untouched. This lets the editor add, edit, and remove\nentries by sending the full desired list it derived from the effective pack."
+      },
+      "SendIn": {
+        "properties": {
+          "artifact_type": {
+            "type": "string",
+            "title": "Artifact Type",
+            "description": "email | gmail | google | slack"
+          },
+          "artifact": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Artifact"
+          },
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "contact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Id"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To"
+          },
+          "contact_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Ids"
+          },
+          "recipients": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipients"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_type"
+        ],
+        "title": "SendIn",
+        "description": "Body for POST /execute/send.\n\n``artifact_type`` is the channel to send through (``email`` via SES,\n``gmail`` / ``google`` via the Gmail API, ``slack`` via webhook). ``artifact``\nis the generated content (e.g. ``{subject, body}`` for email, ``{message}``\nfor slack). ``account_id`` supplies the recipient context; ``run_id`` ties\nthe send to a stored run for auditing."
+      },
+      "SendOut": {
+        "properties": {
+          "sent": {
+            "type": "boolean",
+            "title": "Sent"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "detail": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To"
+          },
+          "results": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sent"
+        ],
+        "title": "SendOut"
+      },
+      "SessionUpsert": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": "New chat"
+          },
+          "turns": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Turns"
+          }
+        },
+        "type": "object",
+        "title": "SessionUpsert"
+      },
+      "SignalIn": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "content"
+        ],
+        "title": "SignalIn"
+      },
+      "SignupRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 8,
+            "title": "Password"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "org_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Org Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password",
+          "org_name"
+        ],
+        "title": "SignupRequest"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WebIngestIn": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query",
+            "description": "Search query to fetch public context for."
+          },
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id",
+            "description": "Optional account to scope to."
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Optional title override."
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain",
+            "description": "Domain pack the corpus belongs to.",
+            "default": "customer_success"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "WebIngestIn",
+        "description": "A live web-search query to fetch and ingest as web evidence."
+      },
+      "WhatIfIn": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "title": "Domain",
+            "default": "customer_success"
+          },
+          "account_id": {
+            "type": "string",
+            "title": "Account Id"
+          },
+          "overrides": {
+            "$ref": "#/components/schemas/Overrides"
+          }
+        },
+        "type": "object",
+        "required": [
+          "account_id"
+        ],
+        "title": "WhatIfIn"
+      },
+      "WorkflowIn": {
+        "properties": {
+          "rosters": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Rosters"
+          }
+        },
+        "type": "object",
+        "title": "WorkflowIn"
       }
     }
   }
