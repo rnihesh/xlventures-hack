@@ -702,17 +702,26 @@ async def send_artifact(
     contact_queries = list(contacts or [])
     if contact:
         contact_queries.append(contact)
+    # A SPECIFIC named recipient that does not resolve must not silently become a
+    # broadcast to the whole account. We only fan out for explicit "all/every/
+    # account contacts" phrasing, not for an unknown name.
+    unresolved_names: List[str] = []
     for query in contact_queries:
+        q = str(query).strip()
         # A literal email address can be sent to directly without a lookup.
-        if "@" in str(query):
-            contact_emails.append(str(query).strip())
+        if "@" in q:
+            contact_emails.append(q)
             continue
         resolved = await _resolve_contact(org_id, query)
         if resolved is None:
-            # The query did not match a specific saved contact (e.g. "all
-            # contacts", "halcyon contacts", a typo). Do NOT hard-fail: treat it
-            # as "email the account's contacts" and let the fan-out below resolve
-            # every saved contact of the run's account.
+            low = q.lower()
+            is_fanout_phrase = any(
+                w in low for w in ("all", "every", "everyone", "contacts", "team")
+            )
+            if not is_fanout_phrase:
+                # A specific name that does not match a saved contact: record it
+                # so we ask instead of emailing everyone.
+                unresolved_names.append(q)
             continue
         if resolved.get("email"):
             contact_emails.append(str(resolved["email"]))
@@ -818,6 +827,22 @@ async def send_artifact(
         explicit = list(contact_emails)
         explicit.extend(recipients or [])
         explicit.extend(_split_addresses(to))
+
+        # A specific name was given that does not match a saved contact: ask,
+        # do NOT silently email the whole account.
+        if unresolved_names and not explicit and not all_account_contacts:
+            names = ", ".join(unresolved_names)
+            return {
+                "sent": False,
+                "reason": "contact_not_found",
+                "channel": channel,
+                "run_id": resolved_run_id,
+                "message": (
+                    f"No saved contact matches '{names}'. Add them on the Contacts "
+                    "page, or give me an email address. I will not email the whole "
+                    "account or guess an address."
+                ),
+            }
 
         # When no explicit recipient is given, or the caller asked to email the
         # whole account, fan out to EVERY saved contact of the account. We never

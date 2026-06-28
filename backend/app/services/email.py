@@ -46,8 +46,12 @@ def is_valid_email(addr: str | None) -> bool:
         return False
     if not _EMAIL_RE.match(candidate):
         return False
-    domain = candidate.rsplit("@", 1)[-1].lower()
-    return domain not in _FAKE_DOMAINS
+    # Normalize (a trailing dot makes "yourcompany.com." bypass the set), and
+    # reject the fake domain itself AND any subdomain of it.
+    domain = candidate.rsplit("@", 1)[-1].lower().rstrip(".")
+    if not domain or "." not in domain:
+        return False
+    return not any(domain == f or domain.endswith("." + f) for f in _FAKE_DOMAINS)
 
 
 def _build_message(link: str) -> tuple[str, str, str]:

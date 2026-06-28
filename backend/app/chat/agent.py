@@ -81,7 +81,9 @@ _SYSTEM_PROMPT = (
     "EXPLICITLY asks you to send it. Recipients may ONLY be (a) saved contacts, or "
     "(b) an exact address the user gave you. To send to a person, pass their NAME "
     "as the 'contact' argument to send_artifact (or the 'contacts' list for "
-    "several); the tool resolves it to the saved contact's REAL address. NEVER "
+    "several); send_message likewise takes a contact NAME (or a user-given "
+    "address) in its 'to' argument. Both resolve the name to the saved contact's "
+    "REAL address, so pass the NAME, not a guessed address. NEVER "
     "invent or guess an email: do not build addresses like name@yourcompany.com, "
     "name@company.com, first.last@<accountname>.com, or any placeholder domain, and "
     "do not derive an address from a person's or account's name. If the name has no "
@@ -817,22 +819,40 @@ async def stream(
 
     # Bind the caller's org for this turn so every org-scoped tool (retrieval,
     # runs, ingest, connectors) resolves to the authenticated tenant. The org
-    # comes from the request's authenticated principal (``org_id``), which always
-    # wins over any client-supplied context hint so a caller cannot read another
-    # org's data by spoofing context. Offline (no auth) this is the demo org.
-    toolkit.set_current_org(org_id or (context or {}).get("org_id"))
+    # comes ONLY from the request's authenticated principal; we never derive the
+    # tenant from client-supplied context (that would let a caller read another
+    # org's data by spoofing it). set_current_org defaults to the demo org when
+    # org_id is falsy (offline / no auth).
+    toolkit.set_current_org(org_id)
 
     if _use_offline():
         async for event in _stream_offline(messages, context):
             yield event
         return
 
+    tool_ran = False
     try:
         async for event in _stream_llm(messages, context):
+            if "tool" in str(event.get("type", "")):
+                tool_ran = True
             yield event
     except Exception:  # noqa: BLE001 - degrade to the deterministic path
-        async for event in _stream_offline(messages, context):
-            yield event
+        if tool_ran:
+            # A tool already executed this turn (possibly side-effecting, e.g. an
+            # email). Do NOT re-run the message through the offline router, which
+            # could duplicate a send. Surface a soft error instead.
+            yield {
+                "type": "error",
+                "data": {
+                    "message": (
+                        "I hit an error mid-task. Some steps may have completed, "
+                        "please check before retrying."
+                    )
+                },
+            }
+        else:
+            async for event in _stream_offline(messages, context):
+                yield event
 
 
 async def answer(
