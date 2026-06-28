@@ -217,6 +217,88 @@ def _split_signals(
     return supporting, contradicting_pool[:1]
 
 
+async def _llm_score(
+    decision_point: str,
+    signal: Dict[str, Any],
+    evidence: List[Dict[str, Any]],
+    account: Dict[str, Any],
+    is_opportunity: bool,
+) -> Tuple[float, List[Dict[str, Any]], Optional[str]]:
+    """Score the situation with the model, grounded in the real context.
+
+    Returns ``(score, factors, summary)`` where ``score`` is clamped to [0, 1]
+    and ``factors`` matches the deterministic factor dict shape (factor, weight,
+    value, contribution, note). Raises on any model or parse error so the caller
+    falls back to the deterministic path.
+    """
+
+    import json
+
+    from app.deps import get_llm
+
+    orientation = "opportunity to grow" if is_opportunity else "churn or downside risk"
+    ev_text = (
+        "\n".join(
+            f"- {(e.get('text') or e.get('snippet') or e.get('claim') or '')[:300]}"
+            for e in evidence[:8]
+            if isinstance(e, dict)
+        )
+        or "none"
+    )
+    acct_text = (
+        ", ".join(
+            f"{k}={account.get(k)}"
+            for k in ("health_score", "risk_level", "sentiment", "renewal_date", "active_seats", "seats")
+            if account.get(k) is not None
+        )
+        or "none"
+    )
+    prompt = (
+        "You are the risk scorer for an account decision. Judge the magnitude of "
+        f"the {orientation} for THIS specific situation, grounded ONLY in the "
+        "signal, the cited evidence, and the account profile below. Do not use a "
+        "fixed formula; weigh what the evidence actually shows.\n\n"
+        f"Decision point: {decision_point}\n"
+        f"Signal: {(signal.get('content') or '')[:1200]}\n\n"
+        f"Evidence:\n{ev_text}\n\n"
+        f"Account profile: {acct_text}\n\n"
+        'Return STRICT JSON: {"score": <0.0 to 1.0>, "summary": "<one sentence, '
+        'grounded in the evidence>", "factors": [{"name": "<short driver name>", '
+        '"value": <0.0 to 1.0>, "note": "<why, grounded in the evidence>"}]}. '
+        "List 2 to 5 named drivers, each tied to the evidence."
+    )
+
+    resp = await get_llm(temperature=0).ainvoke(prompt)
+    text = getattr(resp, "content", "") or ""
+    start, end = text.find("{"), text.rfind("}")
+    data = json.loads(text[start : end + 1])
+
+    score = round(max(0.0, min(1.0, float(data.get("score", 0.5)))), 3)
+
+    raw_factors = data.get("factors") or []
+    count = max(1, len(raw_factors))
+    even_weight = round(1.0 / count, 3)
+    factors: List[Dict[str, Any]] = []
+    for row in raw_factors:
+        if not isinstance(row, dict):
+            continue
+        value = round(max(0.0, min(1.0, float(row.get("value", score)))), 3)
+        factors.append(
+            {
+                "factor": str(row.get("name") or "driver").strip() or "driver",
+                "weight": even_weight,
+                "value": value,
+                "contribution": round(even_weight * value, 3),
+                "note": str(row.get("note") or "").strip(),
+            }
+        )
+    if not factors:
+        raise ValueError("model returned no usable factors")
+
+    summary = str(data.get("summary") or "").strip() or None
+    return score, factors, summary
+
+
 def _weighted_score(
     factors: Dict[str, Optional[float]]
 ) -> Tuple[float, List[Dict[str, Any]]]:
@@ -257,6 +339,8 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
         state.get("account_id", ""), state.get("domain", "customer_success")
     )
 
+    # Deterministic factor blend. On prod this is the offline fallback; with no
+    # OpenAI key (CI / tests) it is the only path.
     sev_value, sev_note = _signal_severity(decision_point, signal)
     evid_value, evid_note = _evidence_strength(evidence)
     acct_value, acct_note = _account_exposure(account, is_opportunity)
@@ -288,6 +372,23 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
             "window indicate compounding churn risk."
         )
 
+    # On prod (a key is configured) ask the model to score the situation from the
+    # actual context. Any failure, or a keyless environment, keeps the
+    # deterministic result above so a run never breaks.
+    from app.demo import demo_mode_enabled
+
+    method = "weighted_factors"
+    if not demo_mode_enabled():
+        try:
+            magnitude, factors, llm_summary = await _llm_score(
+                decision_point, signal, evidence, account, is_opportunity
+            )
+            method = "model"
+            if llm_summary:
+                summary = llm_summary
+        except Exception:  # noqa: BLE001 - fall back to the deterministic blend
+            method = "weighted_factors"
+
     # Top contributing factor, for a one-line "why" in the trace.
     top = max(factors, key=lambda f: f["contribution"]) if factors else None
     driver_phrase = f" Driven mostly by {top['factor'].replace('_', ' ')}." if top else ""
@@ -301,7 +402,7 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
         "drivers": [e.get("claim", "") for e in evidence][:3],
         "factors": factors,
         "score_breakdown": {
-            "method": "weighted_factors",
+            "method": method,
             "weights": _WEIGHTS,
             "score": magnitude,
             "factors": factors,
@@ -321,7 +422,8 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
         "steps": [
             make_step(
                 "risk_scorer",
-                f"Scored {ro_type} at {magnitude:.2f} from {len(factors)} factors",
+                f"Scored {ro_type} at {magnitude:.2f} from {len(factors)} drivers"
+                + (" (model)" if method == "model" else ""),
                 {
                     "score": magnitude,
                     "type": ro_type,

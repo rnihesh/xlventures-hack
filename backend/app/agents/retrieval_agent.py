@@ -7,11 +7,13 @@ by source document, keeping the best-scored citation per source. This broadens
 recall (a usage drop and a lapsed sponsor surface different documents) while
 keeping every record span-cited.
 
-Sub-query generation is deterministic and offline by default: sub-queries are
-built from signal keywords plus the pack's decision-point synonyms (the decision
-point label, its primary KPI, and its trigger-signal labels). When a real LLM is
-configured it may propose the sub-queries instead, but the deterministic path is
-always the fallback so the node never depends on a key.
+Sub-query generation is LLM-driven in production: when an OpenAI key is
+configured the model reads the actual signal, account, and decision point and
+proposes focused search sub-queries so retrieval tracks the real situation. In
+keyless environments (CI / offline) or when the model call fails, the node falls
+back to a deterministic keyword/synonym expansion (signal keywords plus the
+pack's decision-point synonyms), so the node never depends on a key and the run
+never breaks.
 """
 
 from __future__ import annotations
@@ -67,18 +69,65 @@ def _deterministic_subqueries(state: Dict[str, Any], pack: Any) -> List[str]:
     return subqueries
 
 
-def _llm_subqueries(state: Dict[str, Any]) -> List[str]:
-    """Sub-queries for multi-query retrieval.
+async def _llm_subqueries(state: Dict[str, Any]) -> List[str]:
+    """Ask the model for focused search sub-queries (production path).
 
-    Uses the deterministic keyword/synonym expansion only. We deliberately skip
-    an LLM call here: it added a slow serial OpenAI round-trip to every run for
-    little gain over the deterministic expansion, so retrieval stays fast.
+    Reads the actual signal, account, and decision point so retrieval is driven
+    by the situation rather than a fixed keyword expansion. Returns ``[]`` when
+    there is no key (offline / CI) or the model call fails, so the caller can
+    fall back to the deterministic expansion and the run never breaks.
     """
 
-    return []
+    from app.demo import demo_mode_enabled
+
+    if demo_mode_enabled():
+        return []
+
+    import json
+
+    from app.deps import get_llm
+
+    signal = (state.get("signal") or {}).get("content", "")
+    account = state.get("account_name") or state.get("account_id") or "the account"
+    decision_point = state.get("decision_point") or ""
+
+    prompt = (
+        "You generate focused search sub-queries for retrieving evidence about an "
+        "account decision. Read the signal, account, and decision point, then write "
+        "a short list of 3 to 5 distinct search sub-queries that would surface the "
+        "evidence most relevant to THIS specific signal and decision (different "
+        "angles, not paraphrases).\n\n"
+        f"Account: {account}\n"
+        f"Decision point: {decision_point}\n"
+        f"Signal: {signal}\n\n"
+        'Return STRICT JSON: {"subqueries": ["<query>", ...]}. Keys only, no prose.'
+    )
+
+    try:
+        resp = await get_llm(temperature=0).ainvoke(prompt)
+        text = getattr(resp, "content", "") or ""
+        start, end = text.find("{"), text.rfind("}")
+        data = json.loads(text[start : end + 1])
+    except Exception:  # noqa: BLE001 - fall back to the deterministic expansion
+        return []
+
+    out: List[str] = []
+    seen: set[str] = set()
+    for q in data.get("subqueries") or []:
+        norm = " ".join(str(q or "").split()).strip()
+        key = norm.lower()
+        if not norm or key in seen:
+            continue
+        seen.add(key)
+        out.append(norm)
+        if len(out) >= _MAX_SUBQUERIES:
+            break
+    return out
 
 
-def _plan_queries(state: Dict[str, Any], pack: Any) -> List[str]:
+def _plan_queries(
+    state: Dict[str, Any], pack: Any, expansion: List[str] | None = None
+) -> List[str]:
     """Assemble the ordered, de-duplicated query plan (base query first).
 
     When the clarify loop has populated ``gap_queries`` (a re-retrieve driven by
@@ -93,7 +142,8 @@ def _plan_queries(state: Dict[str, Any], pack: Any) -> List[str]:
     # Gap-targeted queries lead on a clarify re-retrieve so they are not capped out.
     queries.extend(gap_queries)
 
-    expansion = _llm_subqueries(state)
+    # LLM-driven sub-queries (computed by the async node) lead; fall back to the
+    # deterministic keyword/synonym expansion when they are unavailable.
     if not expansion:
         expansion = _deterministic_subqueries(state, pack)
     queries.extend(expansion)
@@ -209,7 +259,11 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
     except Exception:  # noqa: BLE001
         pack = None
 
-    queries = await asyncio.to_thread(_plan_queries, state, pack)
+    # Production: ask the model for sub-queries from the live situation. Offline
+    # (no key) or on failure this returns [] and _plan_queries uses the
+    # deterministic keyword/synonym expansion instead.
+    expansion = await _llm_subqueries(state)
+    queries = await asyncio.to_thread(_plan_queries, state, pack, expansion)
 
     evidence, hits = await _multi_retrieve(
         account_id, queries, k=_KEEP, domain=domain, org_id=org_id
