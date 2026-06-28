@@ -979,6 +979,57 @@ async def web_search(query: str, k: int = 6) -> Dict[str, Any]:
     return {"query": q, "count": len(results), "results": results}
 
 
+async def send_message(to: str, subject: str, body: str) -> Dict[str, Any]:
+    """Send a COMPOSED email (your own subject + body text) to a person.
+
+    Use this to send arbitrary written content (a summary, a comparison, a note)
+    to someone. This is NOT for delivering a run's recommendation: use
+    send_artifact for that. The recipient must be a saved contact (by name) or an
+    email address the user gave; never invent one.
+    """
+    from app.config import settings
+    from app.services.email import is_valid_email
+
+    org_id = current_org_id()
+    recipient = (to or "").strip()
+    if not recipient:
+        return {
+            "sent": False,
+            "reason": "no_recipient",
+            "message": "Tell me who to send to: a saved contact name or an email address.",
+        }
+
+    addr: Optional[str] = None
+    name: Optional[str] = None
+    if "@" in recipient:
+        addr = recipient
+    else:
+        resolved = await _resolve_contact(org_id, recipient)
+        if resolved and resolved.get("email"):
+            addr, name = str(resolved["email"]), resolved.get("name")
+
+    if not addr or not is_valid_email(addr):
+        return {
+            "sent": False,
+            "reason": "contact_not_found",
+            "message": (
+                f"No saved contact or valid email for '{to}'. Add the contact on the "
+                "Contacts page, or give me their email address. I will not guess one."
+            ),
+        }
+
+    result = await run_in_threadpool(
+        _send_email, addr, subject or "(no subject)", body or "", settings.ses_sender_email
+    )
+    return {
+        "sent": bool(result.get("sent")),
+        "to": addr,
+        "name": name,
+        "subject": subject,
+        "reason": result.get("reason"),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
@@ -1103,6 +1154,27 @@ TOOLS: Dict[str, Tool] = {
             "required": ["query"],
         },
         run=web_search,
+    ),
+    "send_message": Tool(
+        name="send_message",
+        description=(
+            "Send a COMPOSED email (your own subject and body) to a person, for "
+            "arbitrary content like a summary, comparison, or note the user asked "
+            "you to send. This is NOT for a run's recommendation (use send_artifact "
+            "for that). 'to' is a saved contact NAME or an email the user gave; "
+            "never invent a recipient. Put the actual content the user asked to "
+            "send in 'body', not a generic message."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "to": {"type": "string", "description": "Saved contact name or an email address the user provided."},
+                "subject": {"type": "string", "description": "Email subject."},
+                "body": {"type": "string", "description": "The exact content to send."},
+            },
+            "required": ["to", "subject", "body"],
+        },
+        run=send_message,
     ),
     "evaluate_policy": Tool(
         name="evaluate_policy",
