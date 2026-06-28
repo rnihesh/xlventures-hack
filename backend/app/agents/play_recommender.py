@@ -302,6 +302,74 @@ def build_alternatives(candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]
     return alternatives
 
 
+async def _llm_rank_plays(
+    eligible: List[Action],
+    state: Dict[str, Any],
+    decision_point: str,
+    risk_score: float,
+    episodes: List[Dict[str, Any]],
+) -> List[tuple] | None:
+    """The model chooses and ranks the eligible plays from the actual evidence.
+
+    Returns [(key, score, reason), ...] best-first, or None offline / on error so
+    the deterministic priors are used only when there is no model.
+    """
+    from app.demo import demo_mode_enabled
+
+    if not eligible or demo_mode_enabled():
+        return None
+    import json
+
+    from app.deps import get_llm
+
+    signal = (state.get("signal") or {}).get("content", "")
+    evidence = state.get("evidence") or []
+    ev_text = (
+        "\n".join(
+            f"- {(e.get('text') or e.get('snippet') or '')[:280]}"
+            for e in evidence[:6]
+            if isinstance(e, dict)
+        )
+        if isinstance(evidence, list)
+        else ""
+    ) or "none"
+    plays = "\n".join(f"- {a.key}: {a.title}. {a.description}" for a in eligible)
+    precedent = (
+        ", ".join(str(ep.get("action_key") or ep.get("action") or "") for ep in (episodes or [])[:3])
+        or "none"
+    )
+    prompt = (
+        "You are the play recommender for an account decision. Read the signal and "
+        "the cited evidence, then rank the eligible plays best-first by fit to THIS "
+        "specific situation, not a fixed prior.\n\n"
+        f"Decision point: {decision_point}\n"
+        f"Risk score (0 to 1): {risk_score}\n"
+        f"Signal: {signal}\n\n"
+        f"Evidence:\n{ev_text}\n\n"
+        f"Eligible plays (use ONLY these keys):\n{plays}\n\n"
+        f"Plays the team accepted before on similar accounts: {precedent}\n\n"
+        'Return STRICT JSON: {"ranking": [{"key": "<play key>", "score": <0.0 to 1.0>, '
+        '"reason": "<why, grounded in the evidence>"}]}. Rank ALL eligible plays.'
+    )
+    try:
+        resp = await get_llm(temperature=0).ainvoke(prompt)
+        text = getattr(resp, "content", "") or ""
+        start, end = text.find("{"), text.rfind("}")
+        data = json.loads(text[start : end + 1])
+    except Exception:  # noqa: BLE001 - fall back to deterministic priors
+        return None
+    valid = {a.key for a in eligible}
+    seen: set = set()
+    ranking: List[tuple] = []
+    for r in data.get("ranking") or []:
+        key = str(r.get("key") or "")
+        if key in valid and key not in seen:
+            seen.add(key)
+            score = max(0.02, min(0.99, float(r.get("score", 0.5))))
+            ranking.append((key, score, str(r.get("reason") or "")))
+    return ranking or None
+
+
 @register_agent(
     capability="play_recommender",
     description="Ranks eligible plays using pack eligibility plus learned memory.",
@@ -378,16 +446,35 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
         reverse=True,
     )
 
-    # Annotate the runner-ups with a short "why not" reason on the full list.
+    # Let the model choose and rank the plays from the actual evidence. On prod
+    # this drives the decision; the deterministic priors above are used only when
+    # there is no model (offline). The model reorders and rescores the candidates,
+    # so the choice reflects THIS signal and evidence, not a fixed prior.
+    by_key = {a.key: a for a in eligible}
+    llm_ranking = await _llm_rank_plays(eligible, state, decision_point, risk_score, episodes)
+    if llm_ranking:
+        order = {key: i for i, (key, _s, _r) in enumerate(llm_ranking)}
+        score_by = {key: s for key, s, _r in llm_ranking}
+        reason_by = {key: r for key, _s, r in llm_ranking}
+        for c in candidates:
+            if c["key"] in score_by:
+                c["score"] = score_by[c["key"]]
+                c["_llm_reason"] = reason_by.get(c["key"], "")
+                c.update(_effort_impact(c["key"], c["score"], _effort_for(by_key[c["key"]])))
+        candidates.sort(key=lambda c: order.get(c["key"], 999))
+
+    # Annotate the chosen play and the runner-ups with a short reason.
     if candidates:
         chosen = candidates[0]
         chosen["chosen"] = True
         chosen["reason"] = _with_note(
-            "Highest expected value given risk magnitude and learned preferences.", chosen
+            chosen.get("_llm_reason")
+            or "Highest expected value given risk magnitude and learned preferences.",
+            chosen,
         )
         for alt in candidates[1:]:
             alt["chosen"] = False
-            alt["reason"] = _with_note(_runner_up_why_not(chosen, alt), alt)
+            alt["reason"] = _with_note(alt.get("_llm_reason") or _runner_up_why_not(chosen, alt), alt)
 
     # Compact, ranked alternatives for the recommendation object and UI.
     alternatives = build_alternatives(candidates)

@@ -557,7 +557,7 @@ async def gap_analysis_node(state: RunState) -> Dict[str, Any]:
     the router to loop back to retrieval with gap-targeted sub-queries.
     """
 
-    analysis = analyze_gaps(dict(state))
+    analysis = await analyze_gaps(dict(state))
     missing = analysis["missing_information"]
     information_gaps = analysis["information_gaps"]
     critical = analysis["critical_gaps"]
