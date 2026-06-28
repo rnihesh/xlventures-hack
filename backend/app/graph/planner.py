@@ -454,7 +454,12 @@ async def planner_node(state: RunState) -> Dict[str, Any]:
 
     override = roster_override_for(decision_point)
     if override:
-        capabilities = _runnable(override)
+        # Always keep a play recommender so the run can produce a recommendation,
+        # even if the org's pinned roster omitted it.
+        caps = list(override)
+        if "play_recommender" not in caps and AGENTS.has("play_recommender"):
+            caps.append("play_recommender")
+        capabilities = _runnable(caps)
         plan_rationale = "Roster configured for this org in Workflow Studio."
         skipped = [
             c for c in _SEQUENCE if c not in capabilities and c in _PIPELINE and AGENTS.has(c)

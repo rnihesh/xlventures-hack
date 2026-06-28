@@ -365,12 +365,23 @@ async def _llm_rank_plays(
     valid = {a.key for a in eligible}
     seen: set = set()
     ranking: List[tuple] = []
-    for r in data.get("ranking") or []:
+    rows = data.get("ranking")
+    if not isinstance(rows, list):
+        return None
+    for r in rows:
+        # Tolerate a sloppy completion (string entries, non-numeric scores)
+        # instead of crashing the run; bad rows are skipped.
+        if not isinstance(r, dict):
+            continue
         key = str(r.get("key") or "")
-        if key in valid and key not in seen:
-            seen.add(key)
+        if key not in valid or key in seen:
+            continue
+        seen.add(key)
+        try:
             score = max(0.02, min(0.99, float(r.get("score", 0.5))))
-            ranking.append((key, score, str(r.get("reason") or "")))
+        except (TypeError, ValueError):
+            score = 0.5
+        ranking.append((key, score, str(r.get("reason") or "")))
     return ranking or None
 
 
@@ -455,7 +466,10 @@ async def node(state: Dict[str, Any]) -> Dict[str, Any]:
     # there is no model (offline). The model reorders and rescores the candidates,
     # so the choice reflects THIS signal and evidence, not a fixed prior.
     by_key = {a.key: a for a in eligible}
-    llm_ranking = await _llm_rank_plays(eligible, state, decision_point, risk_score, episodes)
+    try:
+        llm_ranking = await _llm_rank_plays(eligible, state, decision_point, risk_score, episodes)
+    except Exception:  # noqa: BLE001 - never let ranking break the run
+        llm_ranking = None
     if llm_ranking:
         order = {key: i for i, (key, _s, _r) in enumerate(llm_ranking)}
         score_by = {key: s for key, s, _r in llm_ranking}

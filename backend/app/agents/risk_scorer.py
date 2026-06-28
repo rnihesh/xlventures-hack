@@ -262,6 +262,10 @@ async def _llm_score(
         f"Signal: {(signal.get('content') or '')[:1200]}\n\n"
         f"Evidence:\n{ev_text}\n\n"
         f"Account profile: {acct_text}\n\n"
+        "Note: playbook or knowledge-base snippets in the evidence describe "
+        "recommended STEPS, not events that happened to this account. Do NOT treat "
+        "them as a real incident or inflate the score from them; only the signal "
+        "and the account's own records describe what actually happened.\n"
         'Return STRICT JSON: {"score": <0.0 to 1.0>, "summary": "<one sentence, '
         'grounded in the evidence>", "factors": [{"name": "<short driver name>", '
         '"value": <0.0 to 1.0>, "note": "<why, grounded in the evidence>"}]}. '
