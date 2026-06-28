@@ -1084,11 +1084,15 @@ TOOLS: Dict[str, Tool] = {
     "web_search": Tool(
         name="web_search",
         description=(
-            "Search the live web (Google via Serper) for fresh public context: "
-            "company news, market conditions, background on an account or "
-            "industry. Returns title, snippet, and link for each result. Use when "
-            "the answer needs current external information the knowledge base does "
-            "not have. Cite the links you use."
+            "Search the EXTERNAL public web (Google via Serper) for information "
+            "that is NOT in this workspace: general market news, public company "
+            "background, industry trends. Returns title, snippet, and link. This "
+            "is a SECONDARY source: for anything about an account or company in "
+            "the workspace ('their context', 'what do we know about X'), use "
+            "search_knowledge and get_account FIRST to read the user's ingested "
+            "data, and only use web_search to add external public context on top. "
+            "Never use web_search in place of the account's own ingested evidence. "
+            "Cite the links you use."
         ),
         parameters={
             "type": "object",
