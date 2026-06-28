@@ -24,16 +24,30 @@ logger = logging.getLogger("app.services.email")
 # "Local address contains control or whitespace" error.
 _EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
+# Placeholder / example domains an assistant tends to FABRICATE when it does not
+# have a real contact (e.g. "nihesh@yourcompany.com"). Sending to these is always
+# wrong, so we reject them outright: a recipient must be a real saved contact or
+# an address the user actually gave, never an invented one.
+_FAKE_DOMAINS = {
+    "yourcompany.com", "company.com", "mycompany.com", "yourdomain.com",
+    "domain.com", "example.com", "example.org", "example.net", "email.com",
+    "test.com", "sample.com", "placeholder.com",
+    "company.co", "yourcompany.co", "noemail.com", "none.com",
+}
+
 
 def is_valid_email(addr: str | None) -> bool:
-    """True when ``addr`` looks like a single, clean email address."""
+    """True when ``addr`` looks like a single, clean, non-placeholder address."""
 
     if not addr:
         return False
     candidate = addr.strip()
     if any(ord(c) < 32 for c in candidate):
         return False
-    return bool(_EMAIL_RE.match(candidate))
+    if not _EMAIL_RE.match(candidate):
+        return False
+    domain = candidate.rsplit("@", 1)[-1].lower()
+    return domain not in _FAKE_DOMAINS
 
 
 def _build_message(link: str) -> tuple[str, str, str]:
