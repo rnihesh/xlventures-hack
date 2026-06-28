@@ -34,7 +34,7 @@ Node names above match the LangGraph nodes in `backend/app/graph/planner.py`. Th
 
 - **Planner + specialist agents:** a LangGraph orchestrator builds a plan per request and dispatches specialist nodes (risk analysis, action drafting, retrieval, explanation). Durable checkpointing lets a run pause at a human-approval interrupt and resume later.
 - **Memory and learning:** approvals, rejections, and downstream outcomes are stored and distilled into lessons that bias future planning and confidence scoring.
-- **Retrieval:** precedent and policy context are pulled from a pgvector store (with a deterministic in-memory fallback offline) so recommendations cite similar past situations.
+- **Retrieval:** precedent and policy context are pulled from a pgvector store so recommendations cite similar past situations.
 - **Policy:** a guardrail layer evaluates each candidate against domain limits and approval thresholds before it is ever shown.
 - **Eval:** a golden-scenario harness scores recommendation quality across components and outcomes, so changes are measured, not guessed.
 
@@ -134,8 +134,8 @@ Overview and settings (passkeys, workspace).
 | --- | --- |
 | Orchestration | LangGraph (planner, specialist agents, checkpointing, HITL interrupts, memory store) |
 | Backend | Python 3.12, FastAPI, Uvicorn, SSE streaming |
-| Data | Postgres 17 + pgvector (with offline deterministic fallback) |
-| LLM | OpenAI via langchain-openai (with offline deterministic fallback) |
+| Data | Postgres 17 + pgvector |
+| LLM | OpenAI via langchain-openai |
 | Frontend | Next.js 15 (App Router), React 19, Tailwind, shadcn-style UI, lucide icons |
 | Auth | httpOnly `nba_session` JWT cookie, per-org isolation, optional Google sign-in |
 | Integrations | AWS SES email, Slack webhook, Google (all per-org, offline-safe) |
