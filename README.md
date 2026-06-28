@@ -1,4 +1,4 @@
-# Intelligent Next Best Action
+# Aperture - Intelligent Next Best Action
 
 **Turn raw business signals into explainable, confidence-scored Next Best Actions that a human approves in one click, and that get measurably smarter every time.**
 
