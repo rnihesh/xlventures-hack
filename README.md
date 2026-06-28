@@ -82,6 +82,51 @@ The registry is browsable at runtime through `GET /agents` and `GET /tools`.
 - **Multi-tenant by default:** every request resolves an org from an httpOnly `nba_session` cookie, and accounts, episodes, rules, and integrations are all scoped per tenant. Sign in with email and password or with Google.
 - **Configurable rules:** each org can tailor a pack's policy guardrails and action catalog from the UI (`/rules/{domain}`) as an additive override, with no fork of the base pack.
 - **Real integrations:** outbound connectors for AWS SES email, Slack (incoming webhook), plus Google sign-in, configured per org and all offline-safe (an unconfigured connector degrades to a no-op).
+- **Agentic copilot:** operate every capability in plain language. The model calls real platform tools (run an NBA, search the knowledge base with citations, send a composed email to a saved contact, edit the workflow), grounded first in your ingested data.
+- **Workflow Studio:** a visual node graph of the agent pipeline. Toggle which specialists run per decision point, or just tell the built-in chatbot to change it, and the planner honors it per org at run time.
+- **Admin and OpenAI cost:** an allowlist-gated panel for signups, per-org activity, and OpenAI token usage and dollar cost.
+- **Passkeys:** passwordless WebAuthn sign-in, alongside email/password and Google.
+- **Live web search:** the copilot can pull fresh external context via Serper, secondary to your own ingested evidence.
+
+## Screenshots
+
+The decision inbox: accounts ranked by churn risk and signal recency, not another alert feed.
+
+![Inbox](screenshots/inbox.png)
+
+A Next Best Action: planner trace, the explainable recommendation, calibrated confidence, cited evidence, ranked alternatives, policy gate, and human approval.
+
+![Next Best Action](screenshots/nba.png)
+![Recommendation detail](screenshots/nba-2.png)
+
+The agentic copilot: drive the platform in plain language; every step is a real tool call, gated by human approval.
+
+![Copilot](screenshots/copilot.png)
+
+Workflow Studio: the agent graph per decision point. Toggle specialists, or edit the workflow with the context-aware chatbot.
+
+![Workflow Studio](screenshots/workflow-studio.png)
+
+The reusable agent and tool registry, surfaced directly.
+
+![Agents and tools](screenshots/agents-tools.png)
+
+Domains as data: swap a YAML pack to retarget the engine (Customer Success, SaaS Sales, Collections).
+
+![Domains](screenshots/domains.png)
+
+Ingest interactions (notes, transcripts, emails) into the retrieval corpus as cited evidence.
+
+![Ingest](screenshots/ingest.png)
+
+Admin panel: signups, per-org usage, and OpenAI cost.
+
+![Admin](screenshots/admin.png)
+
+Overview and settings (passkeys, workspace).
+
+![Overview](screenshots/overview.png)
+![Settings](screenshots/settings.png)
 
 ## Tech stack
 
@@ -125,13 +170,13 @@ cp .env.example .env
 # terminal 1: backend (loads ./.env, http://localhost:8200)
 make install        # cd backend && uv sync --extra dev
 make api            # live mode (uses OPENAI_API_KEY if set, else offline)
-#   or: make demo   # forced deterministic DEMO_MODE for recording the demo
+#   or: make demo   # offline deterministic mode (no API keys), for recording
 
 # terminal 2: frontend (http://localhost:3200)
 cd frontend && npm install && npm run dev
 ```
 
-Open http://localhost:3200 and sign in with the seeded demo account (**demo@niheshr.com** / **demo1234**), or sign in with Google if it is configured. The backend env (including `DEMO_MODE`, `APP_TOKEN`, `DATABASE_URL`) is loaded from `./.env` via `uv run --env-file`. The frontend reads `NEXT_PUBLIC_API_URL` from `frontend/.env.local`.
+Open http://localhost:3200 and sign in with the seeded demo account (**demo@niheshr.com** / **demo1234**), or sign in with Google if it is configured. The backend env (including `APP_TOKEN`, `DATABASE_URL`) is loaded from `./.env` via `uv run --env-file`. The frontend reads `NEXT_PUBLIC_API_URL` from `frontend/.env.local`.
 
 One-command alternative (Docker): `make dev` brings up Postgres + pgvector, the API, and the web app together, reading the same root `.env`.
 
@@ -242,7 +287,7 @@ Three packs ship today (`customer_success`, `saas_sales`, `collections`) as work
 
 ## Demo walkthrough
 
-A tight 5-minute story, fully offline and deterministic. One command boots the API with `DEMO_MODE=1`:
+A tight 5-minute story. For a fully offline, reproducible recording, boot the API with no API keys (a deterministic model is used):
 
 ```bash
 make demo      # backend on http://localhost:8200 (deterministic, no API keys)
