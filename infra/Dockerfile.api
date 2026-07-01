@@ -35,4 +35,6 @@ COPY --from=builder /app /app
 # the full packs (not the minimal fallback) in the container.
 COPY domain_packs /app/domain_packs
 EXPOSE 8200
-CMD ["uv", "run", "--no-dev", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8200"]
+# --proxy-headers + --forwarded-allow-ips make uvicorn trust the reverse proxy's
+# X-Forwarded-For, so access logs show the real client IP, not the nginx bridge.
+CMD ["uv", "run", "--no-dev", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8200", "--proxy-headers", "--forwarded-allow-ips", "*"]

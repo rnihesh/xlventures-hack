@@ -1,10 +1,22 @@
 name: CI
 
 on:
+  # Only build/deploy when code that ships actually changes. Docs, screenshots,
+  # contracts, and README edits do not trigger a build or a deploy.
   push:
     branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "infra/**"
+      - ".github/workflows/ci.yml"
   pull_request:
     branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "infra/**"
+      - ".github/workflows/ci.yml"
 
 jobs:
   backend:
