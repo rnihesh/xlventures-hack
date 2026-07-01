@@ -8,7 +8,8 @@ DATABASE_URL.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+import logging
+from typing import Any
 
 
 def test_health(client) -> None:
@@ -19,12 +20,32 @@ def test_health(client) -> None:
     assert resp.json() == {"status": "ok"}
 
 
+def test_request_logging_uses_forwarded_client_ip(app, caplog) -> None:
+    """Request logs prefer X-Forwarded-For over the Docker bridge address."""
+
+    from fastapi.testclient import TestClient
+
+    caplog.set_level(logging.INFO, logger="app.main")
+
+    with TestClient(app) as test_client:
+        resp = test_client.get(
+            "/health",
+            headers={
+                "X-Forwarded-For": "203.0.113.10, 10.0.0.2",
+                "X-Real-IP": "198.51.100.7",
+            },
+        )
+
+    assert resp.status_code == 200
+    assert any("client_ip=203.0.113.10" in record.message for record in caplog.records)
+
+
 def test_accounts_inbox(client) -> None:
     """The triage inbox lists seeded accounts, highest risk first."""
 
     resp = client.get("/accounts")
     assert resp.status_code == 200
-    accounts: List[Dict[str, Any]] = resp.json()
+    accounts: list[dict[str, Any]] = resp.json()
     assert isinstance(accounts, list) and len(accounts) >= 3
 
     # Every summary carries the contract fields the inbox renders.
@@ -137,7 +158,10 @@ def test_create_run_returns_run_id(client) -> None:
     payload = {
         "domain": "customer_success",
         "account_id": "ACC-1001",
-        "signal": {"type": "usage_drop", "content": "Usage down 38% QoQ; sponsor disengaged"},
+        "signal": {
+            "type": "usage_drop",
+            "content": "Usage down 38% QoQ; sponsor disengaged",
+        },
     }
     resp = client.post("/runs", json=payload)
     assert resp.status_code == 200
@@ -196,7 +220,11 @@ def test_execute_email_artifact(client) -> None:
         },
         "rationale": "Usage is declining sharply ahead of renewal.",
         "confidence": {"score": 0.82, "label": "high"},
-        "expected_impact": {"kpi": "NRR", "direction": "up", "estimate": "+4 to +6 points"},
+        "expected_impact": {
+            "kpi": "NRR",
+            "direction": "up",
+            "estimate": "+4 to +6 points",
+        },
     }
     resp = client.post(
         "/execute",

@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
@@ -22,6 +22,23 @@ from app.deps import (
 )
 
 logger = logging.getLogger("app.main")
+
+
+def _resolve_client_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        first_forwarded_ip = forwarded_for.split(",")[0].strip()
+        if first_forwarded_ip:
+            return first_forwarded_ip
+
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+
+    if request.client and request.client.host:
+        return request.client.host
+
+    return "-"
 
 
 @asynccontextmanager
@@ -86,6 +103,20 @@ def create_app() -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
+
+    @app.middleware("http")
+    async def log_request_ip(request: Request, call_next):
+        response = await call_next(request)
+        logger.info(
+            "%s %s status=%s client_ip=%s remote_addr=%s xff=%s",
+            request.method,
+            request.url.path,
+            response.status_code,
+            _resolve_client_ip(request),
+            request.client.host if request.client and request.client.host else "-",
+            request.headers.get("x-forwarded-for") or "-",
+        )
+        return response
 
     # CORS for the Next.js frontend.
     app.add_middleware(
