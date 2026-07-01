@@ -1055,6 +1055,183 @@ async def send_message(to: str, subject: str, body: str) -> Dict[str, Any]:
     }
 
 
+async def create_account(
+    name: str,
+    domain: str = "customer_success",
+    industry: Optional[str] = None,
+    segment: Optional[str] = None,
+    arr: Optional[float] = None,
+    health_score: Optional[float] = None,
+    risk_level: Optional[str] = None,
+    owner: Optional[str] = None,
+    signals: Optional[List[Any]] = None,
+    notes: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Create an account in the caller's workspace (notes are ingested as evidence)."""
+    from fastapi import HTTPException
+
+    from app.api.accounts import AccountIn
+    from app.api.accounts import create_account as _create
+
+    if not (name or "").strip():
+        return {"created": False, "error": "name is required"}
+    try:
+        body = AccountIn(
+            name=name,
+            domain=domain or "customer_success",
+            industry=industry,
+            segment=segment,
+            arr=arr,
+            health_score=health_score,
+            risk_level=risk_level,
+            owner=owner,
+            signals=signals or None,
+            notes=notes,
+        )
+        out = await _create(body, org_id=current_org_id())
+        return {"created": True, "account": out}
+    except HTTPException as exc:
+        return {"created": False, "error": exc.detail}
+
+
+async def list_contacts(account_id: Optional[str] = None) -> Dict[str, Any]:
+    """List saved contacts, optionally scoped to one account."""
+    from app.repositories import contacts as contacts_repo
+
+    org_id = current_org_id()
+    if account_id:
+        resolved = await _resolve_org_account(org_id, account_id) or account_id
+        rows = await contacts_repo.list_for_account(org_id, resolved)
+    else:
+        rows = await contacts_repo.list_for_org(org_id)
+    return {
+        "contacts": [
+            {
+                "name": c.get("name"),
+                "email": c.get("email"),
+                "account_id": c.get("account_id"),
+                "role": c.get("role"),
+            }
+            for c in rows
+        ],
+        "count": len(rows),
+    }
+
+
+async def add_contact(
+    name: str, email: str, account_id: Optional[str] = None, role: Optional[str] = None
+) -> Dict[str, Any]:
+    """Save a contact (name + email) to the workspace, optionally tied to an account."""
+    from app.repositories import contacts as contacts_repo
+    from app.services.email import is_valid_email
+
+    if not is_valid_email(email):
+        return {"added": False, "error": f"'{email}' is not a valid email address"}
+    org_id = current_org_id()
+    resolved = await _resolve_org_account(org_id, account_id) if account_id else None
+    c = await contacts_repo.upsert(
+        org_id, name=(name or "").strip(), email=email.strip(), account_id=resolved, role=role
+    )
+    return {
+        "added": True,
+        "contact": {"name": c.get("name"), "email": c.get("email"), "account_id": c.get("account_id")},
+    }
+
+
+async def list_runs(account_id: Optional[str] = None, limit: int = 10) -> Dict[str, Any]:
+    """List the org's recent NBA runs, optionally for one account."""
+    org_id = current_org_id()
+    runs = _org_runs(org_id)
+    if account_id:
+        resolved = await _resolve_org_account(org_id, account_id) or account_id
+        runs = [r for r in runs if str(r.get("account_id") or "").upper() == str(resolved).upper()]
+    out = []
+    for r in runs[: max(1, min(int(limit or 10), 50))]:
+        rec = r.get("recommendation") or {}
+        out.append(
+            {
+                "run_id": r.get("run_id"),
+                "account_id": r.get("account_id"),
+                "action": (rec.get("action") or {}).get("title"),
+                "confidence": (rec.get("confidence") or {}).get("score"),
+                "created_at": r.get("created_at"),
+            }
+        )
+    return {"runs": out, "count": len(out)}
+
+
+async def update_account(
+    account_id: str,
+    name: Optional[str] = None,
+    industry: Optional[str] = None,
+    segment: Optional[str] = None,
+    arr: Optional[float] = None,
+    health_score: Optional[float] = None,
+    risk_level: Optional[str] = None,
+    owner: Optional[str] = None,
+    renewal_date: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Update fields on an existing account (only the fields you pass change)."""
+    from fastapi import HTTPException
+
+    from app.api.accounts import AccountUpdate
+    from app.api.accounts import update_account as _update
+
+    org_id = current_org_id()
+    resolved = await _resolve_org_account(org_id, account_id)
+    if resolved is None:
+        return {"updated": False, "error": f"account not found: {account_id}"}
+    try:
+        body = AccountUpdate(
+            name=name,
+            industry=industry,
+            segment=segment,
+            arr=arr,
+            health_score=health_score,
+            risk_level=risk_level,
+            owner=owner,
+            renewal_date=renewal_date,
+        )
+        out = await _update(resolved, body, org_id=org_id)
+        return {"updated": True, "account": out}
+    except HTTPException as exc:
+        return {"updated": False, "error": exc.detail}
+
+
+async def get_timeline(account_id: str) -> Dict[str, Any]:
+    """Return one account's newest-first audit timeline (interactions, runs, decisions)."""
+    from app.api.accounts import get_account_timeline as _tl
+
+    org_id = current_org_id()
+    resolved = await _resolve_org_account(org_id, account_id)
+    if resolved is None:
+        return {"error": f"account not found: {account_id}"}
+    return await _tl(resolved, org_id=org_id)
+
+
+async def get_integrations() -> Dict[str, Any]:
+    """Return the org's connector status (email/SES, Slack, Google)."""
+    from app.api.integrations import list_integrations as _li
+
+    return await _li(org_id=current_org_id())
+
+
+async def record_outcome(
+    episode_id: str, decision: str, reason: Optional[str] = None
+) -> Dict[str, Any]:
+    """Record a run's outcome (accepted / rejected / edited) into the learning loop."""
+    from fastapi import HTTPException
+
+    from app.api.learning import OutcomeIn
+    from app.api.learning import record_learning_outcome as _ro
+
+    try:
+        body = OutcomeIn(episode_id=episode_id, decision=decision, reason=reason)
+        return await _ro(body, org_id=current_org_id())
+    except HTTPException as exc:
+        return {"error": exc.detail}
+
+
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
@@ -1200,6 +1377,124 @@ TOOLS: Dict[str, Tool] = {
             "required": ["to", "subject", "body"],
         },
         run=send_message,
+    ),
+    "create_account": Tool(
+        name="create_account",
+        description=(
+            "Create a new account in the user's workspace. Provide the name and "
+            "domain (customer_success, collections, saas_sales); optionally "
+            "industry, segment, arr, health_score, risk_level, owner, signals, and "
+            "notes (notes are ingested as retrievable evidence). Use when the user "
+            "asks to add or create an account."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Account / company name."},
+                "domain": {"type": "string", "description": "Domain pack key (default customer_success)."},
+                "industry": {"type": "string"},
+                "segment": {"type": "string"},
+                "arr": {"type": "number", "description": "Annual recurring revenue."},
+                "health_score": {"type": "number", "description": "0 to 100."},
+                "risk_level": {"type": "string", "description": "critical / high / medium / low."},
+                "owner": {"type": "string", "description": "Account owner / CSM."},
+                "signals": {"type": "array", "items": {"type": "string"}, "description": "Active signal keys."},
+                "notes": {"type": "string", "description": "Free-text context, ingested as evidence."},
+            },
+            "required": ["name"],
+        },
+        run=create_account,
+    ),
+    "list_contacts": Tool(
+        name="list_contacts",
+        description="List saved contacts, optionally for one account (pass account_id or name).",
+        parameters={
+            "type": "object",
+            "properties": {
+                "account_id": {"type": "string", "description": "Optional account id or name to scope to."},
+            },
+        },
+        run=list_contacts,
+    ),
+    "add_contact": Tool(
+        name="add_contact",
+        description=(
+            "Save a contact (name + a valid email) to the workspace, optionally "
+            "tied to an account. Use when the user asks to add or save a contact."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "email": {"type": "string", "description": "A valid email address."},
+                "account_id": {"type": "string", "description": "Optional account id or name."},
+                "role": {"type": "string"},
+            },
+            "required": ["name", "email"],
+        },
+        run=add_contact,
+    ),
+    "list_runs": Tool(
+        name="list_runs",
+        description="List the org's recent NBA runs (run id, account, action, confidence), optionally for one account.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "account_id": {"type": "string", "description": "Optional account id or name to scope to."},
+                "limit": {"type": "integer", "description": "Max runs (default 10)."},
+            },
+        },
+        run=list_runs,
+    ),
+    "update_account": Tool(
+        name="update_account",
+        description="Update fields on an existing account (name, industry, segment, arr, health_score, risk_level, owner, renewal_date). Only the fields you pass change.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "account_id": {"type": "string", "description": "Account id or name."},
+                "name": {"type": "string"},
+                "industry": {"type": "string"},
+                "segment": {"type": "string"},
+                "arr": {"type": "number"},
+                "health_score": {"type": "number"},
+                "risk_level": {"type": "string"},
+                "owner": {"type": "string"},
+                "renewal_date": {"type": "string"},
+            },
+            "required": ["account_id"],
+        },
+        run=update_account,
+    ),
+    "get_timeline": Tool(
+        name="get_timeline",
+        description="Return one account's newest-first audit timeline (interactions, runs, decisions, outcomes).",
+        parameters={
+            "type": "object",
+            "properties": {"account_id": {"type": "string", "description": "Account id or name."}},
+            "required": ["account_id"],
+        },
+        run=get_timeline,
+    ),
+    "get_integrations": Tool(
+        name="get_integrations",
+        description="Return the org's connector status (email/SES, Slack, Google). Use to answer 'is Slack connected'.",
+        parameters={"type": "object", "properties": {}},
+        run=get_integrations,
+    ),
+    "record_outcome": Tool(
+        name="record_outcome",
+        description="Record a run's outcome into the learning loop. episode_id from a run; decision is accepted, rejected, or edited.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "episode_id": {"type": "string", "description": "The run's episode id."},
+                "decision": {"type": "string", "description": "accepted / rejected / edited."},
+                "reason": {"type": "string"},
+            },
+            "required": ["episode_id", "decision"],
+        },
+        run=record_outcome,
     ),
     "evaluate_policy": Tool(
         name="evaluate_policy",
