@@ -22,7 +22,7 @@ import uuid
 from typing import Any, Optional
 
 import webauthn
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel
 from webauthn.helpers.structs import (
     AuthenticatorSelectionCriteria,
@@ -32,7 +32,7 @@ from webauthn.helpers.structs import (
 )
 
 from app.api.auth import _set_session_cookie
-from app.auth.deps import _public_user, get_current_user
+from app.auth.deps import _public_user, client_ip, get_current_user
 from app.auth.security import create_session_token
 from app.config import settings
 from app.repositories import passkeys as repo
@@ -178,7 +178,9 @@ class LoginVerifyIn(BaseModel):
 
 
 @router.post("/login/verify")
-async def login_verify(body: LoginVerifyIn, response: Response) -> dict[str, Any]:
+async def login_verify(
+    body: LoginVerifyIn, request: Request, response: Response
+) -> dict[str, Any]:
     challenge = _take(f"login:{body.handle}")
     if challenge is None:
         raise HTTPException(status_code=400, detail="Login expired, try again.")
@@ -205,6 +207,6 @@ async def login_verify(body: LoginVerifyIn, response: Response) -> dict[str, Any
         raise HTTPException(status_code=401, detail="Account not found.")
     token = create_session_token(user["id"], user["org_id"])
     _set_session_cookie(response, token)
-    await users_repo.touch_last_login(user["id"])
+    await users_repo.touch_last_login(user["id"], client_ip(request), "passkey")
     org = await users_repo.get_org(user["org_id"])
     return {"user": _public_user(user), "org": org}

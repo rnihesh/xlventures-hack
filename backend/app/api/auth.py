@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, EmailStr, Field
 
-from app.auth.deps import get_current_user
+from app.auth.deps import client_ip, get_current_user
 from app.auth.security import (
     SESSION_COOKIE,
     SESSION_TTL,
@@ -94,7 +94,7 @@ def _set_session_cookie(response: Response, token: str) -> None:
 
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
-async def signup(payload: SignupRequest) -> dict:
+async def signup(payload: SignupRequest, request: Request) -> dict:
     """Create an org + user, send a verification email (or auto-verify in dev)."""
 
     existing = await users_repo.get_user_by_email(payload.email)
@@ -114,6 +114,8 @@ async def signup(payload: SignupRequest) -> dict:
         role="owner",
         email_verified=False,
         verification_token=token,
+        auth_provider="password",
+        signup_ip=client_ip(request),
     )
 
     link = f"{settings.app_base_url.rstrip('/')}/verify?token={token}"
@@ -166,7 +168,7 @@ async def verify(token: str) -> dict:
 
 
 @router.post("/login")
-async def login(payload: LoginRequest, response: Response) -> dict:
+async def login(payload: LoginRequest, request: Request, response: Response) -> dict:
     """Verify credentials, set the session cookie, and return user + org."""
 
     invalid = HTTPException(
@@ -187,7 +189,7 @@ async def login(payload: LoginRequest, response: Response) -> dict:
     org = await users_repo.get_org(user["org_id"])
     token = create_session_token(user["id"], user["org_id"])
     _set_session_cookie(response, token)
-    await users_repo.touch_last_login(user["id"])
+    await users_repo.touch_last_login(user["id"], client_ip(request), "password")
     return {"user": _public_user(user), "org": org}
 
 
@@ -315,10 +317,12 @@ async def google_exchange(
             role="owner",
             email_verified=True,
             verification_token=None,
+            auth_provider="google",
+            signup_ip=client_ip(request),
         )
 
     org = await users_repo.get_org(user["org_id"])
     token = create_session_token(user["id"], user["org_id"])
     _set_session_cookie(response, token)
-    await users_repo.touch_last_login(user["id"])
+    await users_repo.touch_last_login(user["id"], client_ip(request), "google")
     return {"user": _public_user(user), "org": org}

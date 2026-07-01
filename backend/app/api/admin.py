@@ -90,13 +90,95 @@ async def users(
     rows = await pool.fetch(
         """
         SELECT u.id, u.email, u.name, u.org_id, o.name AS org_name,
-               u.role, u.email_verified, u.created_at, u.last_login_at
+               u.role, u.email_verified, u.created_at, u.last_login_at,
+               u.auth_provider, u.signup_ip, u.last_login_ip, u.last_login_method
         FROM users u
         LEFT JOIN orgs o ON o.id = u.org_id
         ORDER BY u.created_at DESC
         """
     )
     return [dict(r) for r in rows]
+
+
+@router.get("/users/{user_id}")
+async def user_detail(
+    user_id: str, _admin: dict[str, Any] = Depends(require_admin)
+) -> dict[str, Any]:
+    """Full profile for one user: auth, IP, their org's accounts, chats, usage."""
+    pool = await get_pool()
+    if pool is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    u = await pool.fetchrow(
+        """
+        SELECT u.id, u.email, u.name, u.org_id, o.name AS org_name, u.role,
+               u.email_verified, u.created_at, u.last_login_at, u.auth_provider,
+               u.signup_ip, u.last_login_ip, u.last_login_method
+        FROM users u LEFT JOIN orgs o ON o.id = u.org_id
+        WHERE u.id = $1
+        """,
+        user_id,
+    )
+    if u is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    org_id = u["org_id"]
+
+    accounts = await pool.fetch(
+        "SELECT account_id, domain, payload->>'name' AS name, created_at "
+        "FROM accounts WHERE org_id = $1 ORDER BY created_at DESC",
+        org_id,
+    )
+    chats = await pool.fetch(
+        "SELECT id, title, updated_at, "
+        "jsonb_array_length(COALESCE(turns, '[]'::jsonb)) AS turn_count "
+        "FROM chat_sessions WHERE org_id = $1 ORDER BY updated_at DESC",
+        org_id,
+    )
+    runs = await pool.fetchval(
+        "SELECT count(*) FROM episodes WHERE org_id = $1", org_id
+    )
+    cost = (await usage_repo.cost_by_org_map(None)).get(org_id, {})
+
+    return {
+        "user": dict(u),
+        "accounts": [dict(a) for a in accounts],
+        "chats": [dict(c) for c in chats],
+        "runs": runs or 0,
+        "usage": {
+            "total_tokens": cost.get("total_tokens", 0),
+            "cost_usd": round(cost.get("cost_usd", 0.0), 4),
+        },
+    }
+
+
+@router.get("/chats/{session_id}")
+async def chat_detail(
+    session_id: str, _admin: dict[str, Any] = Depends(require_admin)
+) -> dict[str, Any]:
+    """The full turns of one copilot chat session (any org, admin only)."""
+    pool = await get_pool()
+    if pool is None:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    row = await pool.fetchrow(
+        "SELECT id, org_id, title, turns, updated_at FROM chat_sessions WHERE id = $1",
+        session_id,
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    import json
+
+    turns = row["turns"]
+    if isinstance(turns, str):
+        try:
+            turns = json.loads(turns)
+        except (TypeError, ValueError):
+            turns = []
+    return {
+        "id": row["id"],
+        "org_id": row["org_id"],
+        "title": row["title"],
+        "updated_at": row["updated_at"],
+        "turns": turns or [],
+    }
 
 
 @router.get("/usage")

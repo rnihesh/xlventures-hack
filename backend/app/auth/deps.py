@@ -17,6 +17,16 @@ from app.auth.security import SESSION_COOKIE, decode_session_token
 from app.repositories import users as users_repo
 
 
+def client_ip(request: Request) -> str | None:
+    """Best-effort real client IP, honoring the reverse proxy's X-Forwarded-For."""
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        first = xff.split(",")[0].strip()
+        if first:
+            return first
+    return request.client.host if request.client else None
+
+
 def _public_user(user: dict[str, Any]) -> dict[str, Any]:
     """Strip secret fields from a user row before returning it to callers."""
 

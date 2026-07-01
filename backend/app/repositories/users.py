@@ -171,6 +171,8 @@ async def create_user(
     email_verified: bool = False,
     verification_token: str | None = None,
     user_id: str | None = None,
+    auth_provider: str = "password",
+    signup_ip: str | None = None,
 ) -> dict[str, Any]:
     """Create a user and return the full row (including secret fields)."""
 
@@ -188,6 +190,8 @@ async def create_user(
             "org_id": org_id,
             "email_verified": email_verified,
             "verification_token": verification_token,
+            "auth_provider": auth_provider,
+            "signup_ip": signup_ip,
             "created_at": _now(),
         }
         _USERS[uid] = user
@@ -197,8 +201,8 @@ async def create_user(
         """
         INSERT INTO users
             (id, email, password_hash, name, role, org_id,
-             email_verified, verification_token)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             email_verified, verification_token, auth_provider, signup_ip)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING id, email, password_hash, name, role, org_id,
                   email_verified, verification_token, created_at
         """,
@@ -210,6 +214,8 @@ async def create_user(
         org_id,
         email_verified,
         verification_token,
+        auth_provider,
+        signup_ip,
     )
     return _row_to_user(row)
 
@@ -303,8 +309,10 @@ async def set_verified(user_id: str) -> None:
     )
 
 
-async def touch_last_login(user_id: str) -> None:
-    """Record the user's most recent login time (best effort, never raises)."""
+async def touch_last_login(
+    user_id: str, ip: str | None = None, method: str | None = None
+) -> None:
+    """Record the user's most recent login time, IP, and method (best effort)."""
 
     pool = await get_pool()
     if pool is None:
@@ -312,12 +320,18 @@ async def touch_last_login(user_id: str) -> None:
         user = _USERS.get(user_id)
         if user:
             user["last_login_at"] = _now()
+            user["last_login_ip"] = ip
+            user["last_login_method"] = method
         return
     try:
         await pool.execute(
-            "UPDATE users SET last_login_at = now() WHERE id = $1", user_id
+            "UPDATE users SET last_login_at = now(), last_login_ip = $2, "
+            "last_login_method = $3 WHERE id = $1",
+            user_id,
+            ip,
+            method,
         )
-    except Exception:  # noqa: BLE001 - column may be pre-migration; non-fatal
+    except Exception:  # noqa: BLE001 - columns may be pre-migration; non-fatal
         pass
 
 
