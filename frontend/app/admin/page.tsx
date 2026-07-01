@@ -6,7 +6,15 @@
 // "not authorized" state instead of a flash of empty tables.
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, ShieldOff, DollarSign, Cpu } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Cpu,
+  DollarSign,
+  MessageSquare,
+  ShieldOff,
+  X,
+} from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -24,19 +32,25 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/auth-context";
 import {
+  getAdminChat,
   getAdminOverview,
   getAdminOrgs,
   getAdminUsage,
+  getAdminUserDetail,
   getAdminUsers,
+  type AdminChatDetail,
+  type AdminChatTurn,
   type AdminOrg,
   type AdminOverview,
   type AdminUsageReport,
   type AdminUser,
+  type AdminUserDetail,
 } from "@/lib/api/admin";
 
 // ---------------------------------------------------------------------------
@@ -286,6 +300,555 @@ function Th({
 }
 
 // ---------------------------------------------------------------------------
+// Auth provider badge: the sign-in method a user last used, normalized to a
+// short human label. Kept grayscale so the single orange accent stays scarce.
+// ---------------------------------------------------------------------------
+
+function authLabel(provider: string | null | undefined): string {
+  switch ((provider ?? "").toLowerCase()) {
+    case "google":
+      return "Google";
+    case "passkey":
+      return "Passkey";
+    case "password":
+    case "email":
+      return "Email";
+    case "":
+      return "--";
+    default:
+      return provider as string;
+  }
+}
+
+function AuthBadge({ provider }: { provider: string | null | undefined }) {
+  const label = authLabel(provider);
+  if (label === "--") {
+    return <span className="text-muted-foreground">--</span>;
+  }
+  return (
+    <Badge variant="info" className="text-[11px]">
+      {label}
+    </Badge>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Best-effort readers for stored chat turns. Turns come straight from persisted
+// JSON, so their shape is not guaranteed: pull the message text and any tool
+// calls from a few likely keys and degrade gracefully when nothing matches.
+// ---------------------------------------------------------------------------
+
+function asText(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value
+      .map((part) =>
+        typeof part === "object" && part
+          ? asText(
+              (part as Record<string, unknown>).text ??
+                (part as Record<string, unknown>).content,
+            )
+          : asText(part),
+      )
+      .filter(Boolean)
+      .join("\n");
+  }
+  if (typeof value === "object") {
+    const o = value as Record<string, unknown>;
+    return asText(o.text ?? o.content ?? o.message);
+  }
+  return String(value);
+}
+
+function turnText(turn: AdminChatTurn): string {
+  return (
+    asText(turn.content) || asText(turn.text) || asText(turn.message) || ""
+  );
+}
+
+interface TurnToolCall {
+  tool: string;
+  summary?: string;
+  args?: unknown;
+}
+
+function turnToolCalls(turn: AdminChatTurn): TurnToolCall[] {
+  const raw = turn.toolCalls ?? turn.tool_calls;
+  if (!Array.isArray(raw)) return [];
+  return raw.map((c): TurnToolCall => {
+    if (typeof c !== "object" || c == null) return { tool: String(c) };
+    const o = c as Record<string, unknown>;
+    const summary =
+      typeof o.summary === "string"
+        ? o.summary
+        : typeof o.result === "string"
+          ? o.result
+          : undefined;
+    return {
+      tool: String(o.tool ?? o.name ?? o.function ?? "tool"),
+      summary,
+      args: o.args,
+    };
+  });
+}
+
+function roleLabel(role: string | undefined): string {
+  switch ((role ?? "").toLowerCase()) {
+    case "user":
+      return "User";
+    case "assistant":
+      return "Assistant";
+    case "system":
+      return "System";
+    case "tool":
+      return "Tool";
+    case "":
+      return "Message";
+    default:
+      return (role as string).charAt(0).toUpperCase() + (role as string).slice(1);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Detail primitives
+// ---------------------------------------------------------------------------
+
+function DetailRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-1.5">
+      <span className="shrink-0 text-sm text-muted-foreground">{label}</span>
+      <span className="text-right text-sm font-medium tabular-nums">
+        {children}
+      </span>
+    </div>
+  );
+}
+
+function DrawerSection({
+  title,
+  count,
+  children,
+}: {
+  title: string;
+  count?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="flex flex-col gap-3">
+      <h3 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+        {title}
+        {count !== undefined ? (
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            {formatCount(count)}
+          </span>
+        ) : null}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Chat transcript: the full turns of one copilot session, rendered best-effort
+// (role label + message text, with any tool calls shown compactly).
+// ---------------------------------------------------------------------------
+
+function ChatTranscript({
+  sessionId,
+  onBack,
+}: {
+  sessionId: string;
+  onBack: () => void;
+}) {
+  const [chat, setChat] = useState<AdminChatDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let alive = true;
+    setLoading(true);
+    setFailed(false);
+    setChat(null);
+    (async () => {
+      try {
+        const c = await getAdminChat(sessionId, controller.signal);
+        if (!alive) return;
+        setChat(c);
+      } catch (err) {
+        if (!alive) return;
+        if ((err as { name?: string })?.name === "AbortError") return;
+        setFailed(true);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [sessionId]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to user
+      </button>
+
+      {loading ? (
+        <div className="flex flex-col gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 rounded-lg" />
+          ))}
+        </div>
+      ) : failed ? (
+        <div className="rounded-xl border border-dashed border-border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
+          This chat could not be loaded.
+        </div>
+      ) : !chat ? null : (
+        <div className="flex flex-col gap-4">
+          <div>
+            <h3 className="text-base font-semibold tracking-tight">
+              {chat.title || "Untitled chat"}
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Updated {formatDateTime(chat.updated_at)} ({chat.turns.length}{" "}
+              {chat.turns.length === 1 ? "turn" : "turns"})
+            </p>
+          </div>
+
+          {chat.turns.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
+              This chat has no turns.
+            </div>
+          ) : (
+            <ol className="flex flex-col gap-3">
+              {chat.turns.map((turn, i) => {
+                const isUser = (turn.role ?? "").toLowerCase() === "user";
+                const text = turnText(turn);
+                const tools = turnToolCalls(turn);
+                return (
+                  <li
+                    key={i}
+                    className={
+                      "rounded-xl border px-3.5 py-3 " +
+                      (isUser
+                        ? "border-border bg-muted/40"
+                        : "border-border bg-card")
+                    }
+                  >
+                    <div className="mb-1.5 text-eyebrow font-semibold text-muted-foreground">
+                      {roleLabel(turn.role)}
+                    </div>
+                    {text ? (
+                      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+                        {text}
+                      </p>
+                    ) : tools.length === 0 ? (
+                      <p className="text-sm italic text-muted-foreground">
+                        (no text)
+                      </p>
+                    ) : null}
+                    {tools.length > 0 ? (
+                      <div className="mt-2 flex flex-col gap-1.5">
+                        {tools.map((t, ti) => (
+                          <div
+                            key={ti}
+                            className="rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-xs"
+                          >
+                            <span className="font-medium text-primary">
+                              {t.tool}
+                            </span>
+                            {t.summary ? (
+                              <span className="text-muted-foreground">
+                                {" "}
+                                {t.summary}
+                              </span>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// User detail drawer: a right-side sheet (full width on mobile) that loads the
+// full profile, org usage, accounts, chats, and runs for one user. Selecting a
+// chat swaps the body for that chat's transcript with a back button.
+// ---------------------------------------------------------------------------
+
+function UserDrawer({
+  userId,
+  onClose,
+}: {
+  userId: string;
+  onClose: () => void;
+}) {
+  const [detail, setDetail] = useState<AdminUserDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [chatId, setChatId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let alive = true;
+    setLoading(true);
+    setFailed(false);
+    setDetail(null);
+    setChatId(null);
+    (async () => {
+      try {
+        const d = await getAdminUserDetail(userId, controller.signal);
+        if (!alive) return;
+        setDetail(d);
+      } catch (err) {
+        if (!alive) return;
+        if ((err as { name?: string })?.name === "AbortError") return;
+        setFailed(true);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (chatId) setChatId(null);
+      else onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [chatId, onClose]);
+
+  const u = detail?.user;
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div
+        className="absolute inset-0 bg-foreground/20 backdrop-blur-[1px]"
+        onClick={onClose}
+        aria-hidden
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="User detail"
+        className="relative flex h-full w-full max-w-xl flex-col border-l border-border bg-card shadow-xl"
+      >
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div className="min-w-0">
+            <div className="text-eyebrow font-semibold text-muted-foreground">
+              User
+            </div>
+            <div className="truncate text-sm font-semibold">
+              {u?.email ?? "Loading..."}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-5">
+          {loading ? (
+            <div className="flex flex-col gap-4">
+              <Skeleton className="h-40 rounded-xl" />
+              <Skeleton className="h-24 rounded-xl" />
+              <Skeleton className="h-40 rounded-xl" />
+            </div>
+          ) : failed || !detail || !u ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 py-20 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+                <AlertTriangle className="h-6 w-6" />
+              </div>
+              <h2 className="mt-5 text-base font-semibold tracking-tight">
+                User detail unavailable
+              </h2>
+              <p className="mt-2 max-w-xs text-sm leading-relaxed text-muted-foreground">
+                This user could not be loaded. Close and try again.
+              </p>
+            </div>
+          ) : chatId ? (
+            <ChatTranscript
+              sessionId={chatId}
+              onBack={() => setChatId(null)}
+            />
+          ) : (
+            <div className="flex flex-col gap-8">
+              {/* Profile */}
+              <DrawerSection title="Profile">
+                <Card>
+                  <CardContent className="pt-5">
+                    <DetailRow label="Email">{u.email}</DetailRow>
+                    <DetailRow label="Name">{u.name ?? "--"}</DetailRow>
+                    <DetailRow label="Organization">
+                      {u.org_name ?? u.org_id}
+                    </DetailRow>
+                    <DetailRow label="Role">{u.role}</DetailRow>
+                    <DetailRow label="Verified">
+                      <Badge
+                        variant={u.email_verified ? "success" : "muted"}
+                        className="text-[11px]"
+                      >
+                        {u.email_verified ? "Verified" : "Pending"}
+                      </Badge>
+                    </DetailRow>
+                    <DetailRow label="Auth provider">
+                      <AuthBadge provider={u.auth_provider} />
+                    </DetailRow>
+                    <DetailRow label="Signup IP">
+                      {u.signup_ip ?? "--"}
+                    </DetailRow>
+                    <DetailRow label="Last login">
+                      {u.last_login_at ? (
+                        <span className="flex flex-col items-end">
+                          <span>{formatDateTime(u.last_login_at)}</span>
+                          <span className="text-[11px] font-normal text-muted-foreground">
+                            {(u.last_login_ip ?? "--") +
+                              " via " +
+                              authLabel(u.last_login_method)}
+                          </span>
+                        </span>
+                      ) : (
+                        "--"
+                      )}
+                    </DetailRow>
+                    <DetailRow label="Account created">
+                      {formatDate(u.created_at)}
+                    </DetailRow>
+                  </CardContent>
+                </Card>
+              </DrawerSection>
+
+              {/* Usage + runs */}
+              <DrawerSection title="Usage (organization)">
+                <div className="grid grid-cols-3 gap-3">
+                  <StatCard
+                    label="Tokens"
+                    value={formatTokens(detail.usage.total_tokens)}
+                  />
+                  <StatCard
+                    label="Cost"
+                    value={formatCost(detail.usage.cost_usd)}
+                    accent
+                  />
+                  <StatCard label="Runs" value={formatCount(detail.runs)} />
+                </div>
+              </DrawerSection>
+
+              {/* Accounts */}
+              <DrawerSection title="Accounts" count={detail.accounts.length}>
+                {detail.accounts.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
+                    No accounts in this organization.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-border bg-card">
+                    <table className="w-full min-w-[420px] border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/40 text-left">
+                          <Th>Name</Th>
+                          <Th>Domain</Th>
+                          <Th align="right">Created</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detail.accounts.map((a) => (
+                          <tr
+                            key={a.account_id}
+                            className="border-b border-border last:border-0"
+                          >
+                            <td className="px-4 py-2.5 font-medium">
+                              {a.name ?? a.account_id}
+                            </td>
+                            <td className="px-4 py-2.5 text-muted-foreground">
+                              {a.domain ?? "--"}
+                            </td>
+                            <td className="px-4 py-2.5 text-right text-muted-foreground">
+                              {formatDate(a.created_at)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </DrawerSection>
+
+              {/* Chats */}
+              <DrawerSection title="Copilot chats" count={detail.chats.length}>
+                {detail.chats.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
+                    No chat sessions yet.
+                  </div>
+                ) : (
+                  <ul className="flex flex-col gap-2">
+                    {detail.chats.map((c) => (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          onClick={() => setChatId(c.id)}
+                          className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-accent/40"
+                        >
+                          <span className="flex min-w-0 items-center gap-2.5">
+                            <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-medium">
+                                {c.title || "Untitled chat"}
+                              </span>
+                              <span className="block text-[11px] text-muted-foreground">
+                                {formatDateTime(c.updated_at)} ({c.turn_count}{" "}
+                                {c.turn_count === 1 ? "turn" : "turns"})
+                              </span>
+                            </span>
+                          </span>
+                          <ArrowLeft className="h-4 w-4 shrink-0 rotate-180 text-muted-foreground" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </DrawerSection>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -301,6 +864,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [forbidden, setForbidden] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const isAdmin = !!user?.is_admin;
 
@@ -645,11 +1209,12 @@ export default function AdminPage() {
             <div>
               <h2 className="text-base font-semibold tracking-tight">Users</h2>
               <p className="text-sm text-muted-foreground">
-                Everyone with an account across all organizations.
+                Everyone with an account across all organizations. Select a row
+                for full detail.
               </p>
             </div>
             <TableShell
-              cols={7}
+              cols={9}
               empty={!users || users.length === 0}
               head={
                 <>
@@ -657,7 +1222,9 @@ export default function AdminPage() {
                   <Th>Name</Th>
                   <Th>Org</Th>
                   <Th>Role</Th>
+                  <Th>Auth</Th>
                   <Th>Verified</Th>
+                  <Th>Last login IP</Th>
                   <Th>Signed up</Th>
                   <Th align="right">Last login</Th>
                 </>
@@ -666,7 +1233,8 @@ export default function AdminPage() {
               {(users ?? []).map((u) => (
                 <tr
                   key={u.id}
-                  className="border-b border-border last:border-0 hover:bg-accent/40"
+                  onClick={() => setSelectedUserId(u.id)}
+                  className="cursor-pointer border-b border-border last:border-0 hover:bg-accent/40"
                 >
                   <td className="px-4 py-3 font-medium">{u.email}</td>
                   <td className="px-4 py-3 text-muted-foreground">
@@ -676,6 +1244,9 @@ export default function AdminPage() {
                     {u.org_name ?? u.org_id}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{u.role}</td>
+                  <td className="px-4 py-3">
+                    <AuthBadge provider={u.auth_provider} />
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={
@@ -687,6 +1258,9 @@ export default function AdminPage() {
                     >
                       {u.email_verified ? "Verified" : "Pending"}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground tabular-nums">
+                    {u.last_login_ip ?? "--"}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {formatDate(u.created_at)}
@@ -700,6 +1274,13 @@ export default function AdminPage() {
           </section>
         </div>
       )}
+
+      {selectedUserId ? (
+        <UserDrawer
+          userId={selectedUserId}
+          onClose={() => setSelectedUserId(null)}
+        />
+      ) : null}
     </div>
   );
 }

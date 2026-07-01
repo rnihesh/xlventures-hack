@@ -48,6 +48,70 @@ export interface AdminUser {
   email_verified: boolean;
   created_at: string;
   last_login_at: string | null;
+  auth_provider: string | null;
+  signup_ip: string | null;
+  last_login_ip: string | null;
+  last_login_method: string | null;
+}
+
+// One of the user's org accounts, as returned by the user-detail endpoint.
+export interface AdminUserAccount {
+  account_id: string;
+  domain: string | null;
+  name: string | null;
+  created_at: string;
+}
+
+// One copilot chat session in the user's org (summary row, no turns).
+export interface AdminUserChat {
+  id: string;
+  title: string | null;
+  updated_at: string;
+  turn_count: number;
+}
+
+export interface AdminUserDetail {
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+    org_id: string;
+    org_name: string | null;
+    role: string;
+    email_verified: boolean;
+    created_at: string;
+    last_login_at: string | null;
+    auth_provider: string | null;
+    signup_ip: string | null;
+    last_login_ip: string | null;
+    last_login_method: string | null;
+  };
+  accounts: AdminUserAccount[];
+  chats: AdminUserChat[];
+  runs: number;
+  usage: { total_tokens: number; cost_usd: number };
+}
+
+// A single turn in a persisted chat session. The shape is intentionally loose:
+// turns come straight from the stored JSON and may carry role + text/content
+// plus optional tool calls under a few different keys, so the UI renders them
+// best-effort rather than assuming a strict schema.
+export interface AdminChatTurn {
+  role?: string;
+  content?: unknown;
+  text?: unknown;
+  message?: unknown;
+  toolCalls?: unknown;
+  tool_calls?: unknown;
+  [key: string]: unknown;
+}
+
+export interface AdminChatDetail {
+  id: string;
+  org_id: string;
+  title: string | null;
+  updated_at: string;
+  turns: AdminChatTurn[];
 }
 
 export interface AdminUsageTotals {
@@ -118,6 +182,26 @@ export function getAdminOrgs(signal?: AbortSignal): Promise<AdminOrg[]> {
 
 export function getAdminUsers(signal?: AbortSignal): Promise<AdminUser[]> {
   return adminGet<AdminUser[]>("/admin/users", signal);
+}
+
+export function getAdminUserDetail(
+  userId: string,
+  signal?: AbortSignal,
+): Promise<AdminUserDetail> {
+  return adminGet<AdminUserDetail>(
+    `/admin/users/${encodeURIComponent(userId)}`,
+    signal,
+  );
+}
+
+export function getAdminChat(
+  sessionId: string,
+  signal?: AbortSignal,
+): Promise<AdminChatDetail> {
+  return adminGet<AdminChatDetail>(
+    `/admin/chats/${encodeURIComponent(sessionId)}`,
+    signal,
+  );
 }
 
 export function getAdminUsage(
