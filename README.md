@@ -4,6 +4,25 @@
 
 XLVentures Hackathon, Project 2 (selected).
 
+## Team details
+
+- Team name: **Invariant**
+- Team members:
+  - **Rachakonda Nihesh**
+  - **Koppuravuri Pavan Kumar**
+  - **Andem Ritheesh Reddy**
+- Contact: **niheshrachakonda@gmail.com**
+
+## Project overview
+
+Aperture is an intelligent Next Best Action platform. It turns raw signals into explainable, confidence-scored recommendations with ranked alternatives, policy guardrails, and a human approval step. It then captures outcomes and learns from feedback to improve future recommendations.
+
+## Links
+
+- Deployement: [aperture.niheshr.com](https://aperture.niheshr.com)
+- Github Repository: [Github](https://github.com/rnihesh/xlventures-hack)
+- Demo Video: [Drive Link](https://drive.google.com/file/d/1eGbwpkAs-lgYHYJJj9XaB2kzo5sE7Ule/view?usp=drive_link)
+
 ## The problem
 
 Operators drown in dashboards but starve for decisions. A Customer Success Manager can see that an account is slipping, yet still has to guess what to do, justify it to a skeptical stakeholder, and hope it works. Most "AI" tools stop at a prediction or a chat reply: no ranked options, no reasoning a human can audit, no guardrails, and no memory of what actually worked last time.
